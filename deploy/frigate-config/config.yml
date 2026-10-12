@@ -1,0 +1,34 @@
+mqtt:
+  enabled: false
+
+detectors:
+  cpu1:
+    type: cpu
+    num_threads: 2
+
+face_recognition:
+  enabled: false
+
+objects:
+  track:
+    - person
+
+record:
+  enabled: false
+
+snapshots:
+  enabled: false
+
+cameras:
+  demo:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://mediamtx:8554/demo
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 960
+      height: 540
+      fps: 5
