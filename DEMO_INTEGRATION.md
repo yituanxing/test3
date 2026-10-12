@@ -16,3 +16,6 @@
 严格分界：目标检测 event != 身份识别，也不是独立人数。`/api/frigate/quality` 对查准率、召回率返回 null，直至拥有独立标注的真值数据。模型 score 也不是准确率。切勿在公开仓库上传私人录像、人脸照片、真实身份数据。
 
 CI: 本仓库同一 workflow 下分别执行业务30+测试和 Frigate 真推理/RTSP 验收。成功的媒体验收要求真实 person 事件来自上游实际 API，不能模拟出结果。
+
+
+底库归并演示：见 `BASE_REGISTRY_V0.9.md`，`/base` 为虚构身份底库的快照生成、人工归属与增删矫正。与匿名 Frigate person 目标事件隔离。

@@ -55,7 +55,8 @@ def _hit(kind, key_parts, text, subjects, place_ids, evidence, detail):
     }
 
 
-def analyze(observations: list[dict], config: dict, *, now: datetime | None = None) -> dict:
+def analyze(observations: list[dict], config: dict, *, now: datetime | None = None,
+            affiliation_overrides: dict[str,int] | None = None) -> dict:
     """Pure re-computation from inputs. No caches or database side effects."""
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     raw = []
@@ -63,6 +64,8 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
         if r.get('excluded'):
             continue
         person = r.get('effective_person') or r['person_label']
+        if affiliation_overrides and person in affiliation_overrides and affiliation_overrides[person] is None:
+            continue  # removed from the published synthetic roster; source evidence persists
         raw.append({'id': r['id'], 'person': person, 'place_id': r['place_id'],
                     'time': _time(r['observed_at'])})
     raw.sort(key=lambda v: (v['time'], v['id']))
@@ -102,6 +105,12 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
         else:
             affiliation[person] = min(by_place, key=lambda p:
                 (min(v['start'] for v in by_place[p]), p))
+
+    # Published human-reviewed synthetic home assignments override heuristic homes.
+    # This does not bridge Frigate tracks to real-world identities.
+    for person, place_id in (affiliation_overrides or {}).items():
+        if place_id is not None:
+            affiliation[person] = place_id
 
     # Co-presence episodes are SIMULATED approximate time windows, not proof
     # that two actual humans physically met or interacted.

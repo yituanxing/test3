@@ -18,7 +18,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview
-from app import admin
+from app import admin, base_registry
 import httpx
 from pydantic import BaseModel, Field
 
@@ -150,11 +150,13 @@ def setup_db():
                 c.execute('INSERT INTO sources(place_id,name,kind,uri) VALUES(?,?,?,?)',
                           (place_id, '内置测试视频（无真人）', 'file', str(bundled_video)))
         admin.initialize(c)
+        base_registry.initialize(c)
 
 
 setup_db()
 app = FastAPI(title='ZD Business Pipeline Demo', version='0.7.0')
 admin.register(app,db)
+base_registry.register(app,db)
 
 
 class PlaceIn(BaseModel):
@@ -592,7 +594,9 @@ def _analyze_synthetic(c):
         scenario_now = latest.astimezone(timezone.utc) + timedelta(minutes=30)
     else:
         scenario_now = datetime.now(timezone.utc)
-    result = analyze(observations, cfg, now=scenario_now)
+    home, roster_status = base_registry.active_assignments(c)
+    result = analyze(observations, cfg, now=scenario_now, affiliation_overrides=home)
+    result['registry_status'] = roster_status
     result['simulation_time_utc'] = scenario_now.isoformat(timespec='seconds')
     statuses = {r['alert_key']:dict(r) for r in c.execute('''
       SELECT r.alert_key,r.decision,r.evidence_signature FROM synthetic_alert_reviews r
@@ -600,7 +604,7 @@ def _analyze_synthetic(c):
                   GROUP BY alert_key) last ON last.latest_id=r.id
     ''')}
     for hit in result['alerts']:
-        signature = _hit_signature(hit,cfg)
+        signature = _hit_signature(hit,{**cfg,'registry':roster_status})
         hit['review_signature'] = signature
         previous = statuses.get(hit['key'])
         hit['review_stale'] = bool(previous and previous['evidence_signature'] != signature)
@@ -640,6 +644,8 @@ def seed_synthetic_business(reset: bool = False):
             return {'inserted':0, 'existing':count,'idempotent':True,
                     'note':'已存在演示数据；使用 reset=true 才会清空并重建合成数据。'}
         if reset:
+            # A synthetic scenario reset invalidates any previously published roster.
+            c.execute("UPDATE synthetic_registry_runs SET state='archived' WHERE state!='archived'")
             c.execute('DELETE FROM synthetic_observation_reviews')
             c.execute('DELETE FROM synthetic_alert_reviews')
             c.execute('DELETE FROM synthetic_observations')
