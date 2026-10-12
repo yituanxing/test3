@@ -14,6 +14,9 @@ concurrency:
 
 jobs:
   real-media:
+    # GB28181 protocol-only changes should not repeat the unrelated
+    # 4-minute UI/Frigate acceptance suite; routine commits still do.
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[gb-sip]')
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
