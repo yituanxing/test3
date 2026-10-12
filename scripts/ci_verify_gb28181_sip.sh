@@ -149,6 +149,39 @@ docker run -d --rm --name "$SIM_CONTAINER" \
 echo "GB simulated device is in the WVP Docker bridge network, no host-loopback SIP Contact."
 echo "::endgroup::"
 
+echo "::group::Explicitly request WVP Catalog sync AFTER actual SIP REGISTER"
+registered=0
+for n in $(seq 1 25); do
+  DEVICE_ONLINE="$(docker compose -p "$PROJECT" -f "$BASE/wvp/docker/docker-compose.yml" \
+    exec -T polaris-mysql mysql -uwvp_user -pwvp_password -N wvp \
+    -e "SELECT COUNT(*) FROM wvp_device WHERE device_id='$DEVICE' AND on_line=1" \
+    2>/dev/null || true)"
+  if [ "$DEVICE_ONLINE" = 1 ]; then registered=1; break; fi
+  sleep 2
+done
+if [ "$registered" -ne 1 ]; then
+  echo "SIP REGISTER still missing, cannot legitimately trigger Catalog" >&2
+  exit 1
+fi
+echo "WVP independently persisted online device: 1."
+# WVP DeviceQuery.java exposes explicit Catalog sync: it is not guaranteed
+# to send a Catalog query merely upon receiving a SIP REGISTER.
+SYNC_HTTP="$(curl -sS --max-time 15 -o "$BASE/wvp-catalog-sync-response.json" -w '%{http_code}' \
+  "http://127.0.0.1:18978/api/device/query/devices/$DEVICE/sync" || true)"
+if [ "$SYNC_HTTP" != 200 ]; then
+  echo "Catalog request HTTP status: $SYNC_HTTP (expected 200)" >&2
+  exit 1
+fi
+python - "$BASE/wvp-catalog-sync-response.json" <<'PY'
+import json,sys
+from pathlib import Path
+r=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+if not isinstance(r,dict) or r.get('code',0)!=0:
+    raise SystemExit('Upstream WVP declined Catalog request (business code '+str(r.get('code'))+')')
+print('WVP accepted an explicit Catalog refresh request; checking actual MySQL next.')
+PY
+echo "::endgroup::"
+
 echo "::group::Verify real WVP DB online flag AND Catalog channel"
 passed=0
 VALUE="no_database_response"
