@@ -26,3 +26,7 @@
 2. 州级初始化虚构场景，检查首页→场所→规则详情→人工核查→状态变化。
 3. Frigate 实时流打通后，从 `app.main` 同步真实事件，在场所详情展示。当前 CI 的真实 Frigate 成功用例使用独立 `app.bridge`，不能代替主 Web 端到端验收。
 4. 浏览器自动化、单机一键启动、交付说明与打包继续跟进。
+
+## V1.3.1 · 主业务 Web 真实链路认证
+
+`scripts/ci_verify_frigate.sh` 在桥接服务真实 RTSP 验证成功后，额外启动 `app.main` 业务服务，并运行 `python -m scripts.verify_portal_live`：创建一次性的本地州级演示账号、调用真实服务端登录/摄像机绑定/Frigate同步，验证真实匿名事件进入主业务 SQLite、综合门户 /api/insights/overview 的真实视频区块和场所统计，及重复同步无新增。验证源是同一份 Frigate/OpenVINO 实际推理事件；不制造 P### 身份或身份准确率。自动保留 `reports/verify-portal-live.json` 证据。完整 CI 结果以实际 GitHub Actions 为准。

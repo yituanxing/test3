@@ -9,11 +9,13 @@ export FRIGATE_URL="http://127.0.0.1:5000"
 COMPOSE="deploy/compose.frigate-demo.yml"
 PUBLISH_PID=""
 BACKEND_PID=""
+WEB_PID=""
 cleanup() {
   rc=$?
   trap - EXIT
   [ -z "$PUBLISH_PID" ] || kill "$PUBLISH_PID" 2>/dev/null || true
   [ -z "$BACKEND_PID" ] || kill "$BACKEND_PID" 2>/dev/null || true
+  [ -z "$WEB_PID" ] || kill "$WEB_PID" 2>/dev/null || true
   # Capture failure-only diagnostics without dumping credentials, images or private footage.
   if [ "$rc" -ne 0 ]; then
     python - <<'PY' || true
@@ -126,4 +128,12 @@ python scripts/verify_live_frigate.py \
   --backend http://127.0.0.1:8000 \
   --camera demo --place-id 1 --require-person \
   --wait-seconds 100 --report reports/verify-live-frigate.json
+echo "::endgroup::"
+
+echo "::group::Verify SAME actual Frigate events reach the authenticated main Web portal"
+export ZD_DATA_DIR="$PWD/.ci-data/web"
+mkdir -p "$ZD_DATA_DIR"
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8001   >.ci-data/main-web.log 2>&1 &
+WEB_PID=$!
+python -m scripts.verify_portal_live   --frigate http://127.0.0.1:5000 --backend http://127.0.0.1:8001   --camera demo --report reports/verify-portal-live.json
 echo "::endgroup::"
