@@ -61,6 +61,28 @@ git clone -q https://github.com/lzh2nix/gb28181Simulator.git "$BASE/sim"
 git -C "$BASE/sim" checkout -q "$SIM_REV"
 test "$(git -C "$BASE/wvp" rev-parse HEAD)" = "$WVP_REV"
 test "$(git -C "$BASE/sim" rev-parse HEAD)" = "$SIM_REV"
+# The upstream reference simulator has two strict-parser limitations which
+# some real WVP versions exercise: MIME content type is matched with exact
+# capitalization, and the UDP reader hard-limits datagrams to 1500 bytes.
+# Patch ONLY this disposable pinned test fixture, not our application or the
+# GB28181 protocol implementation.
+python - "$BASE/sim" <<'PY'
+from pathlib import Path
+import sys
+root=Path(sys.argv[1])
+ua=root/'internal/useragent/ua.go'
+old='m.Payload.ContentType() == "Application/MANSCDP+xml"'
+new='strings.HasPrefix(strings.ToLower(m.Payload.ContentType()), "application/manscdp+xml")'
+content=ua.read_text()
+if content.count(old)!=1:raise SystemExit('Simulator MIME parser upstream version changed')
+ua.write_text(content.replace(old,new))
+transport=root/'internal/transport/transport.go'
+content=transport.read_text()
+old='const sipMaxPacketSize = 1500'
+if content.count(old)!=1:raise SystemExit('Simulator UDP packet bound upstream version changed')
+transport.write_text(content.replace(old,'const sipMaxPacketSize = 65535'))
+print('Pinned upstream simulator patched for case-insensitive MANSCDP MIME and full UDP datagrams.')
+PY
 echo "Upstream source revisions pinned."
 echo "::endgroup::"
 
@@ -238,6 +260,9 @@ if sim.exists():
         'digest_challenges':len(re.findall('401|WWWAuth',data,re.I)),
         'success_mentions':len(re.findall('200|registered',data,re.I)),
         'error_mentions':len(re.findall('error|failed|panic',data,re.I)),
+        'catalog_mentions':len(re.findall('Catalog|目录',data,re.I)),
+        'unknown_message_mentions':len(re.findall('unknow msg',data,re.I)),
+        'udp_parse_failures':len(re.findall('parse msg failed',data,re.I)),
     }
 logs=list((base/'wvp/docker/logs/wvp').glob('sip*.log'))
 if logs:
