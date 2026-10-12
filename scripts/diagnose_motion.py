@@ -37,16 +37,19 @@ def main():
     raw_frames = []
     try:
         # The initial camera startup can take 20+ seconds on CPU CI.
-        for i in range(15):
+        for i in range(45):
             try:
-                content = fetch(f"{args.frigate}/api/{args.camera}/latest.jpg")
-                if content[:3] == b"\xff\xd8\xff":
+                stats = json.loads(fetch(f"{args.frigate}/api/stats"))
+                camera = (stats.get("cameras") or {}).get(args.camera, {})
+                # Health API can return a placeholder image before frames actually
+                # arrive; require live camera processing before sampling.
+                if camera.get("camera_fps", 0) > 0 and camera.get("process_fps", 0) > 0:
                     break
             except (OSError, TimeoutError, ValueError) as exc:
                 result["errors"].append(str(exc))
             time.sleep(2)
         else:
-            raise RuntimeError("Could not retrieve a valid Frigate JPEG frame")
+            raise RuntimeError("Camera never started delivering frames before debug sampling")
         for n in range(4):
             if n:
                 time.sleep(4)
@@ -72,8 +75,10 @@ def main():
             stats = json.loads(fetch(f"{args.frigate}/api/stats"))
             cam = (stats.get("cameras") or {}).get(args.camera, {})
             result["stats"].append({k: cam.get(k) for k in
-                ("camera_fps", "process_fps", "detection_fps", "detection_enabled")})
+                ("camera_fps", "process_fps", "detection_fps", "detection_enabled", "skipped_fps")})
             result["valid_frames"] += 1
+            result.setdefault("peak_detection_fps", 0)
+            result["peak_detection_fps"] = max(result["peak_detection_fps"], cam.get("detection_fps",0) or 0)
         for a, b in zip(raw_frames, raw_frames[1:]):
             assert len(a) == len(b) and len(a) > 0
             result["frame_change_fractions"].append(
