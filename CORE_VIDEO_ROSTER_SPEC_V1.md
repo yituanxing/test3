@@ -117,3 +117,14 @@ source_type=real_video、place_id、camera、upstream_event_id、started_at、en
 - 管理 API `GET/PUT /api/base/maintenance/config` 持久化开关、周期（1-720h）、天数、策略和矫正模式；`POST /api/base/maintenance/tick` 可人工执行一次确定性检查。
 - 部署时需要显式 `ZD_RUN_ROSTER_SCHEDULER=1 bash scripts/start_local_demo.sh`，独立 Python 调度进程每分钟检查一次到期时间；新输入仅创建待审草稿，绝不自动发布，旧版本不会被定时覆盖。无源数据、无新变化时不会重复造数据。
 - 默认停用；脚本和 API 只操作 P### 合成观测，不处理真实视频身份数据。
+
+## P0-1 补充：本地视频文件的重复采样必须幂等
+
+真实本地文件可能被操作员反复点击“开始解析”，或先按每 3 帧抽样、再按每 2 帧抽样。**不得因此把相同文件相同帧重复计入监测统计**。
+
+- 新文件源观测写入 `source_revision=sha256:<视频内容摘要>`，联合 `(source_id, source_revision, frame_index, detector)` 唯一。重复解析仍实际运行模型，但只新增未入库帧及其检测框；`new_samples`、`previously_imported`、`structured_boxes_saved` 分别报告。
+- 文件同路径内容替换必须形成新 revision；旧 revision 的历史源证据保持不变。脱敏预览在无法证明原始文件内容一致时返回 409，**不展示错配画面**。
+- 旧版已存 `samples` 没有源文件摘要，原始内容无法倒推验证，迁移时保留历史行但不伪造 digest；这些旧记录不提供伪造的可验证预览，新版第一次运行时可能导入一次历史帧。
+- 摄像头/实时 RTSP 非固定文件，只能保证上游明确事件 ID 的幂等；不应按相近时间推断同一真实人员。文件 SHA-256 用于**内容一致性**，不属于人脸特征或身份编号。
+
+真实解码回归：相同 AVI 重跑零新增、不同抽样率仅新增尚未入库帧、旧源文件被替换时拒绝渲染旧证据、更换文件后新 revision 可入库。以上测试不宣称人脸识别准确率。

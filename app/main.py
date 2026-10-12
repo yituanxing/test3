@@ -6,6 +6,7 @@ Demo records are always clearly labeled as simulated.
 import os
 import json
 import sqlite3
+import hashlib
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Literal
@@ -34,6 +35,19 @@ MONITOR_STATIC = ROOT / 'static' / 'monitor.html'
 ADMIN_STATIC = ROOT / 'static' / 'admin.html'
 INSIGHTS_STATIC = ROOT / 'static' / 'insights.html'
 LOGIN_STATIC = ROOT / 'static' / 'login.html'
+
+
+def _file_revision(path: str) -> str:
+    """Content identity of an authorized local source file, not a person ID.
+
+    Replaying the same file must not inflate monitoring counts. Using a content
+    digest rather than mtime/size also handles same-size source replacement.
+    """
+    digest = hashlib.sha256()
+    with open(path, 'rb') as footage:
+        for chunk in iter(lambda: footage.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return 'sha256:' + digest.hexdigest()
 
 
 def utcnow():
@@ -70,7 +84,8 @@ def setup_db():
             video_offset_ms INTEGER,
             frame_index INTEGER,
             detected_faces INTEGER NOT NULL CHECK(detected_faces >= 0),
-            detector TEXT NOT NULL DEFAULT 'legacy'
+            detector TEXT NOT NULL DEFAULT 'legacy',
+            source_revision TEXT
         );
         CREATE INDEX IF NOT EXISTS samples_place ON samples(place_id, id);
         CREATE TABLE IF NOT EXISTS face_boxes (
@@ -156,6 +171,14 @@ def setup_db():
         cols = [r['name'] for r in c.execute('PRAGMA table_info(samples)')]
         if 'detector' not in cols:
             c.execute("ALTER TABLE samples ADD COLUMN detector TEXT NOT NULL DEFAULT 'legacy'")
+        # Legacy rows keep a NULL digest because the original video content
+        # cannot be proven after the fact. New file observations have an
+        # immutable source digest and can be re-imported idempotently.
+        if 'source_revision' not in cols:
+            c.execute('ALTER TABLE samples ADD COLUMN source_revision TEXT')
+        c.execute("""CREATE UNIQUE INDEX IF NOT EXISTS sample_file_frame_revision
+          ON samples(source_id,source_revision,frame_index,detector)
+          WHERE origin='video' AND source_revision IS NOT NULL""")
         # V1 observation event semantics: old rows keep NULL, meaning each
         # individual event_key was one explicit appearance event.
         # Compatibility migration: older schema used event_id as a *global*
@@ -382,6 +405,14 @@ def process_source(source_id: int, max_frames: int = Query(90, ge=1, le=600),
         admin._active_place(c,source['place_id'])
     if source['kind'] == 'file' and not Path(source['uri']).is_file():
         raise HTTPException(400, '视频文件路径不存在：需填写服务端机器上的路径')
+    # Only file-backed content can be replay-deduplicated reliably. Realtime
+    # streams/cameras deliberately have no content-based revision.
+    revision = None
+    if source['kind'] == 'file':
+        try:
+            revision = _file_revision(source['uri'])
+        except OSError as exc:
+            raise HTTPException(400, '无法读取视频文件以验证来源完整性') from exc
     capture_arg = int(source['uri']) if source['kind'] == 'camera' else source['uri']
     cap = cv2.VideoCapture(capture_arg)
     if not cap.isOpened():
@@ -416,11 +447,25 @@ def process_source(source_id: int, max_frames: int = Query(90, ge=1, le=600),
         cap.release()
     if not read_count:
         raise HTTPException(400, '视频已打开，但未读到帧')
+    if revision is not None:
+        # A changed file would otherwise attach boxes from the old content
+        # to a new digest, producing false provenance.
+        try:
+            if _file_revision(source['uri']) != revision:
+                raise HTTPException(409, '视频文件在分析过程中被修改；未保存这批观测')
+        except OSError as exc:
+            raise HTTPException(409, '分析完成后源文件不可读；未保存这批观测') from exc
+    new_samples, previously_imported, new_boxes = 0, 0, 0
     with db() as c:
         for sample,frame_width,frame_height,boxes in detections:
-            cur=c.execute('''INSERT INTO samples
-                   (source_id,place_id,origin,ingested_at,video_offset_ms,frame_index,detected_faces,detector)
-                   VALUES(?,?,?,?,?,?,?,?)''',sample)
+            cur=c.execute('''INSERT OR IGNORE INTO samples
+                   (source_id,place_id,origin,ingested_at,video_offset_ms,frame_index,
+                    detected_faces,detector,source_revision)
+                   VALUES(?,?,?,?,?,?,?,?,?)''',(*sample, revision))
+            if not cur.rowcount:
+                previously_imported += 1
+                continue
+            new_samples += 1
             for box,quality in boxes:
                 c.execute('''INSERT INTO face_boxes(sample_id,detector_score,x,y,w,h,
                   frame_width,frame_height,quality_state,quality_reasons,sharpness)
@@ -428,11 +473,14 @@ def process_source(source_id: int, max_frames: int = Query(90, ge=1, le=600),
                   (cur.lastrowid,box['detector_score'],box['x'],box['y'],box['w'],box['h'],
                    frame_width,frame_height,quality['quality_state'],
                    json.dumps(quality['quality_reasons']),quality['sharpness_laplacian_var']))
+                new_boxes += 1
     return {'source_id': source_id, 'frames_decoded': read_count,
             'frames_analyzed': sampled, 'face_detections': faces_total, 'detector': detector.name,
-            'structured_boxes_saved': faces_total,
+            'source_revision': revision, 'new_samples': new_samples,
+            'previously_imported': previously_imported,
+            'structured_boxes_saved': new_boxes,
             'quality_assessment': 'uncalibrated_heuristic',
-            'note': '逐框几何数据是真实模型输出；没有脸照存储/身份识别/跨镜头去重。'}
+            'note': '文件按内容哈希+帧号+检测器幂等导入；流数据不保证重放去重。检测数为本次推理的框数，新保存框数仅计新记录。'}
 
 
 
@@ -457,6 +505,15 @@ def preview_video_sample(sample_id:int,request:Request):
         raise HTTPException(409,'直播来源没有可离线定位的文件帧；不能伪造抓拍')
     if not Path(sample['uri']).is_file():
         raise HTTPException(409,'原始视频文件已不可用；请检查原始来源')
+    # Fail closed: replacing a source file at the same path would make the
+    # historical face boxes point to a DIFFERENT frame and invent evidence.
+    if not sample['source_revision']:
+        raise HTTPException(409,'历史观测未记录原视频摘要，无法验证画面一致性')
+    try:
+        if _file_revision(sample['uri']) != sample['source_revision']:
+            raise HTTPException(409,'源视频内容已变化，不能用新视频冒充原始观测画面')
+    except OSError as exc:
+        raise HTTPException(409,'无法读取源视频验证观测来源') from exc
     cap=cv2.VideoCapture(sample['uri'])
     try:
         if not cap.isOpened():
@@ -513,7 +570,8 @@ def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
         filter_source=' AND s.source_id=?' if source_id is not None else ''
         rows=[dict(x) for x in c.execute(f'''SELECT s.id,s.source_id,s.place_id,
             so.name AS source_name,p.name AS place_name,s.ingested_at,
-            s.frame_index,s.video_offset_ms,s.detector,s.detected_faces
+            s.frame_index,s.video_offset_ms,s.detector,s.detected_faces,
+            s.source_revision
             FROM samples s JOIN sources so ON s.source_id=so.id
             JOIN places p ON p.id=s.place_id
             WHERE s.origin='video' AND s.place_id IN ({marks}){filter_source}
