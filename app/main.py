@@ -99,6 +99,7 @@ def setup_db():
         CREATE TABLE IF NOT EXISTS synthetic_observations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_key TEXT NOT NULL UNIQUE,
+            occurrence_key TEXT,
             person_label TEXT NOT NULL,
             place_id INTEGER NOT NULL REFERENCES places(id),
             observed_at TEXT NOT NULL,
@@ -142,6 +143,11 @@ def setup_db():
         cols = [r['name'] for r in c.execute('PRAGMA table_info(samples)')]
         if 'detector' not in cols:
             c.execute("ALTER TABLE samples ADD COLUMN detector TEXT NOT NULL DEFAULT 'legacy'")
+        # V1 observation event semantics: old rows keep NULL, meaning each
+        # individual event_key was one explicit appearance event.
+        observation_cols = [r['name'] for r in c.execute('PRAGMA table_info(synthetic_observations)')]
+        if 'occurrence_key' not in observation_cols:
+            c.execute('ALTER TABLE synthetic_observations ADD COLUMN occurrence_key TEXT')
         review_cols = [r['name'] for r in c.execute('PRAGMA table_info(synthetic_alert_reviews)')]
         if 'evidence_signature' not in review_cols:
             c.execute('ALTER TABLE synthetic_alert_reviews ADD COLUMN evidence_signature TEXT')

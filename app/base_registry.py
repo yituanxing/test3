@@ -13,6 +13,7 @@ from typing import Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
+from app.occurrence_semantics import appearance_count
 
 
 def utc_now():
@@ -37,6 +38,7 @@ def initialize(c):
             run_id INTEGER NOT NULL REFERENCES synthetic_registry_runs(id),
             person TEXT NOT NULL, place_id INTEGER NOT NULL REFERENCES places(id),
             first_seen TEXT NOT NULL, appearances INTEGER NOT NULL,
+            raw_observations INTEGER NOT NULL DEFAULT 0,
             visits INTEGER NOT NULL, observation_ids TEXT NOT NULL,
             UNIQUE(run_id,person,place_id)
         );
@@ -55,6 +57,15 @@ def initialize(c):
             detail TEXT NOT NULL, created_at TEXT NOT NULL
         );
     ''')
+    # Upgrade old published candidates without replacing their historical
+    # raw event evidence. The existing 'appearances' values remain unchanged
+    # for legacy records, as they had one event per raw observation.
+    candidate_cols = {r['name'] for r in c.execute('PRAGMA table_info(synthetic_registry_candidates)')}
+    if 'raw_observations' not in candidate_cols:
+        c.execute('ALTER TABLE synthetic_registry_candidates ADD COLUMN raw_observations INTEGER NOT NULL DEFAULT 0')
+        for row in c.execute('SELECT id,observation_ids FROM synthetic_registry_candidates'):
+            c.execute('UPDATE synthetic_registry_candidates SET raw_observations=? WHERE id=?',
+                      (len(json.loads(row['observation_ids'])), row['id']))
 
 
 class GenerateIn(BaseModel):
@@ -74,7 +85,7 @@ def _effective_rows(c):
     # Always derive a roster from the current, reviewed synthetic observations.
     # A raw source observation cannot be overwritten by a reviewer.
     return [dict(r) for r in c.execute('''
-        SELECT o.id, o.observed_at, o.place_id, o.person_label,
+        SELECT o.id, o.event_key, o.occurrence_key, o.observed_at, o.place_id, o.person_label,
           COALESCE((SELECT r.corrected_person FROM synthetic_observation_reviews r
                     WHERE r.observation_id=o.id ORDER BY r.id DESC LIMIT 1),o.person_label)
                     AS effective_person,
@@ -85,14 +96,17 @@ def _effective_rows(c):
 
 
 def _data_fingerprint(rows):
+    # Backwards-compatible hash: NULL occurrence_key retains the old
+    # fingerprint, so pre-migration published snapshots do not falsely stale.
     identity = [[r['id'], r['effective_person'], r['place_id'], r['observed_at']]
+                + ([r['occurrence_key']] if r.get('occurrence_key') else [])
                 for r in sorted(rows, key=lambda x:x['id'])]
     return sha256(json.dumps(identity, ensure_ascii=False, separators=(',',':')).encode()).hexdigest()
 
 
 def _entries(c, run_id):
     return [dict(row) for row in c.execute('''
-        SELECT person,place_id,first_seen,appearances,visits,observation_ids
+        SELECT person,place_id,first_seen,appearances,raw_observations,visits,observation_ids
           FROM synthetic_registry_candidates WHERE run_id=? ORDER BY person,place_id
     ''',(run_id,))]
 
@@ -179,7 +193,7 @@ def present(c, run=None):
             'conflicts':conflicts,
             'candidate_count':sum(len(p['candidates']) for p in selected),
             'unresolved_count':sum(p['unresolved'] for p in selected),
-            'disclaimer':'P001等标识及跨场所观测均为虚构；出现次数按原始有效合成观测数统计。'}
+            'disclaimer':'P001等标识均为虚构；出现次数按显式事件键去重，原始观测数与到访数单独展示。'}
 
 
 def active_assignments(c):
@@ -226,8 +240,9 @@ def generate(c, data:GenerateIn):
                 visit_count+=1
             last=dt
         c.execute('''INSERT INTO synthetic_registry_candidates
-        (run_id,person,place_id,first_seen,appearances,visits,observation_ids)
-        VALUES(?,?,?,?,?,?,?)''',(rid,person,place,arr[0]['observed_at'],len(arr),
+        (run_id,person,place_id,first_seen,appearances,raw_observations,visits,observation_ids)
+        VALUES(?,?,?,?,?,?,?,?)''',(rid,person,place,arr[0]['observed_at'],
+                              appearance_count(arr),len(arr),
                               visit_count,json.dumps([r['id'] for r in arr])))
     if data.correction_mode=='reconcile' and prev:
         old = _latest_decisions(c,prev['id'])

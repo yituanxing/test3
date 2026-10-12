@@ -12,6 +12,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from itertools import combinations
+from app.occurrence_semantics import occurrence_identity
 
 RULE_NAMES = {
     'cross_place': '跨场所出现（合成）',
@@ -75,6 +76,7 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
         if affiliation_overrides and person in affiliation_overrides and affiliation_overrides[person] is None:
             continue  # removed from the published synthetic roster; source evidence persists
         raw.append({'id': r['id'], 'person': person, 'place_id': r['place_id'],
+                    'event_key': r.get('event_key'), 'occurrence_key': r.get('occurrence_key'),
                     'time': _time(r['observed_at'])})
     raw.sort(key=lambda v: (v['time'], v['id']))
 
@@ -97,6 +99,12 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
                 last['observation_ids'].append(entry['id'])
     visits.sort(key=lambda v: (v['start'], v['person'], v['place_id']))
 
+    # Count explicitly distinct synthetic appearance EVENTS, not 100 capture
+    # frames from one continuous event. Never infer cross-camera real identity.
+    occurrences_by_place = defaultdict(set)
+    for event in raw:
+        occurrences_by_place[(event['person'], event['place_id'])].add(
+            occurrence_identity(event))
     # Each synthetic person belongs to one simulated base location. Stable
     # tie-breaking, with full historical observations retained in other places.
     groups = defaultdict(list)
@@ -109,7 +117,7 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
             by_place[v['place_id']].append(v)
         if config['affiliation_mode'] == 'frequency':
             affiliation[person] = min(by_place, key=lambda p:
-                (-sum(len(v['observation_ids']) for v in by_place[p]),
+                (-len(occurrences_by_place[(person,p)]),
                  min(v['start'] for v in by_place[p]), p))
         else:
             affiliation[person] = min(by_place, key=lambda p:
