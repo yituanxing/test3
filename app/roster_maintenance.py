@@ -59,15 +59,18 @@ def tick(c,*,now:datetime|None=None,force:bool=False):
     if checked and not force and now<datetime.fromisoformat(checked)+timedelta(hours=current['interval_hours']):
         return {'action':'not_due','policy':current}
     observations=[r for r in base_registry._effective_rows(c) if not r['excluded']]
-    if not observations:
+    # Do not create a meaningless empty first-ever roster if the demo has no
+    # observations, but after an existing release an EMPTY time window must
+    # be representable so inactive fictional subjects can be removed.
+    pub=base_registry._published(c)
+    if not observations and not pub:
         action={'action':'no_source_observations'}
     else:
-        latest_time=max(r['observed_at'] for r in observations)
-        start=(datetime.fromisoformat(latest_time)-timedelta(days=current['days'])).isoformat()
+        latest_time=now.isoformat()
+        start=(now-timedelta(days=current['days'])).isoformat()
         scoped=base_registry._window_rows(observations,start,latest_time)
         signature=base_registry._data_fingerprint(scoped)
         latest=base_registry._latest(c)
-        pub=base_registry._published(c)
         # Do not reuse a roster built with a DIFFERENT affiliation rule.
         # Identical observations can lead to different assigned places when
         # switching earliest/frequency/manual or rebuild/reconcile. A policy
@@ -75,7 +78,9 @@ def tick(c,*,now:datetime|None=None,force:bool=False):
         def same_inputs_and_policy(run):
             return bool(
                 run and run['input_signature']==signature
-                and run['window_start']==start and run['window_end']==latest_time
+                # Moving the clock does not require a pointless new draft if
+                # effective roster inputs and policy remain identical; once
+                # a subject actually ages out the signature changes.
                 and run['days']==current['days']
                 and run['strategy']==current['strategy']
                 and run['correction_mode']==current['correction_mode']
@@ -88,7 +93,7 @@ def tick(c,*,now:datetime|None=None,force:bool=False):
         else:
             gen=base_registry.generate(c,base_registry.GenerateIn(
                 days=current['days'],strategy=current['strategy'],
-                correction_mode=current['correction_mode']))
+                correction_mode=current['correction_mode'],as_of=now))
             action={'action':'draft_created','run_id':gen['run']['id'],
                     'unresolved_count':gen['unresolved_count'],
                     'input_signature':gen['run']['input_signature']}

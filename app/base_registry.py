@@ -78,6 +78,10 @@ class GenerateIn(BaseModel):
     days: int = Field(default=7, ge=1, le=365)
     strategy: Literal['earliest', 'frequency', 'manual'] = 'earliest'
     correction_mode: Literal['rebuild', 'reconcile'] = 'rebuild'
+    # Without an explicit date, keep the deterministic demo scenario window.
+    # Periodic maintenance always supplies its ACTUAL check time, so inactive
+    # fictional persons can disappear from the next roster after N days.
+    as_of: datetime | None = None
 
 
 class DecisionIn(BaseModel):
@@ -220,14 +224,24 @@ def active_assignments(c):
 
 def generate(c, data:GenerateIn):
     observations = [r for r in _effective_rows(c) if not r['excluded']]
-    if not observations:
+    if not observations and data.as_of is None:
         raise HTTPException(409,'没有有效合成观测；请先生成演示数据。')
-    latest = max(r['observed_at'] for r in observations)
-    # Fixed range anchored at scenario latest (not runtime wallclock).
+    if data.as_of is not None:
+        if data.as_of.tzinfo is None or data.as_of.utcoffset() is None:
+            raise HTTPException(422,'底库截止时间需要明确时区')
+        latest = data.as_of.astimezone(timezone.utc).isoformat()
+    else:
+        # Scenario-friendly manual mode, whose explicit fictional history
+        # should not silently expire merely because the wall clock moved.
+        latest = max(r['observed_at'] for r in observations)
     start = (datetime.fromisoformat(latest) - timedelta(days=data.days)).isoformat()
-    rows = _window_rows(observations,start)
-    if not rows:
+    # Important: BOTH bounds must apply. A scheduled run must never include
+    # fictional observations timestamped in the future.
+    rows = _window_rows(observations,start,latest)
+    if not rows and data.as_of is None:
         raise HTTPException(409,'所选时间范围没有有效合成观测')
+    # A genuinely empty current window IS a valid updated roster: it removes
+    # fictional persons no longer present, without modifying the old release.
     prev = _published(c)
     cur = c.execute('''INSERT INTO synthetic_registry_runs
         (strategy,correction_mode,days,window_start,window_end,input_signature,state,created_at,parent_run_id)
@@ -262,7 +276,7 @@ def generate(c, data:GenerateIn):
                     (rid,person,r['place_id'],'assign',
                      '[carry-forward] '+r['reason'],utc_now()))
     c.execute('INSERT INTO synthetic_registry_audit(operation,run_id,detail,created_at) VALUES(?,?,?,?)',
-              ('generate',rid,json.dumps(data.model_dump(),ensure_ascii=False),utc_now()))
+              ('generate',rid,json.dumps(data.model_dump(mode='json'),ensure_ascii=False),utc_now()))
     return present(c,_run(c,rid))
 
 

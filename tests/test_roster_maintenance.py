@@ -14,6 +14,11 @@ def test_policy_off_on_due_idempotent_and_draft_only(tmp_path,monkeypatch):
         assert roster_maintenance.tick(c,now=now)['action']=='disabled'
     client=TestClient(main.app)
     assert client.post('/api/business/seed').status_code==200
+    # Use a check time after the full fictional fixture was observed; this
+    # test measures scheduling, not artificial partially-future events.
+    with main.db() as c:
+        now=datetime.fromisoformat(c.execute(
+            'SELECT MAX(observed_at) FROM synthetic_observations').fetchone()[0])+timedelta(hours=1)
     config={'enabled':True,'interval_hours':24,'days':7,'strategy':'earliest',
             'correction_mode':'reconcile'}
     assert client.put('/api/base/maintenance/config',json=config).status_code==200
@@ -98,3 +103,79 @@ def test_policy_change_regenerates_draft_even_with_identical_observations(tmp_pa
                                        force=True)
         assert again['action']=='draft_exists'
         assert again['run_id']==after['run_id']
+
+
+def test_periodic_correction_removes_absent_fictional_person_after_window_expires(tmp_path,monkeypatch):
+    """Excel #3: a weekly correction must not anchor forever to LAST capture.
+
+    After nine days with no new fictional observations, the new roster is
+    legitimately empty. The old released roster remains an archived snapshot;
+    no video/object event or real identity is included in this test.
+    """
+    import app.main as main
+    monkeypatch.setattr(main,'DB',tmp_path/'expired-correction.sqlite3')
+    main.setup_db()
+    begin=datetime(2026,10,12,12,tzinfo=timezone.utc)
+    with main.db() as c:
+        leaf=c.execute('SELECT id FROM places ORDER BY id LIMIT 1').fetchone()[0]
+        c.execute("""INSERT INTO synthetic_observations(event_key,person_label,place_id,observed_at,origin)
+                     VALUES(?,?,?,?, 'synthetic_only')""",
+                  ('WEEKLY-TRUTH-P001','P001',leaf,(begin-timedelta(days=1)).isoformat()))
+        roster_maintenance.configure(c,roster_maintenance.Policy(
+            enabled=True,interval_hours=24,days=7,strategy='earliest',
+            correction_mode='reconcile'))
+        first=roster_maintenance.tick(c,now=begin)
+        assert first['action']=='draft_created'
+        old=first['run_id']
+        assert {p['person'] for p in base_registry.present(c,base_registry._run(c,old))['people']}=={'P001'}
+        base_registry.publish(c,old)
+        # No new observations: the 7-day lookback has now EXPIRED.
+        later=roster_maintenance.tick(c,now=begin+timedelta(days=9))
+        assert later['action']=='draft_created'
+        assert later['run_id']!=old
+        proposed=base_registry.present(c,base_registry._run(c,later['run_id']))
+        assert proposed['people']==[]
+        delta=base_registry.diff_runs(c,later['run_id'])
+        assert delta['counts']['removed']==1
+        assert delta['changes'][0]['person']=='P001'
+        assert base_registry._published(c)['id']==old
+        assert base_registry._run(c,old)['state']=='published'
+        # An unchanged check must not generate a duplicate draft.
+        again=roster_maintenance.tick(c,now=begin+timedelta(days=9,hours=1),force=True)
+        assert again['action']=='draft_exists'
+        assert again['run_id']==later['run_id']
+        base_registry.publish(c,later['run_id'])
+        assert base_registry._run(c,old)['state']=='archived'
+        assert base_registry._published(c)['id']==later['run_id']
+        assert base_registry.present(c,base_registry._published(c))['people']==[]
+
+
+def test_explicit_correction_window_excludes_future_synthetic_events(tmp_path,monkeypatch):
+    """No future rows in an as-of snapshot and no accidental stale alerts."""
+    import app.main as main
+    monkeypatch.setattr(main,'DB',tmp_path/'bounded.sqlite3')
+    main.setup_db()
+    c=TestClient(main.app)
+    at=datetime(2026,10,12,12,tzinfo=timezone.utc)
+    with main.db() as db:
+        place=db.execute('SELECT id FROM places ORDER BY id LIMIT 1').fetchone()[0]
+        db.executemany("""INSERT INTO synthetic_observations
+            (event_key,person_label,place_id,observed_at,origin) VALUES(?,?,?,?, 'synthetic_only')""",
+            [('BEFORE','P001',place,(at-timedelta(hours=2)).isoformat()),
+             ('FUTURE','P002',place,(at+timedelta(hours=2)).isoformat())])
+    first=c.post('/api/base/generate',json={'days':7,'strategy':'earliest',
+        'correction_mode':'rebuild','as_of':at.isoformat()})
+    assert first.status_code==200,first.text
+    body=first.json()
+    assert {p['person'] for p in body['people']}=={'P001'}
+    assert body['run']['window_end']==at.isoformat()
+    assert c.post(f"/api/base/runs/{body['run']['id']}/publish").status_code==200
+    assert c.get('/api/base/active').json()['stale'] is False
+    # Later observation is not in this fixed historical window.
+    late=c.post('/api/base/generate',json={'days':7,
+        'as_of':(at+timedelta(days=1)).isoformat()})
+    assert late.status_code==200,late.text
+    assert {p['person'] for p in late.json()['people']}=={'P001','P002'}
+    # Missing timezone is NOT silently interpreted as host local time.
+    bad=c.post('/api/base/generate',json={'days':7,'as_of':'2026-10-12T12:00:00'})
+    assert bad.status_code==422
