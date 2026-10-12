@@ -20,7 +20,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview
-from app import admin, base_registry, insights, access
+from app import admin, base_registry, insights, access, gb28181
 import httpx
 from pydantic import BaseModel, Field
 
@@ -231,6 +231,7 @@ def setup_db():
         admin.initialize(c)
         base_registry.initialize(c)
         access.initialize(c)
+        gb28181.initialize(c)
 
 
 setup_db()
@@ -238,6 +239,7 @@ app = FastAPI(title='ZD Business Pipeline Demo', version='1.1.0')
 admin.register(app,db)
 base_registry.register(app,db)
 access.register(app,db)
+gb28181.register(app,db)
 
 
 @app.middleware('http')
