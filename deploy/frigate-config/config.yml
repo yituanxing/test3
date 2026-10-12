@@ -51,10 +51,10 @@ cameras:
     enabled: true
     ffmpeg:
       inputs:
-        # Isolated upstream test from Frigate's official dummy-camera guide.
-        # Bypass RTSP temporarily to diagnose its zero inference rate.
-        - path: /media/frigate/pedestrian.mp4
-          input_args: -re -stream_loop -1 -fflags +genpts
+        # Production-shaped verification: decoded through MediaMTX RTSP.
+        # The previous local-file OpenVINO control test is separately certified.
+        - path: rtsp://mediamtx:8554/demo
+          input_args: preset-rtsp-generic
           roles:
             - detect
     detect:

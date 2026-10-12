@@ -49,6 +49,18 @@ def run(args):
                 json={"camera": args.camera, "place_id": args.place_id})
             assert binding["place_id"] == args.place_id
 
+            # A local-file camera can have camera_fps>0 and person events.
+            # Require actual Frigate RTSP configuration before certifying RTSP.
+            config = checked_json(client, "GET", args.frigate + "/api/config")
+            camera = (config.get("cameras") or {}).get(args.camera, {})
+            inputs = ((camera.get("ffmpeg") or {}).get("inputs") or [])
+            rtsp_path = "rtsp://mediamtx:8554/" + args.camera
+            assert any(item.get("path") == rtsp_path and "detect" in item.get("roles", []) for item in inputs), (
+                "Frigate camera does not read MediaMTX RTSP; cannot certify full video chain"
+            )
+            report["checks"]["rtsp_input_configured"] = "PASS"
+            report["frigate_input_kind"] = "mediamtx_rtsp"
+
             while time.monotonic() < end_time:
                 try:
                     stats = checked_json(client, "GET", args.frigate + "/api/stats")
