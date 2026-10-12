@@ -1,0 +1,10 @@
+.ci-data/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.sqlite3
+reports/
+.env
+*.mp4
+*.webm
+deploy/frigate-media/
