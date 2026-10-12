@@ -40,7 +40,7 @@ window.addEventListener('load',async()=>{
 });
 })();
 </script></head><body><main class="wrap">
-<header class="top"><div class="brand">ZD 场所分析 <span class="badge">V0.6 · 运行验证</span></div><nav class="tabs"><a class="active" href="/insights">态势检索</a><a href="/monitor">全链路运行台</a><a href="/business">合成业务闭环</a><a href="/">视频源操作台</a><a href="/admin">区域与设备</a><a href="/docs">API文档</a></nav></header>
+<header class="top"><div class="brand">ZD 场所分析 <span class="badge">V0.6 · 运行验证</span></div><nav class="tabs"><a href="/portal">综合首页</a><a class="active" href="/insights">态势检索</a><a href="/monitor">全链路运行台</a><a href="/business">合成业务闭环</a><a href="/">视频源操作台</a><a href="/admin">区域与设备</a><a href="/docs">API文档</a></nav></header>
 <section class="hero"><div><h1>每条数据都有来源，每个环节都能验证。</h1><p>真实视频帧、Frigate 匿名 person 事件、合成规则数据分开统计。没有安装 Frigate 时，本地视频与业务测试仍可独立运行；连接可达不等于 AI 检测成功。</p></div><div class="actions"><button onclick="runVideo()" id="videoButton">▶ 验证本地视频</button><button class="subtle" onclick="syncFrigate()" id="syncButton">↻ 同步 Frigate 事件</button></div></section>
 <div class="inline" style="margin:15px 0"><span class="legend">行政区域：</span><select id="scopeRegion" onchange="reload()"><option value="">全部区域</option></select><span class="legend">仅用于查看区域范围内的真实视频观测，不是权限控制</span></div><div class="metrics"><div class="kpi"><label>视频解码·抽样帧</label><strong id="sampled">—</strong><small>真实视频抽样帧，不含测试种子</small></div><div class="kpi"><label>检测框总数</label><strong id="faces">—</strong><small>人脸检测次数 ≠ 独立人数</small></div><div class="kpi"><label>Frigate person 事件</label><strong id="objects">—</strong><small>目标轨迹事件，不是身份识别</small></div><div class="kpi"><label>已绑定摄像机</label><strong id="cameraCount">—</strong><small>Frigate通道与场所对应</small></div></div>
 <div class="grid">

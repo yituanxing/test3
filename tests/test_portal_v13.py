@@ -46,3 +46,11 @@ def test_portal_place_scope_enforced_for_lower_role(tmp_path, monkeypatch):
     assert client.get('/api/places', headers=headers).status_code == 200
     assert client.get('/api/insights/overview', headers=headers).status_code == 200
     assert client.get('/api/business/analysis', headers=headers).status_code == 403
+
+
+def test_legacy_workbenches_link_back_to_portal():
+    from pathlib import Path
+    base=Path(__file__).resolve().parents[1]/'static'
+    for name in ('index','admin','base','business','insights','monitor'):
+        page=(base/(name+'.html')).read_text(encoding='utf-8')
+        assert 'href="/portal"' in page, name

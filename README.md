@@ -5,6 +5,14 @@
 1. **业务Web平台**：`python -m uvicorn app.main:app --port 8001`。页面：`/admin`、`/business`、`/monitor`；行政区域、场所与设备管理、视频观测、合成规则、审核和纠错。
 2. **Frigate技术验收桥**：`python -m uvicorn app.bridge:app --port 8000`，供 Docker/RTSP/OpenVINO 实机验收使用。
 
+## 最终业务演示入口（V1.3）
+
+- `/login`：登录后进入 `/portal` 综合态势门户；包含授权辖区场所列表、场所真实匿名检测统计、合成预警中心、规则证据详情和州级复核。
+- `/portal?tab=places`：场所列表；`/portal?tab=alerts`：模拟规则候选；与原有管理工作台互相跳转。
+- 首次启动需在本机通过 `python -m scripts.bootstrap_roles --username demo_state --region-id 1` 创建州级演示用户，并输入至少12位密码。区域 ID 以 SQLite 实际数据为准。
+- 视频生产链路仍需 Frigate/MediaMTX。主 Web 真实事件闭环由最新 `scripts/verify_portal_live.py` + GitHub Actions 验证。
+- 真实匿名人形目标事件与合成 P### 身份、到访、预警严格分离；不得宣称已经实现真实人员身份识别。
+
 安装及运行：
 
 ```bash
