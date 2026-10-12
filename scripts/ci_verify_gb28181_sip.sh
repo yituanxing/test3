@@ -368,6 +368,30 @@ v.update({'live_sip_registration':True,'wvp_persisted_online_device':True,
 p.write_text(json.dumps(v,indent=2,ensure_ascii=False),encoding='utf-8')
 PY
 
+echo "::group::Real WVP live INVITE and media endpoint"
+PLAY_HTTP="$(curl -sS --max-time 45 -o "$BASE/wvp-play.json" \
+  -w '%{http_code}' "http://127.0.0.1:18978/api/play/start/$DEVICE/$CHANNEL" || true)"
+if [ "$PLAY_HTTP" != 200 ]; then
+  echo "WVP INVITE play request returned HTTP $PLAY_HTTP" >&2
+  exit 1
+fi
+python - "$BASE/wvp-play.json" "$BASE/gb-rtsp.url" <<'PY'
+import json,sys
+from pathlib import Path
+from urllib.parse import urlsplit
+response=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+data=response.get('data') or {}
+uri=data.get('rtsp') if isinstance(data,dict) else None
+if response.get('code')!=0 or not isinstance(uri,str):
+    raise SystemExit('WVP did not complete real SIP INVITE/stream activation')
+parsed=urlsplit(uri)
+if parsed.scheme!='rtsp' or parsed.hostname not in ('127.0.0.1','localhost') or parsed.username or parsed.password:
+    raise SystemExit('WVP returned an invalid/nonlocal RTSP endpoint')
+Path(sys.argv[2]).write_text(uri,encoding='utf-8')
+print('WVP reported a local RTSP endpoint after real SIP INVITE')
+PY
+echo "::endgroup::"
+
 python - <<'PY'
 import json,os
 from datetime import datetime,timezone
