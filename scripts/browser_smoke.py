@@ -94,7 +94,13 @@ def run():
                         expect(p099.locator("td").nth(2)).to_contain_text("测试场所 B")
                         checks.append("actual_dedup_100_to_1_and_frequency_home_B")
                         page.screenshot(path=str(OUT/"ui-dedup-roster.png"),full_page=True)
-                        page.on("dialog",lambda dialog:dialog.accept())
+                        # Playwright accept() defaults prompt text to the
+                        # empty string, even when the webpage supplied a
+                        # nonempty default. The actual review form requires a
+                        # reason (>=2 chars); emulate a real user submitting it.
+                        page.on("dialog",lambda dialog:(
+                            dialog.accept("浏览器实际人工审核理由")
+                            if dialog.type=="prompt" else dialog.accept()))
                         page.locator("#pub").click()
                         expect(page.locator("#kRunState")).to_contain_text("当前已发布底库")
                         page.locator("#strategy").select_option("earliest")
