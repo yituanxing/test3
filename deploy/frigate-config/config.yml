@@ -27,8 +27,12 @@ motion:
 record:
   enabled: false
 
+# Persist a limited test snapshot so tracked objects remain queryable via
+# /api/events even when continuous recording is disabled.
 snapshots:
-  enabled: false
+  enabled: true
+  retain:
+    default: 1
 
 cameras:
   demo:
