@@ -14,6 +14,36 @@ cleanup() {
   trap - EXIT
   [ -z "$PUBLISH_PID" ] || kill "$PUBLISH_PID" 2>/dev/null || true
   [ -z "$BACKEND_PID" ] || kill "$BACKEND_PID" 2>/dev/null || true
+  # Capture failure-only diagnostics without dumping credentials, images or private footage.
+  if [ "$rc" -ne 0 ]; then
+    python - <<'PY' || true
+import json
+from pathlib import Path
+from urllib.request import urlopen
+from collections import Counter
+output = {"stage": "live_frigate_failure_diagnostics"}
+try:
+    with urlopen("http://127.0.0.1:5000/api/stats", timeout=6) as response:
+        stats = json.load(response)
+    output["cameras"] = {name: {k: v for k, v in info.items()
+        if k in ("camera_fps", "process_fps", "detection_fps", "skipped_fps", "ffmpeg_pid", "capture_pid")}
+        for name, info in stats.get("cameras", {}).items()}
+    output["detectors"] = {name: {k: v for k, v in info.items()
+        if k in ("inference_speed", "detection_start", "pid")}
+        for name, info in stats.get("detectors", {}).items()}
+except Exception as exc:
+    output["stats_error"] = str(exc)
+try:
+    with urlopen("http://127.0.0.1:5000/api/events?limit=200", timeout=6) as response:
+        events = json.load(response)
+    output["event_counts"] = dict(Counter(str(e.get("label", "?")) for e in events)) if isinstance(events, list) else {"invalid_shape": 1}
+except Exception as exc:
+    output["events_error"] = str(exc)
+Path("reports").mkdir(exist_ok=True)
+Path("reports/frigate-diagnostics.json").write_text(json.dumps(output, indent=2), encoding="utf-8")
+print("Frigate failure diagnostics:", json.dumps(output, ensure_ascii=False), flush=True)
+PY
+  fi
   # Do not emit Frigate startup logs (may include generated credentials).
   docker compose -f "$COMPOSE" ps || true
   docker compose -f "$COMPOSE" down --remove-orphans >/dev/null 2>&1 || true
