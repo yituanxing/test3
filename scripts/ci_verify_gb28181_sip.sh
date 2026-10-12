@@ -193,7 +193,7 @@ if ! command -v ffmpeg >/dev/null 2>&1; then
   sudo apt-get install -y -qq ffmpeg
 fi
 ffmpeg -hide_banner -loglevel error -nostdin -y -f lavfi \
-  -i 'testsrc2=size=320x240:rate=15' -t 8 -an \
+  -i 'testsrc2=size=320x240:rate=15' -t 45 -an \
   -c:v libx264 -pix_fmt yuv420p -g 15 -f mpeg "$BASE/sim/test.dat"
 test -s "$BASE/sim/test.dat"
 docker run -d --rm --name "$SIM_CONTAINER" \
