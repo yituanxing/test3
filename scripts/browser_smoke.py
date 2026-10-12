@@ -98,6 +98,19 @@ def run():
                         expect(page.locator("#diffRows")).to_contain_text("迁移")
                         checks.append("actual_roster_version_change_and_evidence_diff")
                         page.screenshot(path=str(OUT/"ui-roster-v2-diff.png"),full_page=True)
+                        # Requirement 3, browser-level acceptance: select a
+                        # future cutoff to show that P099 truly leaves the new
+                        # candidate roster without rewriting the published V1.
+                        page.locator("#asOf").fill("2035-01-01T00:00")
+                        page.get_by_role("button",name="② 生成底库草稿").click()
+                        expect(page.locator("#kPeople")).to_have_text("0", timeout=12000)
+                        expect(page.locator("#diffRows")).to_contain_text("P099")
+                        expect(page.locator("#diffRows")).to_contain_text("移除")
+                        expect(page.locator("#windowInfo")).to_contain_text("2035")
+                        # A pending empty draft does not auto-publish itself.
+                        expect(page.locator("#kRunState")).to_contain_text("未发布草稿")
+                        checks.append("real_browser_rolling_window_removes_absent_fictional_person")
+                        page.screenshot(path=str(OUT/"ui-roster-expiry-diff.png"),full_page=True)
                         page.goto(base+"/portal")
                         page.set_viewport_size({"width": 390, "height": 844})
                         page.screenshot(path=str(OUT / "ui-mobile.png"), full_page=True)
