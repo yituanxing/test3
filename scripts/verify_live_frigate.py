@@ -17,7 +17,7 @@ def checked_json(client, method, url, **kwargs):
 def run(args):
     report = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "video_source": "CC0 Wikimedia Commons pedestrian-area source",
+        "video_source": "Intel sample-videos / one-by-one-person-detection.mp4 (CC-BY-4.0)",
         "camera": args.camera,
         "verified": False,
         "identity_inference_performed": False,
