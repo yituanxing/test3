@@ -470,6 +470,12 @@ except OSError:
     reachable=False
 print('GB media RTSP diagnostic:',{'port':port,'tcp_reachable':reachable,
    'ffmpeg_failures':{k:len(re.findall(p,s,re.I)) for k,p in errors.items()}})
+# FFmpeg's public error strings are useful, but never print an RTSP URL or
+# query tokens which could contain a WVP media playback grant.
+clean=re.sub(r'rtsp://[^\\s\\]\\[()]+','rtsp://[redacted]',s,flags=re.I)
+for line in clean.splitlines()[-10:]:
+    if re.search('error|timed out|stream|could not|refused|input|rtsp',line,re.I):
+        print('GB sanitized FFmpeg stderr:',line[:260])
 PY
   docker logs "$SIM_CONTAINER" > "$BASE/gb-device-runtime.log" 2>&1 || true
   docker compose -p "$PROJECT" -f "$BASE/wvp/docker/docker-compose.yml" \
@@ -484,11 +490,42 @@ print('GB simulator media signals:',{
  'invite_received':len(re.findall('Sever.*Invite',s,re.I)),
  'ack_received':len(re.findall('Server.*ACK',s,re.I)),
  'rtp_sender_started':len(re.findall('stream data will be write',s,re.I)),
+ 'ps_first_au_emitted':len(re.findall('CI_GB_PS_RTP_FIRST_AU_SENT',s)),
+ 'input_file_failures':len(re.findall('read file error|No such file',s,re.I)),
  'rtp_connect_failed':len(re.findall('connect failed|dial tcp|write data by udp error',s,re.I)),
  'panic':len(re.findall('panic:|runtime error:',s,re.I)),
  'zlm_media_registered':len(re.findall('regist|on_stream_changed|stream registered',z,re.I)),
  'zlm_rtp_errors':len(re.findall('Rtp.*error|invalid.*RTP|recv RTP.*failed',z,re.I))
 })
+PY
+  # Query the actual ZLM media registry over the private Docker bridge.
+  # Only emit aggregate stream counts and codec names, never stream IDs or URLs.
+  python - "$MEDIA_IP" <<'PY'
+import json,sys
+from urllib.request import urlopen
+from urllib.parse import urlencode
+ip=sys.argv[1]
+secret='su6TiedN2rVAmBbIDX0aa0QTiBJLBdcf'
+for port in (80,8080):
+    try:
+        url=f'http://{ip}:{port}/index/api/getMediaList?'+urlencode({'secret':secret})
+        with urlopen(url,timeout=3) as response:
+            payload=json.load(response)
+        data=payload.get('data') or []
+        if not isinstance(data,list): continue
+        info={'http_port':port,'total_streams':len(data),
+              'by_schema':{},'video_codecs':[], 'total_bytes_speed':0}
+        for stream in data:
+            schema=str(stream.get('schema','unknown'))
+            info['by_schema'][schema]=info['by_schema'].get(schema,0)+1
+            info['total_bytes_speed']+=int(stream.get('bytesSpeed') or 0)
+            for track in stream.get('tracks') or []:
+                if track.get('codec_type')==0 or track.get('codec_type')=='0':
+                    info['video_codecs'].append(track.get('codec_id_name'))
+        print('GB ZLMediaKit media registry:',info)
+        break
+    except Exception as e:
+        print('GB ZLMediaKit probe:',{'port':port,'error_type':type(e).__name__})
 PY
   echo "GB PS/RTP media decode not proven; Catalog remains independently PASS." >&2
   exit 1
