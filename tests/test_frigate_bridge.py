@@ -112,3 +112,56 @@ def test_upstream_track_ids_scoped_to_camera_and_migration_preserves_events(tmp_
     saved=client.get('/api/frigate/events').json()
     assert len(saved)==2 and {x['camera'] for x in saved}=={'CAM1','CAM2'}
     assert {x['place_id'] for x in saved}=={1,2}
+
+
+def test_rebinding_camera_does_not_reassign_historical_person_events(tmp_path,monkeypatch):
+    """SQLite and HTTP boundary: camera changes may affect future events only.
+
+    If old Frigate event IDs are replayed after changing a camera's site,
+    the original place and start timestamp must remain historical facts.
+    We mock only Frigate's remote HTTP transport, not local DB/REST behavior.
+    """
+    import app.main as main
+    monkeypatch.setattr(main,'DB',tmp_path/'binding-history.sqlite3')
+    main.setup_db()
+    cli=TestClient(main.app)
+    first_event={'id':'CAM1-T1','camera':'CAM1','label':'person',
+                 'start_time':1791795600.0,'end_time':None,
+                 'data':{'top_score':0.8},'has_snapshot':True}
+    later_event={'id':'CAM1-T2','camera':'CAM1','label':'person',
+                 'start_time':1791799200.0,'end_time':None,
+                 'data':{'top_score':0.9},'has_snapshot':True}
+    response=Mock()
+    response.raise_for_status.return_value=None
+    response.json.return_value=[first_event]
+    assert cli.post('/api/frigate/cameras',
+                    json={'camera':'CAM1','place_id':1}).status_code==200
+    with patch('app.main.httpx.get',return_value=response):
+        initial=cli.post('/api/frigate/sync').json()
+        assert initial['inserted']==1
+        original=cli.get('/api/frigate/events').json()[0]
+        assert original['place_id']==1
+        assert cli.post('/api/frigate/cameras',
+                        json={'camera':'CAM1','place_id':2}).status_code==200
+        # An upstream replay of the old event must NOT migrate it to B.
+        response.json.return_value=[
+          {**first_event,'end_time':1791795630.0,
+           'data':{'top_score':0.7},'has_snapshot':False},later_event]
+        changed=cli.post('/api/frigate/sync').json()
+        assert changed['updated']==1 and changed['inserted']==1
+        saved={x['event_id']:x for x in cli.get('/api/frigate/events').json()}
+        assert saved['CAM1-T1']['place_id']==1
+        assert saved['CAM1-T1']['started_at']==original['started_at']
+        assert saved['CAM1-T1']['ended_at'] is not None
+        # The snapshot existence flag is monotonic on repeat sync.
+        assert saved['CAM1-T1']['has_snapshot']==1
+        assert saved['CAM1-T2']['place_id']==2
+        same=cli.post('/api/frigate/sync').json()
+        assert same['inserted']==0 and same['updated']==2
+    monitoring=cli.get('/api/monitoring/overview?days=7').json()
+    # Event timestamps may be outside today's real clock in this fixture:
+    # persistent site facts, not a wall-clock-dependent count, are the oracle.
+    with main.db() as c:
+        from_db=[tuple(z) for z in c.execute(
+          "SELECT event_id,place_id FROM frigate_object_events ORDER BY event_id")]
+        assert from_db==[('CAM1-T1',1),('CAM1-T2',2)]

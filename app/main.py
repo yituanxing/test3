@@ -734,9 +734,12 @@ def sync_frigate(limit: int = Query(100, ge=1, le=500)):
               (event_id,camera,place_id,label,started_at,ended_at,score,has_snapshot,updated_at)
               VALUES(?,?,?,?,?,?,?,?,?)
               ON CONFLICT(camera,event_id) DO UPDATE SET
-                 place_id=excluded.place_id,
-                 started_at=excluded.started_at,ended_at=excluded.ended_at,
-                 score=excluded.score,has_snapshot=excluded.has_snapshot,
+                 -- Place and first observed timestamp belong to the ORIGINAL
+                 -- evidence fact. Reassigning a camera MUST NOT rewrite past
+                 -- site visits or historical monitoring totals.
+                 ended_at=COALESCE(excluded.ended_at,frigate_object_events.ended_at),
+                 score=COALESCE(excluded.score,frigate_object_events.score),
+                 has_snapshot=MAX(excluded.has_snapshot,frigate_object_events.has_snapshot),
                  updated_at=excluded.updated_at''',
               (event.event_id,event.camera,bindings[event.camera],event.label,event.started_at,
                event.ended_at,event.score,int(event.has_snapshot),utcnow()))
