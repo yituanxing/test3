@@ -104,7 +104,7 @@ SIP_Port=18160
 SIP_Domain=3402000000
 SIP_Id=34020000002000000001
 SIP_Password=$PASSPHRASE
-RecordSip=false
+RecordSip=true
 RecordPushLive=false
 EOF
 # Isolated, non-public CI-only WVP control-plane: disable only WVP HTTP
@@ -217,6 +217,25 @@ echo "::group::Verify real WVP DB online flag AND Catalog channel"
 passed=0
 VALUE="no_database_response"
 for n in $(seq 1 55); do
+  # Early samples are essential: upstream WVP may expire sync progress
+  # before the 165-second DB assertion timeout.
+  if [ "$n" = 1 ] || [ "$n" = 5 ] || [ "$n" = 15 ] || [ "$n" = 35 ]; then
+    curl -sS --max-time 4       "http://127.0.0.1:18978/api/device/query/sync_status?deviceId=$DEVICE"       -o "$BASE/wvp-sync-$n.json" 2>/dev/null || true
+    python - "$BASE/wvp-sync-$n.json" "$n" <<'PY'
+import json,sys
+try:
+    v=json.load(open(sys.argv[1],encoding='utf-8'))
+    d=v.get('data') if isinstance(v,dict) else None
+    d=d if isinstance(d,dict) else {}
+    print('WVP Catalog progress sample:',json.dumps({
+        'poll':int(sys.argv[2]),'api_code':v.get('code'),
+        'total':d.get('total'),'current':d.get('current'),
+        'running':d.get('syncIng'),'has_error':bool(d.get('errorMsg')),
+    },ensure_ascii=False))
+except (OSError,ValueError,AttributeError):
+    print('WVP Catalog progress sample: unavailable')
+PY
+  fi
   if [ "$(docker inspect -f '{{.State.Running}}' "$SIM_CONTAINER" 2>/dev/null || true)" != "true" ]; then
     echo "GB SIP simulator container exited before registration" >&2
     docker logs "$SIM_CONTAINER" > "$BASE/simulator.log" 2>&1 || true
@@ -243,6 +262,7 @@ if [ "$passed" -ne 1 ]; then
   export DB_STATE
   echo "WVP persisted SIP state (device rows:online flag:channel rows:matching channel) = ${DB_STATE:-unavailable}" >&2
   docker logs "$SIM_CONTAINER" > "$BASE/simulator.log" 2>&1 || true
+  docker compose -p "$PROJECT" -f "$BASE/wvp/docker/docker-compose.yml"     logs --no-color polaris-wvp > "$BASE/wvp-runtime.log" 2>&1 || true
   python - "$BASE" <<'PY'
 import json,os,re,sys
 from pathlib import Path
@@ -263,6 +283,17 @@ if sim.exists():
         'catalog_mentions':len(re.findall('Catalog|目录',data,re.I)),
         'unknown_message_mentions':len(re.findall('unknow msg',data,re.I)),
         'udp_parse_failures':len(re.findall('parse msg failed',data,re.I)),
+    }
+runtime=base/'wvp-runtime.log'
+if runtime.exists():
+    data=runtime.read_text(encoding='utf-8',errors='replace')
+    v['wvp_runtime_signal_counts']={
+        'channel_received':len(re.findall('收到通道',data)),
+        'channel_sync':len(re.findall('同步通道',data)),
+        'xml_parse_error':len(re.findall('xml解析.*失败|解析XML消息内容异常',data,re.I)),
+        'unknown_device':len(re.findall('设备未找到|device .* not found',data,re.I)),
+        'channel_decode_error':len(re.findall('目录订阅.*解析失败|收到通道.*异常',data)),
+        'channel_write_error':len(re.findall('直接入库失败|同步通道.*失败',data)),
     }
 logs=list((base/'wvp/docker/logs/wvp').glob('sip*.log'))
 if logs:
