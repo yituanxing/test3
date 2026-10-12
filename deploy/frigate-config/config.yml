@@ -1,6 +1,10 @@
 mqtt:
   enabled: false
 
+# Explicitly enable inference at both global and camera scopes.
+detect:
+  enabled: true
+
 detectors:
   cpu1:
     type: cpu

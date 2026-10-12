@@ -26,13 +26,28 @@ try:
     with urlopen("http://127.0.0.1:5000/api/stats", timeout=6) as response:
         stats = json.load(response)
     output["cameras"] = {name: {k: v for k, v in info.items()
-        if k in ("camera_fps", "process_fps", "detection_fps", "skipped_fps", "ffmpeg_pid", "capture_pid")}
+        if k in ("camera_fps", "process_fps", "detection_fps", "detection_enabled", "motion_enabled", "skipped_fps", "ffmpeg_pid", "capture_pid")}
         for name, info in stats.get("cameras", {}).items()}
     output["detectors"] = {name: {k: v for k, v in info.items()
         if k in ("inference_speed", "detection_start", "pid")}
         for name, info in stats.get("detectors", {}).items()}
+    output["detection_total"] = stats.get("detection_fps")
 except Exception as exc:
     output["stats_error"] = str(exc)
+try:
+    with urlopen("http://127.0.0.1:5000/api/config", timeout=6) as response:
+        config = json.load(response)
+    camera = (config.get("cameras") or {}).get("demo", {})
+    output["resolved_config"] = {
+        "global_detect_enabled": (config.get("detect") or {}).get("enabled"),
+        "camera_detect_enabled": (camera.get("detect") or {}).get("enabled"),
+        "camera_motion_enabled": (camera.get("motion") or {}).get("enabled"),
+        "camera_motion_threshold": (camera.get("motion") or {}).get("threshold"),
+        "camera_motion_contour_area": (camera.get("motion") or {}).get("contour_area"),
+        "camera_objects_track": (camera.get("objects") or {}).get("track"),
+    }
+except Exception as exc:
+    output["config_error"] = str(exc)
 try:
     with urlopen("http://127.0.0.1:5000/api/events?limit=200", timeout=6) as response:
         events = json.load(response)
