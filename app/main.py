@@ -100,6 +100,15 @@ def setup_db():
             quality_assessment TEXT NOT NULL DEFAULT 'uncalibrated_heuristic'
         );
         CREATE INDEX IF NOT EXISTS face_boxes_by_sample ON face_boxes(sample_id);
+        CREATE TABLE IF NOT EXISTS face_box_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            box_id INTEGER NOT NULL REFERENCES face_boxes(id) ON DELETE CASCADE,
+            decision TEXT NOT NULL CHECK(decision IN ('false_positive','plausible','unreviewed')),
+            reason TEXT NOT NULL,
+            reviewer TEXT NOT NULL,
+            reviewed_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS face_box_reviews_latest ON face_box_reviews(box_id,id);
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sample_id INTEGER NOT NULL REFERENCES samples(id),
@@ -275,6 +284,11 @@ class SourceIn(BaseModel):
 class ReviewIn(BaseModel):
     corrected_faces: int = Field(ge=0, le=100)
     reason: str = Field(min_length=1, max_length=500)
+
+
+class FaceBoxReviewIn(BaseModel):
+    decision: Literal['false_positive', 'plausible', 'unreviewed']
+    reason: str = Field(min_length=2, max_length=300)
 
 
 class RuleIn(BaseModel):
@@ -547,6 +561,27 @@ def preview_video_sample(sample_id:int,request:Request):
                              'X-Content-Type-Options':'nosniff'})
 
 
+@app.post('/api/video/observations/{sample_id}/boxes/{box_id}/review')
+def review_real_face_box(sample_id:int,box_id:int,data:FaceBoxReviewIn,request:Request):
+    """Append-only judgement on one anonymous geometric detection, not identity."""
+    with db() as c:
+        found=c.execute('''SELECT s.place_id FROM face_boxes b
+            JOIN samples s ON s.id=b.sample_id
+            WHERE b.id=? AND s.id=? AND s.origin='video' ''',(box_id,sample_id)).fetchone()
+        if not found:
+            raise HTTPException(404,'检测框不存在或不属于该视频帧')
+        access.check_place(c,request,found['place_id'])
+        actor=access.principal(request)
+        reviewer=actor['username'] if actor else 'legacy-test-only'
+        c.execute('''INSERT INTO face_box_reviews(box_id,decision,reason,reviewer,reviewed_at)
+                     VALUES(?,?,?,?,?)''',(box_id,data.decision,data.reason,reviewer,utcnow()))
+        n=c.execute('SELECT COUNT(*) FROM face_box_reviews WHERE box_id=?',(box_id,)).fetchone()[0]
+        return {'sample_id':sample_id,'box_id':box_id,'decision':data.decision,
+                'reviewer':reviewer,'history_count':n,
+                'raw_detection_preserved':True,
+                'note':'复核仅修改人工判断状态；原始人脸框和匿名事实不变。'}
+
+
 @app.get('/api/video/observations')
 def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
                        source_id:int|None=Query(None,ge=1),
@@ -570,7 +605,11 @@ def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
                                       'no_face_frames':0,'boxes_with_geometry':0,
                                       'candidate_boxes':0,'needs_review_boxes':0,
                                       'quality_assessment':'uncalibrated_heuristic',
-                                      'legacy_detections_without_geometry':0},
+                                      'legacy_detections_without_geometry':0,
+                                      'manual_false_positive_boxes':0,
+                                      'manual_plausible_boxes':0,
+                                      'unreviewed_boxes':0,
+                                      'not_rejected_boxes':0},
                     'bounded_by_limit':limit,'snapshot_images_stored':False}
         marks=','.join('?' for _ in allowed)
         filter_source=' AND s.source_id=?' if source_id is not None else ''
@@ -588,10 +627,19 @@ def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
             COALESCE(SUM(CASE WHEN b.quality_state='candidate' THEN 1 ELSE 0 END),0)
               AS candidate_boxes,
             COALESCE(SUM(CASE WHEN b.quality_state='needs_review' THEN 1 ELSE 0 END),0)
-              AS needs_review_boxes
+              AS needs_review_boxes,
+            COALESCE(SUM(CASE WHEN r.decision='false_positive' THEN 1 ELSE 0 END),0)
+              AS manual_false_positive_boxes,
+            COALESCE(SUM(CASE WHEN r.decision='plausible' THEN 1 ELSE 0 END),0)
+              AS manual_plausible_boxes,
+            COALESCE(SUM(CASE WHEN r.decision IS NULL OR r.decision='unreviewed'
+                              THEN 1 ELSE 0 END),0) AS unreviewed_boxes
             FROM face_boxes b JOIN samples s ON s.id=b.sample_id
+            LEFT JOIN face_box_reviews r ON r.id=(
+                SELECT MAX(ir.id) FROM face_box_reviews ir WHERE ir.box_id=b.id)
             WHERE {scope_sql}''',bind).fetchone()
         all_quality={**dict(totals),**dict(quality),
+            'not_rejected_boxes':int(quality['boxes_with_geometry'])-int(quality['manual_false_positive_boxes']),
             'quality_assessment':'uncalibrated_heuristic',
             'legacy_detections_without_geometry':max(
                 0,int(totals['raw_face_detections'])-int(quality['boxes_with_geometry']))}
@@ -606,9 +654,13 @@ def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
             (*bind,limit))]
         for row in rows:
             faces=[]
-            for v in c.execute('''SELECT x,y,w,h,frame_width,frame_height,detector_score,
-                        quality_state,quality_reasons,sharpness
-                        FROM face_boxes WHERE sample_id=? ORDER BY id''',(row['id'],)):
+            for v in c.execute('''SELECT b.id,b.x,b.y,b.w,b.h,b.frame_width,b.frame_height,
+                        b.detector_score,b.quality_state,b.quality_reasons,b.sharpness,
+                        (SELECT r.decision FROM face_box_reviews r WHERE r.box_id=b.id
+                           ORDER BY r.id DESC LIMIT 1) AS review_decision,
+                        (SELECT r.reviewed_at FROM face_box_reviews r WHERE r.box_id=b.id
+                           ORDER BY r.id DESC LIMIT 1) AS reviewed_at
+                        FROM face_boxes b WHERE b.sample_id=? ORDER BY b.id''',(row['id'],)):
                 b=dict(v)
                 b['quality_reasons']=json.loads(b['quality_reasons'])
                 b['quality_assessment']='uncalibrated_heuristic'
