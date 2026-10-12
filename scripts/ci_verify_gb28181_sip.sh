@@ -398,7 +398,7 @@ decoded=0
 for attempt in 1 2 3 4; do
   if timeout 18 ffmpeg -hide_banner -loglevel error -nostdin -y \
        -rtsp_transport tcp -rw_timeout 8000000 -i "$RTSP_URL" \
-       -frames:v 1 "$BASE/gb-decoded.jpg" >/dev/null 2>&1 \
+       -frames:v 1 "$BASE/gb-decoded.jpg" >"$BASE/gb-ffmpeg.log" 2>&1 \
        && test -s "$BASE/gb-decoded.jpg"; then
     decoded=1
     break
@@ -406,7 +406,31 @@ for attempt in 1 2 3 4; do
   sleep 2
 done
 if [ "$decoded" != 1 ]; then
-  echo "No decoded frame from WVP/ZLMediaKit RTSP after real GB RTP/PS" >&2
+  python - "$BASE/gb-ffmpeg.log" "$BASE/gb-rtsp.url" <<'PY'
+import sys,re,socket
+from pathlib import Path
+from urllib.parse import urlsplit
+s=Path(sys.argv[1]).read_text(encoding='utf-8',errors='replace')
+u=urlsplit(Path(sys.argv[2]).read_text(encoding='utf-8'))
+errors={
+    'connection_refused':r'connection refused',
+    'rtsp_not_found':r'404 not found',
+    'rtsp_unauthorized':r'401 unauthorized|403 forbidden',
+    'invalid_media':r'invalid data|could not find codec|unspecified size',
+    'timeout':r'timed out|timeout',
+    'no_streams':r'no video|does not contain any stream',
+    'protocol_error':r'rtsp.*error|error.*rtsp',
+}
+port=u.port or 554
+try:
+    with socket.create_connection(('127.0.0.1',port),timeout=2):
+        reachable=True
+except OSError:
+    reachable=False
+print('GB media RTSP diagnostic:',{'port':port,'tcp_reachable':reachable,
+   'ffmpeg_failures':{k:len(re.findall(p,s,re.I)) for k,p in errors.items()}})
+PY
+  echo "GB PS/RTP media decode not proven; Catalog remains independently PASS." >&2
   exit 1
 fi
 python - "$BASE/gb-decoded.jpg" <<'PY'
