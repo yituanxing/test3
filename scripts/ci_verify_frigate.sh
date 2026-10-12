@@ -78,6 +78,16 @@ ffmpeg -hide_banner -loglevel error -y -i .ci-data/pedestrian-source.webm \
   -t 15 -vf 'fps=5,scale=960:540' -an -pix_fmt yuv420p \
   -c:v libx264 -preset ultrafast -crf 26 -movflags +faststart .ci-data/pedestrian.mp4
 test -s .ci-data/pedestrian.mp4
+# Assert that our genuine source contains different decoded frames.
+ffmpeg -hide_banner -loglevel error -i .ci-data/pedestrian.mp4 \
+  -vf fps=1 -an -f framemd5 .ci-data/source-frame-hashes.txt
+python - <<'PY'
+from pathlib import Path
+lines = Path(".ci-data/source-frame-hashes.txt").read_text().splitlines()
+hashes = [line.split(",")[-1].strip() for line in lines if line and not line.startswith("#")]
+print(f"Decoded video frames sampled={len(hashes)}, distinct={len(set(hashes))}", flush=True)
+assert len(set(hashes)) > 2, "Source video does not contain enough frame-to-frame visual changes"
+PY
 echo "::endgroup::"
 
 echo "::group::Start upstream services"
@@ -94,6 +104,14 @@ PUBLISH_PID=$!
 sleep 3
 kill -0 "$PUBLISH_PID" || { echo "RTSP publisher exited" >&2; tail -n 50 .ci-data/publisher.log; exit 1; }
 docker compose -f "$COMPOSE" up -d frigate
+# Wait for the API to settle before querying JPEGs (startup may reset sockets).
+for i in $(seq 1 40); do
+  if curl -fsS --connect-timeout 2 --max-time 3 \
+    http://127.0.0.1:5000/api/stats -o /dev/null 2>/dev/null; then
+    break
+  fi
+  sleep 2
+done
 echo "::group::Independent motion and decoded-frame diagnostics"
 python scripts/diagnose_motion.py --camera demo --frigate http://127.0.0.1:5000 --report reports/motion-diagnostics.json || true
 echo "::endgroup::"

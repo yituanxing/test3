@@ -42,7 +42,7 @@ def main():
                 content = fetch(f"{args.frigate}/api/{args.camera}/latest.jpg")
                 if content[:3] == b"\xff\xd8\xff":
                     break
-            except (URLError, TimeoutError) as exc:
+            except (OSError, TimeoutError, ValueError) as exc:
                 result["errors"].append(str(exc))
             time.sleep(2)
         else:
@@ -50,11 +50,25 @@ def main():
         for n in range(4):
             if n:
                 time.sleep(4)
-            jpg = fetch(f"{args.frigate}/api/{args.camera}/latest.jpg")
-            if jpg[:3] != b"\xff\xd8\xff":
-                raise RuntimeError("Expected JPEG but received unexpected format")
+            for retry in range(8):
+                try:
+                    jpg = fetch(f"{args.frigate}/api/{args.camera}/latest.jpg")
+                    if jpg[:3] != b"\xff\xd8\xff":
+                        raise ValueError("Expected JPEG but received unexpected format")
+                    break
+                except (OSError, TimeoutError, ValueError):
+                    if retry == 7:
+                        raise
+                    time.sleep(2)
             (root / f"frigate-frame-{n}.jpg").write_bytes(jpg)
             raw_frames.append(pixel_bytes(jpg))
+            if n == 3:
+                try:
+                    annotated = fetch(f"{args.frigate}/api/{args.camera}/latest.jpg?bbox=1&motion=1&regions=1")
+                    if annotated[:3] == b"\xff\xd8\xff":
+                        (root / "frigate-frame-debug.jpg").write_bytes(annotated)
+                except (OSError, TimeoutError):
+                    pass
             stats = json.loads(fetch(f"{args.frigate}/api/stats"))
             cam = (stats.get("cameras") or {}).get(args.camera, {})
             result["stats"].append({k: cam.get(k) for k in
