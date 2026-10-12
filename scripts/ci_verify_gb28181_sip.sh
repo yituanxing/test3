@@ -108,7 +108,7 @@ replacement='''func (inv *Invite) sendFile(buf []byte) {
         if n <= 0 { return }
         frame := buf[:n]
         // Emit PS pack + PSM(H264=0x1B, video PES=0xE0) on IDR access units.
-        isIDR := bytes.Contains(frame, []byte{0,0,0,1,0x65})
+        // Annex-B NAL start code can have three OR four bytes. A three-byte\n        // sequence also matches the suffix of a four-byte one.\n        isIDR := bytes.Contains(frame, []byte{0,0,1,0x65})
         inv.rtp.Send2data(frame, isIDR, inv.pts)
         inv.pts += 6000 // RTP clock 90 kHz / 15 fps
         if inv.pts == 6000 { println("CI_GB_PS_RTP_FIRST_AU_SENT") }
