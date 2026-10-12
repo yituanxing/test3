@@ -438,7 +438,7 @@ RTSP_URL="$(cat "$BASE/gb-rtsp.url")"
 decoded=0
 for attempt in 1 2 3 4; do
   if timeout 18 ffmpeg -hide_banner -loglevel error -nostdin -y \
-       -rtsp_transport tcp -rw_timeout 8000000 -i "$RTSP_URL" \
+       -rtsp_transport tcp -i "$RTSP_URL" \
        -frames:v 1 "$BASE/gb-decoded.jpg" >"$BASE/gb-ffmpeg.log" 2>&1 \
        && test -s "$BASE/gb-decoded.jpg"; then
     decoded=1
