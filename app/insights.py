@@ -81,7 +81,7 @@ def overview(analysis: dict, places: list[dict], *, days: int = 7) -> dict:
                  'unique_synthetic_people_in_window':len(people), 'rule_hits':len(alerts),
                  'published_roster_state':analysis['registry_status']['state']},
         'trend':trend, 'ranking':ranking, 'recent_alerts':recent,
-        'rule_counts':analysis['rule_counts'],
+        'rule_counts':[{**r, 'count':sum(a['type']==r['type'] for a in alerts)} for r in analysis['rule_counts']],
         'notes':{'visits':'按合成观测聚合的到访会话；不是人脸识别结果',
                  'unique_synthetic_people_in_window':'仅指生成的 P### 虚构标识去重',
                  'rule_hits':'对模拟规则结果进行场所交集过滤；不用于真实风险认定'},

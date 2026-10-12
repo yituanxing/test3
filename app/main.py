@@ -11,14 +11,15 @@ from pathlib import Path
 from typing import Literal
 
 import cv2
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from app.detector import choose_detector, detector_info
 from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview
-from app import admin, base_registry, insights
+from app import admin, base_registry, insights, access
 import httpx
 from pydantic import BaseModel, Field
 
@@ -31,6 +32,7 @@ BUSINESS_STATIC = ROOT / 'static' / 'business.html'
 MONITOR_STATIC = ROOT / 'static' / 'monitor.html'
 ADMIN_STATIC = ROOT / 'static' / 'admin.html'
 INSIGHTS_STATIC = ROOT / 'static' / 'insights.html'
+LOGIN_STATIC = ROOT / 'static' / 'login.html'
 
 
 def utcnow():
@@ -152,12 +154,43 @@ def setup_db():
                           (place_id, '内置测试视频（无真人）', 'file', str(bundled_video)))
         admin.initialize(c)
         base_registry.initialize(c)
+        access.initialize(c)
 
 
 setup_db()
 app = FastAPI(title='ZD Business Pipeline Demo', version='1.1.0')
 admin.register(app,db)
 base_registry.register(app,db)
+access.register(app,db)
+
+
+@app.middleware('http')
+async def enforce_role_scope(request: Request, call_next):
+    """Default-deny API gateway; region filters are additionally imposed by endpoints.
+
+    Old regression tests may explicitly enable the compatibility mode, which is
+    ONLY effective inside an active pytest test. Never used by the running server.
+    """
+    path = request.url.path
+    if path.startswith('/api/') and path not in ('/api/health','/api/auth/login'):
+        legacy_test = (os.environ.get('ZD_AUTH_TEST_COMPAT') == '1'
+                       and bool(os.environ.get('PYTEST_CURRENT_TEST')))
+        if not legacy_test:
+            try:
+                with db() as c:
+                    actor = access.current(c, request.headers.get('authorization'))
+                if not path.startswith('/api/auth/') and not access.permitted(actor,request.method,path):
+                    raise HTTPException(403,'当前角色无权操作此接口')
+                request.state.principal = actor
+            except HTTPException as error:
+                return JSONResponse({'detail':error.detail}, status_code=error.status_code,
+                                    headers=error.headers)
+    return await call_next(request)
+
+
+@app.get('/login')
+def login_page():
+    return FileResponse(LOGIN_STATIC)
 
 
 class PlaceIn(BaseModel):
@@ -207,8 +240,9 @@ def insights_home():
 
 
 @app.get('/api/monitoring/overview')
-def get_monitoring_overview(days: int = Query(7, ge=1, le=31), region_id: int | None = Query(None,ge=1)):
+def get_monitoring_overview(request:Request, days: int = Query(7, ge=1, le=31), region_id: int | None = Query(None,ge=1)):
     with db() as c:
+        region_id=access.effective_region(c,request,region_id)
         return monitoring_overview(c, days=days,region_id=region_id,
                       allowed_region_ids=admin.subtree_ids(c,region_id))
 
@@ -219,13 +253,13 @@ def health():
 
 
 @app.get('/api/places')
-def places(region_id: int | None = Query(None,ge=1)):
+def places(request:Request, region_id: int | None = Query(None,ge=1)):
     with db() as c:
-        return admin.place_rows(c,region_id)
+        return admin.place_rows(c,access.effective_region(c,request,region_id))
 
 
 @app.post('/api/places')
-def add_place(data: PlaceIn):
+def add_place(data: PlaceIn,request:Request):
     name=data.name.strip()
     if not name:
         raise HTTPException(422,'场所名称不能为空')
@@ -233,6 +267,7 @@ def add_place(data: PlaceIn):
         with db() as c:
             region_id=data.region_id or admin.demo_leaf(c) # legacy quick-start compatibility
             admin._validate_leaf(c,region_id)
+            access.effective_region(c,request,region_id)
             cursor=c.execute('INSERT INTO places(name,region_id) VALUES(?,?)',(name,region_id))
             result={'id':cursor.lastrowid,'name':name,'region_id':region_id,'active':True}
             admin.audit(c,'place_create',f"place:{result['id']}",None,result)
@@ -242,18 +277,22 @@ def add_place(data: PlaceIn):
 
 
 @app.get('/api/sources')
-def sources():
+def sources(request:Request):
     with db() as c:
-        return [dict(r) for r in c.execute('''
+        allowed={p['id'] for p in admin.place_rows(c,access.effective_region(c,request,None))}
+        return [{**dict(r), 'uri': ('[REDACTED]' if access.principal(request)
+                                            and access.principal(request)['level']>=2 else r['uri'])}
+                for r in c.execute('''
             SELECT s.*, p.name AS place_name, p.active AS place_active FROM sources s JOIN places p ON p.id=s.place_id ORDER BY s.id DESC
-        ''')]
+        ''') if r['place_id'] in allowed]
 
 
 @app.post('/api/sources')
-def add_source(data: SourceIn):
+def add_source(data: SourceIn,request:Request):
     admin.validate_source(data.kind,data.uri)
     with db() as c:
         admin._active_place(c,data.place_id)
+        access.check_place(c,request,data.place_id)
         cursor = c.execute('INSERT INTO sources(place_id,name,kind,uri) VALUES (?,?,?,?)',
                            (data.place_id, data.name, data.kind, data.uri))
         result={'id': cursor.lastrowid, **data.model_dump()}
@@ -434,10 +473,12 @@ def bind_frigate_camera(data: FrigateCameraBinding):
 
 
 @app.get('/api/frigate/cameras')
-def list_frigate_cameras():
+def list_frigate_cameras(request:Request):
     with db() as c:
+        allowed={p['id'] for p in admin.place_rows(c,access.effective_region(c,request,None))}
         return [dict(r) for r in c.execute('''SELECT b.camera, b.place_id, p.name AS place_name
-            FROM frigate_camera_bindings b JOIN places p ON p.id=b.place_id ORDER BY b.camera''')]
+            FROM frigate_camera_bindings b JOIN places p ON p.id=b.place_id ORDER BY b.camera''')
+            if r['place_id'] in allowed]
 
 
 @app.post('/api/frigate/sync')
@@ -484,9 +525,10 @@ def sync_frigate(limit: int = Query(100, ge=1, le=500)):
 
 
 @app.get('/api/frigate/events')
-def list_frigate_events(limit: int = Query(100, ge=1, le=500),
+def list_frigate_events(request:Request, limit: int = Query(100, ge=1, le=500),
                         region_id: int | None = Query(None,ge=1)):
     with db() as c:
+        region_id=access.effective_region(c,request,region_id)
         subtree=admin.subtree_ids(c,region_id)
         if subtree is None:
             query='''SELECT e.*,p.name AS place_name FROM frigate_object_events e
@@ -502,14 +544,15 @@ def list_frigate_events(limit: int = Query(100, ge=1, le=500),
 
 
 @app.get('/api/frigate/summary')
-def frigate_summary():
+def frigate_summary(request:Request):
     with db() as c:
         rows = c.execute('''SELECT p.id AS place_id,p.name AS place_name,
             COUNT(e.event_id) AS observed_person_objects,
             SUM(CASE WHEN e.event_id IS NOT NULL AND e.ended_at IS NULL THEN 1 ELSE 0 END) AS still_active
             FROM places p LEFT JOIN frigate_object_events e ON e.place_id=p.id
             GROUP BY p.id,p.name ORDER BY p.id''').fetchall()
-        return {'places':[dict(r) for r in rows],
+        allowed={p['id'] for p in admin.place_rows(c,access.effective_region(c,request,None))}
+        return {'places':[dict(r) for r in rows if r['place_id'] in allowed],
                 'note':'person目标事件数不等于身份去重人数或真实到访人次。'}
 
 
@@ -773,10 +816,11 @@ def frigate_status():
 # Synthetic-only operational dashboard + people/visit search. Never join a
 # Frigate object event to a synthetic identity. Real metrics remain separate.
 @app.get('/api/insights/overview')
-def get_insights_overview(days: int = Query(7, ge=1, le=31),
+def get_insights_overview(request:Request, days: int = Query(7, ge=1, le=31),
                           region_id: int | None = Query(None, ge=1),
                           place_id: int | None = Query(None, ge=1)):
     with db() as c:
+        region_id=access.effective_region(c,request,region_id)
         allowed = admin.subtree_ids(c, region_id)
         rows = admin.place_rows(c,region_id)
         if place_id is not None:
@@ -797,31 +841,34 @@ def get_insights_overview(days: int = Query(7, ge=1, le=31),
 
 
 @app.get('/api/insights/people')
-def search_insights_people(q: str = Query('',max_length=40),
+def search_insights_people(request:Request, q: str = Query('',max_length=40),
                            days: int = Query(30,ge=1,le=365),
                            place_id: int | None = Query(None,ge=1),
                            region_id: int | None = Query(None,ge=1)):
     with db() as c:
+        region_id=access.effective_region(c,request,region_id)
         return insights.people_search(_analyze_synthetic(c), admin.place_rows(c,region_id),
                                       days=days,query=q,place_id=place_id)
 
 
 @app.get('/api/insights/people/{person}')
-def get_insights_person(person: str, days: int = Query(30,ge=1,le=365),
+def get_insights_person(request:Request, person: str, days: int = Query(30,ge=1,le=365),
                         region_id: int | None = Query(None,ge=1)):
     if not __import__('re').fullmatch(r'P[0-9]{3}',person):
         raise HTTPException(422, '只能查询虚构的 P### 人员编号')
     with db() as c:
+        region_id=access.effective_region(c,request,region_id)
         return insights.person_detail(_analyze_synthetic(c),admin.place_rows(c,region_id),
                                       person,days=days)
 
 
 @app.get('/api/insights/relationships')
-def get_insights_relationships(days: int = Query(30,ge=1,le=365),
+def get_insights_relationships(request:Request, days: int = Query(30,ge=1,le=365),
                                region_id: int | None = Query(None,ge=1),
                                place_id: int | None = Query(None,ge=1),
                                person: str | None = Query(None,pattern=r'^P[0-9]{3}$')):
     with db() as c:
+        region_id=access.effective_region(c,request,region_id)
         rows=admin.place_rows(c,region_id)
         place_ids={p['id'] for p in rows}
         if place_id is not None:

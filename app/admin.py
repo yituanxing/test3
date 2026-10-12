@@ -4,7 +4,8 @@ This is local-only DEMO infrastructure: no geolocation of persons, no identifica
 The data migration preserves existing observations and binds legacy places to an
 explicitly fictional leaf region; original place ids never change.
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from app import access
 from pydantic import BaseModel, Field
 from typing import Literal
 import sqlite3
@@ -177,9 +178,10 @@ def register(app,get_db):
 
 
 @router.get('/api/regions')
-def get_regions():
+def get_regions(request:Request):
     with _get_db() as c:
-        return regions_with_paths(c)
+        allowed=access.subtree(c,request)
+        return [r for r in regions_with_paths(c) if allowed is None or r['id'] in allowed]
 
 
 @router.post('/api/regions')
@@ -208,12 +210,14 @@ def add_region(data: RegionIn):
 
 
 @router.put('/api/places/{place_id}')
-def update_place(place_id:int,data:PlaceUpdate):
+def update_place(place_id:int,data:PlaceUpdate,request:Request):
     with _get_db() as c:
         old=c.execute('SELECT * FROM places WHERE id=?',(place_id,)).fetchone()
         if not old:
             raise HTTPException(404,'场所不存在')
         _validate_leaf(c,data.region_id)
+        access.check_place(c,request,place_id)
+        access.effective_region(c,request,data.region_id)
         name=data.name.strip()
         if not name:
             raise HTTPException(422,'场所名称不能为空')
@@ -228,12 +232,14 @@ def update_place(place_id:int,data:PlaceUpdate):
 
 
 @router.put('/api/sources/{source_id}')
-def update_source(source_id:int,data:SourceUpdate):
+def update_source(source_id:int,data:SourceUpdate,request:Request):
     validate_source(data.kind,data.uri)
     with _get_db() as c:
         old=c.execute('SELECT * FROM sources WHERE id=?',(source_id,)).fetchone()
         if not old:
             raise HTTPException(404,'视频源不存在')
+        access.check_source(c,request,source_id)
+        access.check_place(c,request,data.place_id)
         if data.enabled:
             _active_place(c,data.place_id)
         elif not c.execute('SELECT 1 FROM places WHERE id=?',(data.place_id,)).fetchone():
@@ -249,11 +255,12 @@ def update_source(source_id:int,data:SourceUpdate):
 
 
 @router.patch('/api/sources/{source_id}/state')
-def source_state(source_id:int,data:SourceState):
+def source_state(source_id:int,data:SourceState,request:Request):
     with _get_db() as c:
         src=c.execute('SELECT place_id,enabled FROM sources WHERE id=?',(source_id,)).fetchone()
         if not src:
             raise HTTPException(404,'视频源不存在')
+        access.check_source(c,request,source_id)
         if data.enabled:
             _active_place(c,src['place_id'])
         c.execute('UPDATE sources SET enabled=? WHERE id=?',(int(data.enabled),source_id))

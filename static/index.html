@@ -1,7 +1,42 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>ZD视频采集-分析验证台 V0.6</title><style>
 :root{font-family:system-ui,-apple-system,'Microsoft Yahei',sans-serif;color:#1b2a41;background:#f5f7fa}*{box-sizing:border-box}body{max-width:1150px;margin:30px auto;padding:0 20px}h1{font-size:26px;margin-bottom:6px}small,p{color:#556277}h2{font-size:17px;margin:0 0 18px}section{background:white;border:1px solid #e4e9ef;border-radius:12px;padding:20px;margin:18px 0;box-shadow:0 3px 13px #00000007}input,select,button{border-radius:7px;padding:10px 11px;border:1px solid #cbd5e1;margin-right:6px;max-width:100%}input{min-width:190px}button{background:#145db2;color:white;border:0;cursor:pointer}button:hover{background:#074589}button.alt{background:#e9eef5;color:#173352}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:10px;border-bottom:1px solid #edf1f6;text-align:left}th{color:#50627a;font-weight:600}.tag{display:inline-block;padding:2px 7px;background:#ecfdf5;color:#166534;border-radius:5px}.fake{background:#fff7ed;color:#9a3412}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.hint{font-size:13px;color:#526582}.box{padding:13px;background:#eff7ff;border-left:3px solid #347add;border-radius:4px;white-space:pre-wrap}.box.error{background:#fff4f2;border-color:#de4736}.kpi{font-size:24px;font-weight:700}.kpi small{font-size:12px;font-weight:400}#status{min-height:25px;margin:13px 0;font-size:14px}
-</style></head><body><div style="background:#e7f4e9;padding:12px;text-align:center"><b>全链路运行：</b> <a href="/insights">态势检索</a><a href="/monitor">打开运行监控与真实数据统计 →</a>　|　<a href="/business">打开合成业务闭环验证台 →</a>　|　<a href="/admin">行政区域与设备管理 →</a></div>
+</style><script>
+(function(){
+const token=sessionStorage.getItem('zd_access_token');
+if(!token){location.replace('/login');return}
+const original=window.fetch.bind(window);
+window.fetch=function(input,init={}){
+  let target=(typeof input==='string'?input:input.url)||'';
+  let options={...init};
+  if(target.startsWith('/api/')){
+    const headers=new Headers(init.headers||{});
+    headers.set('Authorization','Bearer '+token);
+    options.headers=headers;
+  }
+  return original(input,options).then(resp=>{
+    if(resp.status===401 && !target.includes('/api/auth/login')){
+      sessionStorage.removeItem('zd_access_token'); location.replace('/login');
+    }
+    return resp;
+  });
+};
+window.zdLogout=async function(){
+  await window.fetch('/api/auth/logout',{method:'POST'}).catch(()=>{});
+  sessionStorage.removeItem('zd_access_token');location.replace('/login')};
+window.addEventListener('load',async()=>{
+  try{
+    const r=await fetch('/api/auth/me');
+    if(!r.ok)return;
+    const user=await r.json();
+    const badge=document.createElement('div');badge.style.cssText='position:fixed;right:12px;top:6px;z-index:500;background:#132c4a;color:#fff;border-radius:8px;padding:5px 12px;font:12px system-ui';
+    badge.textContent=user.username+' · '+user.region_name+' · '+user.role+'　';
+    const btn=document.createElement('button');btn.textContent='退出';btn.style.cssText='background:#3e648f;color:#fff;padding:3px 8px;border:0;border-radius:5px;cursor:pointer';
+    btn.onclick=window.zdLogout;badge.append(btn);document.body.append(badge);
+  }catch(e){console.warn('Auth status unavailable')}
+});
+})();
+</script></head><body><div style="background:#e7f4e9;padding:12px;text-align:center"><b>全链路运行：</b> <a href="/insights">态势检索</a><a href="/monitor">打开运行监控与真实数据统计 →</a>　|　<a href="/business">打开合成业务闭环验证台 →</a>　|　<a href="/admin">行政区域与设备管理 →</a></div>
 <h1>视频采集与业务分析验证台 <small>V0.6</small></h1>
 <p>真实的视频解码 / 可选 OpenCV Zoo YuNet 人脸检测 / 结构化入库 / 阈值重算 / 人工纠正。此版不识别人员身份，亦不推断跨场所关系。</p>
 <div id="status" class="box">准备就绪。可先点击“插入合成测试数据”，无需摄像头就能检查后端规则链路。</div>
