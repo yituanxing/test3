@@ -196,7 +196,7 @@ ffmpeg -hide_banner -loglevel error -nostdin -y -f lavfi \
   -i 'testsrc2=size=320x240:rate=15' -t 45 -an \
   -c:v libx264 -pix_fmt yuv420p -g 15 -f mpeg "$BASE/sim/test.dat"
 test -s "$BASE/sim/test.dat"
-docker run -d --rm --name "$SIM_CONTAINER" \
+docker run -d --name "$SIM_CONTAINER" \
   --network "${PROJECT}_media-net" \
   --mount "type=bind,src=$BASE/sim,dst=/app" \
   --workdir /app golang:1.23 \
@@ -429,6 +429,25 @@ except OSError:
     reachable=False
 print('GB media RTSP diagnostic:',{'port':port,'tcp_reachable':reachable,
    'ffmpeg_failures':{k:len(re.findall(p,s,re.I)) for k,p in errors.items()}})
+PY
+  docker logs "$SIM_CONTAINER" > "$BASE/gb-device-runtime.log" 2>&1 || true
+  docker compose -p "$PROJECT" -f "$BASE/wvp/docker/docker-compose.yml" \
+    logs --no-color polaris-media > "$BASE/gb-media-runtime.log" 2>&1 || true
+  python - "$BASE" <<'PY'
+import json,re,sys
+from pathlib import Path
+p=Path(sys.argv[1])
+s=(p/'gb-device-runtime.log').read_text(encoding='utf-8',errors='replace') if (p/'gb-device-runtime.log').exists() else ''
+z=(p/'gb-media-runtime.log').read_text(encoding='utf-8',errors='replace') if (p/'gb-media-runtime.log').exists() else ''
+print('GB simulator media signals:',{
+ 'invite_received':len(re.findall('Sever.*Invite',s,re.I)),
+ 'ack_received':len(re.findall('Server.*ACK',s,re.I)),
+ 'rtp_sender_started':len(re.findall('stream data will be write',s,re.I)),
+ 'rtp_connect_failed':len(re.findall('connect failed|dial tcp|write data by udp error',s,re.I)),
+ 'panic':len(re.findall('panic:|runtime error:',s,re.I)),
+ 'zlm_media_registered':len(re.findall('regist|on_stream_changed|stream registered',z,re.I)),
+ 'zlm_rtp_errors':len(re.findall('Rtp.*error|invalid.*RTP|recv RTP.*failed',z,re.I))
+})
 PY
   echo "GB PS/RTP media decode not proven; Catalog remains independently PASS." >&2
   exit 1
