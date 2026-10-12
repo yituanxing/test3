@@ -28,6 +28,7 @@ DATA_DIR = Path(os.getenv('ZD_DATA_DIR', str(ROOT / 'data')))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB = DATA_DIR / 'demo.sqlite3'
 STATIC = ROOT / 'static' / 'index.html'
+PORTAL_STATIC = ROOT / 'static' / 'portal.html'
 BUSINESS_STATIC = ROOT / 'static' / 'business.html'
 MONITOR_STATIC = ROOT / 'static' / 'monitor.html'
 ADMIN_STATIC = ROOT / 'static' / 'admin.html'
@@ -217,6 +218,11 @@ class RuleIn(BaseModel):
 @app.get('/')
 def home():
     return FileResponse(STATIC)
+
+
+@app.get('/portal')
+def portal_home():
+    return FileResponse(PORTAL_STATIC)
 
 
 @app.get('/business')

@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>重点场所智能预警分析平台 · 综合工作台</title>
+<style>
+:root{--nav:#112543;--nav2:#1e3a60;--blue:#3568d9;--bg:#f2f5fa;--ink:#20334f;--muted:#71819a;--border:#e2e8f1;--green:#0a8f7a;--orange:#d28a2c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,"Microsoft Yahei",sans-serif}
+a{color:inherit;text-decoration:none}button,select,textarea{font:inherit}button{border:0;border-radius:9px;cursor:pointer;padding:9px 15px;background:var(--blue);color:#fff}
+button:disabled{opacity:.5}button.alt{background:#e9f0fd;color:#2653aa}button.link{background:none;color:var(--blue);padding:4px 0;text-align:left}
+.layout{display:grid;grid-template-columns:235px minmax(0,1fr);min-height:100vh}
+aside{background:linear-gradient(180deg,var(--nav),#172f51);color:#d6e2f1;padding:24px 13px;position:sticky;top:0;height:100vh;overflow:auto}
+.logo{padding:3px 12px 20px;border-bottom:1px solid #3e5271}.logo b{font-size:17px;color:white;display:block}.logo small{font-size:11px;color:#9eb4d3}
+.navtitle{margin:22px 12px 8px;text-transform:uppercase;font-size:11px;color:#879dbc;letter-spacing:1px}
+nav a{display:block;padding:12px 13px;border-radius:9px;margin:4px 0;color:#bcd0e7}
+nav a:hover,nav a.on{background:#2a4770;color:#fff}
+.sidebar-foot{border-top:1px solid #334d70;padding:18px 12px;margin-top:22px;font-size:12px;color:#a8bed8}
+main{min-width:0}.top{height:76px;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 32px;border-bottom:1px solid var(--border)}
+.top h1{margin:0;font-size:21px;letter-spacing:.2px}.top small{color:var(--muted)}.userinfo{display:flex;align-items:center;gap:10px;color:#455b77}
+.content{max-width:1500px;margin:auto;padding:26px 32px 64px}
+.caption{font-size:12px;color:#5d7092;letter-spacing:1px;font-weight:750;margin-bottom:5px}
+.lead{font-size:22px;font-weight:780;line-height:1.4;margin:0}.sub{color:var(--muted);margin:8px 0 20px}
+.banner{background:#eff7ff;border:1px solid #c9dcf2;padding:13px 17px;border-radius:11px;color:#355476;font-size:13px;margin:0 0 21px}
+.banner strong{color:#244a7b}.smallnote{font-size:12px;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin:20px 0}.card,.panel{background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 4px 25px #18395e09}
+.card{padding:21px 20px;border-top:3px solid #7499ef}.card:nth-child(2){border-top-color:#3cb7a7}.card:nth-child(3){border-top-color:#eba65c}.card:nth-child(4){border-top-color:#8894c9}
+.card strong{display:block;font-size:32px;margin:4px 0;color:#1e3559}.card .label{color:#657a95;font-size:12px}
+.grid{display:grid;grid-template-columns:minmax(0,1.38fr) minmax(310px,1fr);gap:16px;margin:16px 0}.panel{padding:21px;min-width:0}
+.panel h2{margin:0 0 6px;font-size:17px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.pill{border-radius:20px;padding:4px 9px;background:#eaf1ff;color:#385daa;font-size:12px}
+.pill.real{background:#e4f5f2;color:#107b6b}.pill.demo{background:#fff4e2;color:#92621d}
+.items{display:grid;gap:10px;margin-top:15px}.item{padding:14px;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.item:hover{background:#f8faff}.item b{display:block}.item small{display:block;color:var(--muted);margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:#657791;background:#f5f8fd;font-weight:650}td,th{padding:12px 10px;border-bottom:1px solid #edf1f7;vertical-align:top}td:last-child{text-align:right}
+.scroller{overflow:auto}.scroller table{min-width:590px}.empty{padding:29px;color:var(--muted);text-align:center;border:1px dashed #d5deed;border-radius:9px;margin:14px 0}
+.chart{height:185px;margin:15px 0 5px}.chart svg{width:100%;height:100%}
+.statline{display:flex;justify-content:space-between;gap:10px;margin:10px 0;border-bottom:1px solid #edf0f5;padding-bottom:9px}
+.arrow{color:var(--blue);font-weight:700}.detail-head{display:flex;justify-content:space-between;gap:15px;margin-bottom:17px;align-items:start}
+.breadcrumb{color:var(--muted);font-size:13px;margin-bottom:12px}.breadcrumb a{color:var(--blue)}
+.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.field{display:grid;gap:7px;margin:12px 0}select,textarea{border:1px solid #cdd8e7;border-radius:8px;padding:10px 12px;background:#fff;color:var(--ink)}textarea{min-height:85px;resize:vertical;width:100%}
+.code{background:#f4f7fd;border-radius:8px;padding:12px;word-break:break-all;font:12px/1.7 ui-monospace,monospace;color:#3e5271}
+.notice{color:#945e14;background:#fff5e5;padding:13px 15px;border-radius:9px;margin:16px 0}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}.toolbar a{padding:9px 12px;border:1px solid #cbd8e9;border-radius:8px;color:#2858b4;background:white}
+.err{border:1px solid #f2cccc;background:#fff3f2;padding:15px;border-radius:10px;color:#9b3737}
+#flash{position:fixed;bottom:25px;right:25px;z-index:30;padding:13px 18px;background:#173d63;color:white;border-radius:10px;display:none}
+@media(max-width:1120px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.cols{grid-template-columns:1fr}}
+@media(max-width:760px){.layout{grid-template-columns:1fr}aside{height:auto;position:static;padding:12px}.logo{padding:8px}.navtitle,.sidebar-foot{display:none}nav{display:flex;flex-wrap:wrap}nav a{padding:9px}.top{height:auto;padding:15px}.top h1{font-size:16px}.content{padding:16px}.userinfo{font-size:11px}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside>
+  <div class="logo"><b>ZD · 智能预警</b><small>重点场所 / 综合治理 / DEMO</small></div>
+  <div class="navtitle">业务工作台</div>
+  <nav id="navigation">
+    <a data-tab="overview" href="/portal">◉ &nbsp;综合态势</a>
+    <a data-tab="places" href="/portal?tab=places">▦ &nbsp;场所监测</a>
+    <a data-tab="alerts" href="/portal?tab=alerts">◇ &nbsp;预警中心</a>
+    <a href="/monitor">◷ &nbsp;视频监测</a>
+    <a href="/insights">↗ &nbsp;智能分析</a>
+    <a class="state-only" href="/base">▤ &nbsp;模拟人员底库</a>
+    <a class="state-only" href="/business">⚙ &nbsp;规则与复核</a>
+    <a href="/admin">▣ &nbsp;系统管理</a>
+  </nav>
+  <div class="sidebar-foot">真实视频仅统计匿名目标事件；P### 人员、跨所关系及预警为合成演示。</div>
+</aside>
+<main>
+ <div class="top"><div><h1>重点场所智能预警分析平台</h1><small id="scope">辖区信息加载中</small></div><div class="userinfo"><span id="who">—</span><button class="alt" id="logout">退出</button></div></div>
+ <div class="content" id="view"><div class="empty">正在加载辖区数据…</div></div>
+</main>
+</div>
+<div id="flash"></div>
+<script>
+(function(){
+'use strict';
+const token=sessionStorage.getItem('zd_access_token');
+if(!token){location.replace('/login');return;}
+const h={Authorization:'Bearer '+token};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\u0027':'&#39;'}[c]));
+const route=o=>'/portal?'+new URLSearchParams(o).toString();
+const dt=s=>s?new Date(s).toLocaleString('zh-CN',{hour12:false}):'—';
+let state={user:null,places:[],sources:[],dash:null,monitor:null,events:[]};
+async function api(url,opts){
+  const o=Object.assign({},opts||{});o.headers=Object.assign({},h,o.headers||{});
+  const r=await fetch(url,o);
+  if(r.status===401){sessionStorage.removeItem('zd_access_token');location.replace('/login');throw Error('会话过期');}
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw Error(data.detail||('请求失败 HTTP '+r.status));
+  return data;
+}
+function toast(msg){$('flash').textContent=msg;$('flash').style.display='block';setTimeout(()=>$('flash').style.display='none',3600);}
+function title(k,s){return '<div class="caption">'+esc(k)+'</div><h2 class="lead">'+esc(s)+'</h2>';}
+function notice(){return '<div class="banner"><strong>数据来源说明：</strong>真实视频只展示匿名 person 目标事件、抽样帧与检测框；模拟到访、P### 编号、七类业务预警均来自合成场景，不代表真实人员身份或真实风险结论。</div>';}
+function stat(a,b,c){return '<div class="card"><span class="label">'+esc(a)+'</span><strong>'+esc(b)+'</strong><span class="smallnote">'+esc(c)+'</span></div>';}
+function placeLink(p){return route({place:p.id});}
+function alertLink(a){return route({alert:a.key});}
+function rows(r){return r.length?r.join(''):'<tr><td colspan="5" class="smallnote">暂无记录；可由管理员初始化合成演示数据。</td></tr>';}
+function synthetic(){return state.dash.synthetic;}
+function video(){return state.dash.real_video;}
+function placeData(id){return state.places.find(x=>x.id===id);}
+function placeStats(id){return state.monitor.places.find(x=>x.place_id===id)||{};}
+function placeSynthetic(id){return synthetic().ranking.find(x=>x.place_id===id)||{};}
+function trend(arr){
+ if(!arr||!arr.length)return '<div class="empty">暂无趋势数据</div>';
+ const m=Math.max(1,...arr.map(x=>x.visits));
+ const points=arr.map((v,i)=>(35+(i*585/Math.max(arr.length-1,1))).toFixed(1)+','+(165-v.visits*140/m).toFixed(1)).join(' ');
+ return '<div class="chart"><svg viewBox="0 0 660 185" preserveAspectRatio="none" role="img" aria-label="合成到访趋势图"><line x1="30" y1="165" x2="630" y2="165" stroke="#dce5f2"/><line x1="30" y1="85" x2="630" y2="85" stroke="#edf1f7"/><polyline points="'+points+'" fill="none" stroke="#4678e8" stroke-width="3" stroke-linejoin="round"/><text x="35" y="180" fill="#71819a" font-size="12">'+esc(arr[0].day)+'</text><text x="535" y="180" fill="#71819a" font-size="12">'+esc(arr[arr.length-1].day)+'</text></svg></div><div class="smallnote">合成场景按 UTC 日期统计去重到访会话</div>';
+}
+function summary(){
+ const syn=synthetic(),real=video(),c=syn.cards;
+ const rank=syn.ranking.slice(0,6).map(p=>'<a class="item" href="'+placeLink(p)+'"><div><b>'+esc(p.place_name)+'</b><small>合成到访 '+p.visits+' · 模拟命中 '+p.alerts+'</small></div><span class="arrow">查看 →</span></a>').join('');
+ const hits=syn.recent_alerts.slice(0,7).map(a=>'<a class="item" href="'+alertLink(a)+'"><div><b>'+esc(a.type_name)+'</b><small>'+esc((a.place_names||[]).join('、'))+' · '+esc(a.status||'待复核')+'</small></div><span class="pill demo">合成</span></a>').join('');
+ return title('OVERVIEW · 综合态势','辖区重点场所运行概览')+'<p class="sub">从辖区总览进入场所、证据和预警复核。所有统计按真实数据与合成场景分区展示。</p>'+notice()+
+ '<div class="cards">'+stat('辖区场所',c.place_count,'当前账号授权范围')+stat('登记视频源',state.sources.length,'登记不代表实时在线')+stat('匿名目标事件（近7天）',real.counts.person_objects,'真实 Frigate 目标事件，非独立人数')+stat('模拟规则命中',c.rule_hits,'合成数据，不是实际风险')+'</div>'+
+ '<div class="grid"><section class="panel"><div class="row"><h2>场所监测入口</h2><a class="arrow" href="'+route({tab:'places'})+'">全部场所 →</a></div><p class="smallnote">按辖区归属查看；尚未录入场所经纬度，不伪造地图坐标。</p><div class="items">'+(rank||'<div class="empty">没有场所或合成活动记录</div>')+'</div></section>'+
+ '<section class="panel"><div class="row"><h2>近期规则命中</h2><a class="arrow" href="'+route({tab:'alerts'})+'">预警中心 →</a></div><p class="smallnote">以下为合成规则候选，待人工核实。</p><div class="items">'+(hits||'<div class="empty">尚无模拟规则命中</div>')+'</div></section></div>'+
+ '<div class="grid"><section class="panel"><h2>合成场景 · 到访趋势</h2>'+trend(syn.trend)+'</section>'+
+ '<section class="panel"><h2>真实视频 · 检测数据</h2><div class="statline"><span>Frigate person 事件</span><b>'+real.counts.person_objects+'</b></div><div class="statline"><span>OpenCV 抽样帧</span><b>'+real.counts.sampled_frames+'</b></div><div class="statline"><span>人脸检测框</span><b>'+real.counts.face_detections+'</b></div><p class="smallnote">不能据此计算不同人数或人脸识别准确率。</p><a class="arrow" href="/monitor">前往视频运行监测 →</a></section></div>'+
+ (state.user.level===1?'<div class="toolbar"><button id="seed">初始化合成业务场景（不会写入视频数据）</button><a href="/base">生成模拟底库</a><a href="/business">配置规则和复核</a></div>':'');
+}
+function listPlaces(){
+ return title('PLACES · 场所监测','辖区场所列表')+'<p class="sub">选择一个场所，查看设备登记、真实匿名事件、合成业务概况。</p>'+notice()+
+ '<section class="panel"><div class="scroller"><table><thead><tr><th>场所名称</th><th>所属辖区</th><th>状态</th><th>登记源</th><th>匿名事件（7天）</th><th>详情</th></tr></thead><tbody>'+
+ rows(state.places.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.region_path||'—')+'</td><td>'+(p.active?'启用':'停用')+'</td><td>'+state.sources.filter(x=>x.place_id===p.id).length+'</td><td>'+esc(placeStats(p.id).person_objects||0)+'</td><td><a class="arrow" href="'+placeLink(p)+'">查看 →</a></td></tr>'))+'</tbody></table></div></section>';
+}
+function showPlace(id){
+ const p=placeData(id);if(!p)return '<div class="err">无权查看或场所不存在。<a href="/portal?tab=places">返回场所列表</a></div>';
+ const real=placeStats(id),demo=placeSynthetic(id),src=state.sources.filter(x=>x.place_id===id);
+ const events=state.events.filter(x=>x.place_id===id).slice(0,12);
+ const alerts=synthetic().recent_alerts.filter(x=>x.place_ids.includes(id)).slice(0,10);
+ return '<div class="breadcrumb"><a href="/portal">综合态势</a> / <a href="'+route({tab:'places'})+'">场所监测</a> / '+esc(p.name)+'</div>'+
+ '<div class="detail-head">'+title('PLACE DETAIL · 场所详情',p.name)+'<span class="pill">'+(p.active?'场所启用':'场所停用')+'</span></div>'+
+ '<p class="sub">所属辖区：'+esc(p.region_path||'—')+'</p>'+notice()+
+ '<div class="cards">'+stat('已登记视频源',src.length,'非实时在线数量')+stat('匿名目标事件（7天）',real.person_objects||0,'真实 person 事件数')+
+ stat('合成到访',demo.visits||0,'虚构活动数据')+stat('合成规则命中',demo.alerts||0,'候选提示，非真实异常')+'</div>'+
+ '<div class="grid"><section class="panel"><h2>视频源与设备</h2><p class="smallnote">显示已登记设备，不宣称在线播放或在线。</p><div class="items">'+(src.map(s=>'<div class="item"><div><b>'+esc(s.name)+'</b><small>'+esc(s.kind)+' · '+(s.enabled?'已启用':'已停用')+'</small></div><span class="pill real">视频源</span></div>').join('')||'<div class="empty">未登记视频源</div>')+'</div><div class="toolbar"><a href="/monitor">查看视频检测 →</a><a href="/admin">设备管理 →</a></div></section>'+
+ '<section class="panel"><h2>近期香港真实目标事件</h2><p class="smallnote">从最近 100 条已同步事件中筛选，不代表全部历史；不含人员身份。</p>'+
+ (events.length?'<div class="scroller"><table><thead><tr><th>摄像机</th><th>发生时间</th><th>置信度</th><th>类型</th></tr></thead><tbody>'+
+ events.map(e=>'<tr><td>'+esc(e.camera)+'</td><td>'+esc(dt(e.started_at))+'</td><td>'+esc(e.score==null?'—':Number(e.score).toFixed(2))+'</td><td>匿名 person</td></tr>').join('')+'</tbody></table></div>':'<div class="empty">近期无真实检测事件。可进入视频监测页面同步。</div>')+'</section></div>'+
+ '<section class="panel"><div class="row"><h2>关联模拟规则候选</h2><span class="pill demo">合成演示</span></div>'+
+ (alerts.length?'<div class="items">'+alerts.map(a=>'<a class="item" href="'+alertLink(a)+'"><div><b>'+esc(a.type_name)+'</b><small>'+esc(a.title)+'</small></div><span class="arrow">查看依据 →</span></a>').join('')+'</div>':'<div class="empty">此场所近期没有合成预警。</div>')+'</section>';
+}
+function listAlerts(){
+ const a=synthetic().recent_alerts;
+ return title('ALERTS · 预警中心','业务规则候选与人工复核')+'<p class="sub">模拟规则采用统一列表、证据详情和审核结果；不将共同出现或跨场所活动直接认定为异常。</p>'+notice()+
+ '<section class="panel"><div class="scroller"><table><thead><tr><th>类型</th><th>规则命中说明</th><th>场所</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
+ rows(a.map(x=>'<tr><td><span class="pill demo">'+esc(x.type_name)+'</span></td><td>'+esc(x.title)+'</td><td>'+esc((x.place_names||[]).join('、'))+'</td><td>'+esc(x.status||'待复核')+'</td><td><a class="arrow" href="'+alertLink(x)+'">证据详情 →</a></td></tr>'))+'</tbody></table></div><p class="smallnote">当前只展示最多 30 条近期合成规则候选；完整规则列表请从管理员业务验证台查看。</p></section>';
+}
+function showAlert(key){
+ const a=synthetic().recent_alerts.find(x=>x.key===key);
+ if(!a)return '<div class="err">该规则候选不在当前辖区或近期列表中。<a href="'+route({tab:'alerts'})+'">返回预警中心</a></div>';
+ const people=(a.people||[]).map(x=>esc(x)).join('、')||'—';
+ const sites=(a.place_names||[]).map(x=>esc(x)).join('、')||'—';
+ return '<div class="breadcrumb"><a href="/portal">综合态势</a> / <a href="'+route({tab:'alerts'})+'">预警中心</a> / 规则详情</div>'+
+ title('ALERT DETAIL · 规则依据','合成业务规则候选')+'<p class="sub">只有经人工复核的业务模拟结论；不是对真实人物的风险判断。</p>'+notice()+
+ '<div class="grid"><section class="panel"><div class="row"><h2>'+esc(a.type_name)+'</h2><span class="pill demo">合成演示</span></div>'+
+ '<div class="statline"><span>规则候选</span><b>'+esc(a.title)+'</b></div>'+
+ '<div class="statline"><span>涉及场所</span><b>'+sites+'</b></div>'+
+ '<div class="statline"><span>虚构标识</span><b>'+people+'</b></div>'+
+ '<div class="statline"><span>当前复核状态</span><b>'+esc(a.status||'待复核')+'</b></div>'+
+ '<h2>触发口径</h2><p>'+esc(a.detail||'请核对合成规则阈值和源数据。')+'</p>'+
+ '<h2>原始模拟观测证据 ID</h2><div class="code">'+esc((a.observation_ids||[]).join(', ')||'—')+'</div><p class="smallnote">ID 对应合成观测；未附真实照片，也不表明真实身份匹配。</p></section>'+
+ '<section class="panel"><h2>人工核查记录</h2>'+
+ (state.user.level===1?'<p class="smallnote">州级演示管理员可更新本条模拟规则的核查结论；保留规则依据。</p>'+
+ '<label class="field">处理结论<select id="decision"><option value="needs_review">继续核查</option><option value="false_positive">排除误报</option><option value="confirmed">确认规则命中</option></select></label>'+
+ '<label class="field">核查说明<textarea id="reason" maxlength="300" placeholder="至少输入两个字符，说明判断依据"></textarea></label>'+
+ '<button id="review" data-key="'+esc(a.key)+'">保存核查记录</button>':
+ '<div class="notice">当前账号仅可查看辖区内合成分析，核查操作需州级演示管理员。</div>')+
+ '<div class="toolbar"><a href="'+route({tab:'alerts'})+'">返回预警列表</a>'+
+ (state.user.level===1?'<a href="/business">完整规则管理 →</a>':'')+'</div></section></div>';
+}
+function render(){
+ const q=new URLSearchParams(location.search),tab=q.get('tab')||'overview';
+ document.querySelectorAll('nav [data-tab]').forEach(x=>x.classList.toggle('on',x.dataset.tab===tab&&!q.has('place')&&!q.has('alert')));
+ let page;
+ if(q.has('place')){const id=Number(q.get('place'));page=Number.isInteger(id)&&id>0?showPlace(id):'<div class="err">非法场所参数</div>';}
+ else if(q.has('alert'))page=showAlert(q.get('alert'));
+ else if(tab==='places')page=listPlaces();
+ else if(tab==='alerts')page=listAlerts();
+ else page=summary();
+ $('view').innerHTML=page;
+ const seed=$('seed');if(seed)seed.onclick=async()=>{
+  seed.disabled=true;try{await api('/api/business/seed',{method:'POST'});toast('已准备合成演示场景');await loadData();render();}
+  catch(e){toast(e.message);}finally{seed.disabled=false;}
+ };
+ const review=$('review');if(review)review.onclick=async()=>{
+  const reason=$('reason').value.trim();if(reason.length<2){toast('请填写核查说明（至少2字）');return;}
+  review.disabled=true;try{
+   await api('/api/business/alerts/'+encodeURIComponent(review.dataset.key)+'/review',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision:$('decision').value,reason})});
+   await loadData();render();toast('已保存模拟核查记录');
+  }catch(e){toast(e.message);}finally{review.disabled=false;}
+ };
+}
+async function loadData(){
+ const [places,sources,dash,monitor,events]=await Promise.all([
+  api('/api/places'),api('/api/sources'),api('/api/insights/overview?days=7'),
+  api('/api/monitoring/overview?days=7'),api('/api/frigate/events?limit=100')]);
+ Object.assign(state,{places,sources,dash,monitor,events});
+}
+$('logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST'}).catch(()=>{});sessionStorage.removeItem('zd_access_token');location.assign('/login');};
+(async()=>{
+ try{
+  state.user=await api('/api/auth/me');
+  $('who').textContent=state.user.username+' · '+state.user.region_name;
+  $('scope').textContent='当前授权辖区：'+state.user.region_name+' · '+['','州级','县市级','街道级','社区级'][state.user.level];
+  if(state.user.level!==1)document.querySelectorAll('.state-only').forEach(x=>x.remove());
+  await loadData();render();
+ }catch(e){$('view').innerHTML='<div class="err">加载失败：'+esc(e.message)+'。检查服务、会话和数据权限。<br><button id="retry">重新加载</button></div>';const retry=$('retry');if(retry)retry.onclick=()=>location.reload();}
+})();
+})();
+</script>
+</body>
+</html>
