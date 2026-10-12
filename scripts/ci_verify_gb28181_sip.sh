@@ -29,7 +29,9 @@ cleanup() {
     docker compose -p "$PROJECT" -f "$BASE/wvp/docker/docker-compose.yml" \
       down --volumes --remove-orphans >/dev/null 2>&1 || true
   fi
-  rm -rf "$BASE"
+  # Upstream MySQL/Redis write files as container root/mysql; a normal
+  # runner rm floods stderr with permission errors and hides SIP failures.
+  sudo rm -rf -- "$BASE" >/dev/null 2>&1 || true
   exit "$rc"
 }
 trap cleanup EXIT
@@ -139,6 +141,7 @@ echo "::endgroup::"
 
 echo "::group::Verify real WVP DB online flag AND Catalog channel"
 passed=0
+VALUE="no_database_response"
 for n in $(seq 1 55); do
   kill -0 "$SIM_PID" 2>/dev/null || {
     echo "GB SIP simulator exited before registration" >&2;exit 1;
@@ -156,7 +159,44 @@ for n in $(seq 1 55); do
   sleep 3
 done
 if [ "$passed" -ne 1 ]; then
-  echo "GB SIP REGISTER or Catalog channel did not materialize in WVP database" >&2
+  # Distinguish not registered, registered but offline, and Catalog missing.
+  # Never print raw WVP or Go SIP logs: they can expose Authorization hashes
+  # and platform/device credentials. Only collect aggregate diagnostics.
+  SQL_STATE="SELECT CONCAT(COALESCE((SELECT COUNT(*) FROM wvp_device WHERE device_id='$DEVICE'),0),':',COALESCE((SELECT MAX(on_line) FROM wvp_device WHERE device_id='$DEVICE'),-1),':',COALESCE((SELECT COUNT(*) FROM wvp_device_channel WHERE device_id='$DEVICE'),0),':',COALESCE((SELECT COUNT(*) FROM wvp_device_channel WHERE device_id='$DEVICE' AND gb_device_id='$CHANNEL'),0));"
+  DB_STATE="$(docker compose -p "$PROJECT" -f "$BASE/wvp/docker/docker-compose.yml" exec -T polaris-mysql mysql -uwvp_user -pwvp_password -N wvp -e "$SQL_STATE" 2>/dev/null || true)"
+  export DB_STATE
+  echo "WVP persisted SIP state (device rows:online flag:channel rows:matching channel) = ${DB_STATE:-unavailable}" >&2
+  python - "$BASE" <<'PY'
+import json,os,re,sys
+from pathlib import Path
+base=Path(sys.argv[1])
+path=Path(os.environ['REPORT'])
+v=json.loads(path.read_text(encoding='utf-8'))
+v['failure_stage']='WVP_SIP_REGISTER_OR_CATALOG_DATABASE_ASSERTION'
+v['db_counts_device_online_channels_matching']=os.getenv('DB_STATE','unavailable')
+sim=base/'simulator.log'
+if sim.exists():
+    # Counts only. Avoid dumping SIP authorization, config or passwords.
+    data=sim.read_text(encoding='utf-8',errors='replace')
+    v['simulator_log_signal_counts']={
+        'register_mentions':len(re.findall('register',data,re.I)),
+        'digest_challenges':len(re.findall('401|WWWAuth',data,re.I)),
+        'success_mentions':len(re.findall('200|registered',data,re.I)),
+        'error_mentions':len(re.findall('error|failed|panic',data,re.I)),
+    }
+logs=list((base/'wvp/docker/logs/wvp').glob('sip*.log'))
+if logs:
+    data='\n'.join(p.read_text(encoding='utf-8',errors='replace') for p in logs)
+    v['server_sip_signal_counts']={
+        'register_mentions':len(re.findall('REGISTER|注册',data,re.I)),
+        'auth_failures':len(re.findall('401|鉴权失败|认证失败',data,re.I)),
+        'catalog_mentions':len(re.findall('Catalog|目录',data,re.I)),
+    }
+path.write_text(json.dumps(v,indent=2,ensure_ascii=False),encoding='utf-8')
+print('Diagnostic stage:',v['failure_stage'])
+print('Diagnostic signal counts:',json.dumps({k:v[k] for k in v if k.endswith('_signal_counts')},ensure_ascii=False))
+PY
+  echo "GB SIP REGISTER or Catalog not proven; WVP database requirements failed" >&2
   exit 1
 fi
 echo "SUCCESS: WVP persisted 1 online SIP device and its advertised Catalog channel."
