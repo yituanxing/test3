@@ -41,5 +41,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: verified-video-pipeline
-          path: reports/verify-live-frigate.json
+          path: |
+            reports/verify-live-frigate.json
+            reports/motion-diagnostics.json
+            reports/frigate-frame-*.jpg
           if-no-files-found: warn

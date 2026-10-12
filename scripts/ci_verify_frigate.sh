@@ -94,6 +94,9 @@ PUBLISH_PID=$!
 sleep 3
 kill -0 "$PUBLISH_PID" || { echo "RTSP publisher exited" >&2; tail -n 50 .ci-data/publisher.log; exit 1; }
 docker compose -f "$COMPOSE" up -d frigate
+echo "::group::Independent motion and decoded-frame diagnostics"
+python scripts/diagnose_motion.py --camera demo --frigate http://127.0.0.1:5000 --report reports/motion-diagnostics.json || true
+echo "::endgroup::"
 python -m uvicorn app.bridge:app --host 127.0.0.1 --port 8000 \
   >.ci-data/backend.log 2>&1 &
 BACKEND_PID=$!
@@ -104,5 +107,5 @@ python scripts/verify_live_frigate.py \
   --frigate http://127.0.0.1:5000 \
   --backend http://127.0.0.1:8000 \
   --camera demo --place-id 1 --require-person \
-  --wait-seconds 210 --report reports/verify-live-frigate.json
+  --wait-seconds 100 --report reports/verify-live-frigate.json
 echo "::endgroup::"
