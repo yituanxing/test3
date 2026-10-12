@@ -81,6 +81,14 @@ content=transport.read_text()
 old='const sipMaxPacketSize = 1500'
 if content.count(old)!=1:raise SystemExit('Simulator UDP packet bound upstream version changed')
 transport.write_text(content.replace(old,'const sipMaxPacketSize = 65535'))
+# Use SDP transport matching the actual offer, not the legacy TCP-only reply.
+invite=root/'internal/invite/invite.go'
+content=invite.read_text()
+old='Proto: "TCP/RTP/AVP",'
+new='Proto: func() string { if inv.remote.proto == "TCP" { return "TCP/RTP/AVP" }; return "RTP/AVP" }(),'
+if content.count(old)!=1:raise SystemExit('Upstream invite version changed')
+invite.write_text(content.replace(old,new))
+
 print('Pinned upstream simulator patched for case-insensitive MANSCDP MIME and full UDP datagrams.')
 PY
 echo "Upstream source revisions pinned."
@@ -119,6 +127,12 @@ grep -q 'interface-authentication: false' \
 # No external host ports are needed for media if only REGISTER and Catalog
 # are being tested. Do not advertise this as an RTP media test.
 echo "::group::Build/start ACTUAL WVP-PRO + MySQL/Redis/ZLMediaKit"
+docker compose -p "$PROJECT" -f "$BASE/wvp/docker/docker-compose.yml" \
+  up -d polaris-mysql polaris-redis polaris-media
+MEDIA_CID="$(docker compose -p "$PROJECT" -f "$BASE/wvp/docker/docker-compose.yml" ps -q polaris-media)"
+MEDIA_IP="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$MEDIA_CID")"
+test -n "$MEDIA_IP"
+sed -i "s/^SDP_IP=127.0.0.1$/SDP_IP=$MEDIA_IP/" "$BASE/wvp/docker/.env"
 docker compose -p "$PROJECT" -f "$BASE/wvp/docker/docker-compose.yml" \
   up -d --build polaris-wvp
 echo "::endgroup::"
