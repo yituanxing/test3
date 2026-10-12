@@ -565,9 +565,36 @@ def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
                 raise HTTPException(403,'视频源不在当前辖区')
         if not allowed:
             return {'mode':'real_video_anonymous','observations':[],
-                    'counts':{'sampled_frames':0,'face_boxes':0}}
+                    'counts':{'sampled_frames':0,'face_boxes':0},
+                    'quality_totals':{'sampled_frame_records':0,'raw_face_detections':0,
+                                      'no_face_frames':0,'boxes_with_geometry':0,
+                                      'candidate_boxes':0,'needs_review_boxes':0,
+                                      'quality_assessment':'uncalibrated_heuristic',
+                                      'legacy_detections_without_geometry':0},
+                    'bounded_by_limit':limit,'snapshot_images_stored':False}
         marks=','.join('?' for _ in allowed)
         filter_source=' AND s.source_id=?' if source_id is not None else ''
+        bind=(*sorted(allowed), *((source_id,) if source_id is not None else ()))
+        # ALL scoped records: quality metrics must not depend on display LIMIT.
+        # Frame-level detections are anonymous; a quality "candidate" is NOT
+        # a verified unique person or a usable facial identity.
+        scope_sql=f"s.origin='video' AND s.place_id IN ({marks}){filter_source}"
+        totals=c.execute(f'''SELECT COUNT(*) AS sampled_frame_records,
+            COALESCE(SUM(s.detected_faces),0) AS raw_face_detections,
+            COALESCE(SUM(CASE WHEN s.detected_faces=0 THEN 1 ELSE 0 END),0)
+              AS no_face_frames
+            FROM samples s WHERE {scope_sql}''',bind).fetchone()
+        quality=c.execute(f'''SELECT COUNT(b.id) AS boxes_with_geometry,
+            COALESCE(SUM(CASE WHEN b.quality_state='candidate' THEN 1 ELSE 0 END),0)
+              AS candidate_boxes,
+            COALESCE(SUM(CASE WHEN b.quality_state='needs_review' THEN 1 ELSE 0 END),0)
+              AS needs_review_boxes
+            FROM face_boxes b JOIN samples s ON s.id=b.sample_id
+            WHERE {scope_sql}''',bind).fetchone()
+        all_quality={**dict(totals),**dict(quality),
+            'quality_assessment':'uncalibrated_heuristic',
+            'legacy_detections_without_geometry':max(
+                0,int(totals['raw_face_detections'])-int(quality['boxes_with_geometry']))}
         rows=[dict(x) for x in c.execute(f'''SELECT s.id,s.source_id,s.place_id,
             so.name AS source_name,p.name AS place_name,s.ingested_at,
             s.frame_index,s.video_offset_ms,s.detector,s.detected_faces,
@@ -576,7 +603,7 @@ def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
             JOIN places p ON p.id=s.place_id
             WHERE s.origin='video' AND s.place_id IN ({marks}){filter_source}
             ORDER BY s.id DESC LIMIT ?''',
-            (*sorted(allowed),*((source_id,) if source_id is not None else ()),limit))]
+            (*bind,limit))]
         for row in rows:
             faces=[]
             for v in c.execute('''SELECT x,y,w,h,frame_width,frame_height,detector_score,
@@ -588,8 +615,10 @@ def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
                 faces.append(b)
             row['boxes']=faces
         return {'mode':'real_video_anonymous','observations':rows,
+                # Legacy 'counts' remain PAGE counts for existing callers.
                 'counts':{'sampled_frames':len(rows),
                           'face_boxes':sum(len(x['boxes']) for x in rows)},
+                'quality_totals':all_quality,
                 'bounded_by_limit':limit,'snapshot_images_stored':False,
                 'note':'仅含视频抽样与真实人脸检测框；没有人物身份或人脸图片存储。'}
 
