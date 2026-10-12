@@ -205,7 +205,7 @@ def bind(data:BindChannel,request:Request):
 @router.get('/bindings')
 def bindings(request:Request):
     with _get_db() as c:
-        allowed={p['id'] for p in admin.place_rows(c,access.subtree(c,request))}
+        allowed={p['id'] for p in admin.place_rows(c,access.effective_region(c,request,None))}
         rows=[dict(x) for x in c.execute(
             'SELECT * FROM gb28181_channel_bindings ORDER BY id')]
         return {'bindings':[x for x in rows if x['place_id'] in allowed]}
@@ -308,7 +308,7 @@ def stop(session_id:int,request:Request):
 @router.get('/sessions')
 def sessions(request:Request,limit:int=Query(50,ge=1,le=250)):
     with _get_db() as c:
-        allowed={p['id'] for p in admin.place_rows(c,access.subtree(c,request))}
+        allowed={p['id'] for p in admin.place_rows(c,access.effective_region(c,request,None))}
         rows=[dict(x) for x in c.execute('''SELECT ss.id,ss.binding_id,ss.source_id,
             ss.mode,ss.state,ss.created_at,ss.stopped_at,ss.start_at,ss.end_at,
             b.place_id,b.device_id,b.channel_id,b.name
