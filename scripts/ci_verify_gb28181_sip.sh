@@ -357,6 +357,17 @@ fi
 echo "SUCCESS: WVP persisted 1 online SIP device and its advertised Catalog channel."
 echo "::endgroup::"
 
+# Persist control-plane proof independently of subsequent RTP media outcome.
+python - <<'PY'
+import json,os
+from pathlib import Path
+p=Path(os.environ['REPORT'])
+v=json.loads(p.read_text(encoding='utf-8'))
+v.update({'live_sip_registration':True,'wvp_persisted_online_device':True,
+          'catalog_channel_received':True,'sip_catalog_verdict':'PASS'})
+p.write_text(json.dumps(v,indent=2,ensure_ascii=False),encoding='utf-8')
+PY
+
 python - <<'PY'
 import json,os
 from datetime import datetime,timezone
