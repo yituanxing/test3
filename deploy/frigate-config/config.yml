@@ -5,10 +5,20 @@ mqtt:
 detect:
   enabled: true
 
+# Prefer Frigate's bundled, verified OpenVINO IR model on the CPU.
+# This avoids external model downloads and isolates the previous TFLite path.
 detectors:
-  cpu1:
-    type: cpu
-    num_threads: 2
+  ov_cpu:
+    type: openvino
+    device: CPU
+
+model:
+  width: 300
+  height: 300
+  input_tensor: nhwc
+  input_pixel_format: bgr
+  path: /openvino-model/ssdlite_mobilenet_v2.xml
+  labelmap_path: /openvino-model/coco_91cl_bkgr.txt
 
 face_recognition:
   enabled: false
