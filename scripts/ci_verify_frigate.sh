@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Genuine CC0 pedestrian footage -> FFmpeg -> RTSP/MediaMTX -> Frigate -> FastAPI/SQLite
+# Genuine CC-BY-4.0 person-detection footage -> FFmpeg -> RTSP/MediaMTX -> Frigate -> FastAPI/SQLite
 # Never fabricate a person detection: an actual Frigate person event is required.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -66,15 +66,15 @@ PY
 }
 trap cleanup EXIT
 
-echo "::group::Download CC0 video from Wikimedia Commons"
-VIDEO_URL='https://upload.wikimedia.org/wikipedia/commons/a/ae/Video_Codec_Test_pedestrian_area_1080p25.y4m.webm'
+echo "::group::Download CC-BY-4.0 person-detection test clip from Intel"
+VIDEO_URL='https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-by-one-person-detection.mp4'
 curl -fSL --retry 3 --connect-timeout 15 --max-time 120 \
-  --user-agent 'ZD-Demo-OpenSource-Integration-Test/1.0 (anonymous video testing)' \
-  "$VIDEO_URL" -o .ci-data/pedestrian-source.webm
-test "$(stat -c %s .ci-data/pedestrian-source.webm)" -gt 50000
+  --user-agent 'ZD-Demo-Integration-Test/1.0 (anonymous person detection)' \
+  "$VIDEO_URL" -o .ci-data/person-source.mp4
+test "$(stat -c %s .ci-data/person-source.mp4)" -gt 50000
 ffprobe -v error -select_streams v:0 -show_entries stream=width,height \
-  -of default=noprint_wrappers=1 .ci-data/pedestrian-source.webm
-ffmpeg -hide_banner -loglevel error -y -i .ci-data/pedestrian-source.webm \
+  -of default=noprint_wrappers=1 .ci-data/person-source.mp4
+ffmpeg -hide_banner -loglevel error -y -i .ci-data/person-source.mp4 \
   -t 15 -vf 'fps=5,scale=960:540' -an -pix_fmt yuv420p \
   -c:v libx264 -preset ultrafast -crf 26 -movflags +faststart .ci-data/pedestrian.mp4
 test -s .ci-data/pedestrian.mp4
