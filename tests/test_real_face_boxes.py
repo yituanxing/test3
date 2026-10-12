@@ -36,6 +36,10 @@ def test_actual_opencv_face_detector_returns_rectangles_not_fictional_people():
             assert qual['face_area_px']==b['w']*b['h']
     cap.release()
     assert decoded>=10,'must analyze real frames, not skip the model'
+    # Previous test could pass with saw==0, i.e. without finding ONE face.
+    # A positive test video must yield at least one genuine detected rectangle.
+    # This is detection evidence, NOT recognition accuracy or identity.
+    assert saw > 0, 'Haar detected zero faces in the licensed positive video: model/path/sample must be investigated'
     # Do not invent a high accuracy metric for the detector without annotated
     # frame-level ground truth. The persistence contract is tested below.
 
@@ -86,6 +90,9 @@ def test_sqlite_samples_correlate_with_actual_boxes_and_authenticated_scope(tmp_
     assert analyzed.status_code==200,analyzed.text
     data=analyzed.json()
     assert data['frames_analyzed']==9
+    # 0 == 0 is a vacuous test; require actual positive inference on the
+    # person-positive video before praising the evidence pipeline.
+    assert data['face_detections'] > 0, 'Nine sampled positive-video frames gave no face detections'
     assert data['structured_boxes_saved']==data['face_detections']
     facts=client.get(f'/api/video/observations?source_id={sid}',headers=admin)
     assert facts.status_code==200,facts.text
