@@ -31,7 +31,8 @@ def initialize(c):
             window_end TEXT NOT NULL,
             input_signature TEXT NOT NULL,
             state TEXT NOT NULL CHECK(state IN ('draft','published','archived')),
-            created_at TEXT NOT NULL, published_at TEXT
+            created_at TEXT NOT NULL, published_at TEXT,
+            parent_run_id INTEGER REFERENCES synthetic_registry_runs(id)
         );
         CREATE TABLE IF NOT EXISTS synthetic_registry_candidates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +58,9 @@ def initialize(c):
             detail TEXT NOT NULL, created_at TEXT NOT NULL
         );
     ''')
+    run_cols = {row['name'] for row in c.execute('PRAGMA table_info(synthetic_registry_runs)')}
+    if 'parent_run_id' not in run_cols:
+        c.execute('ALTER TABLE synthetic_registry_runs ADD COLUMN parent_run_id INTEGER')
     # Upgrade old published candidates without replacing their historical
     # raw event evidence. The existing 'appearances' values remain unchanged
     # for legacy records, as they had one event per raw observation.
@@ -171,12 +175,14 @@ def _published(c):
     return dict(row) if row else None
 
 
-def _window_rows(all_rows, start):
-    return [r for r in all_rows if not r['excluded'] and r['observed_at']>=start]
+def _window_rows(all_rows, start, end=None):
+    # A published historical snapshot has a fixed inclusive end boundary.
+    return [r for r in all_rows if not r['excluded'] and r['observed_at']>=start
+            and (end is None or r['observed_at']<=end)]
 
 
 def _is_stale(c, run):
-    rows = _window_rows(_effective_rows(c),run['window_start'])
+    rows = _window_rows(_effective_rows(c),run['window_start'],run['window_end'])
     return _data_fingerprint(rows)!=run['input_signature']
 
 
@@ -222,10 +228,10 @@ def generate(c, data:GenerateIn):
         raise HTTPException(409,'所选时间范围没有有效合成观测')
     prev = _published(c)
     cur = c.execute('''INSERT INTO synthetic_registry_runs
-        (strategy,correction_mode,days,window_start,window_end,input_signature,state,created_at)
-        VALUES (?,?,?,?,?,?,'draft',?)''',
+        (strategy,correction_mode,days,window_start,window_end,input_signature,state,created_at,parent_run_id)
+        VALUES (?,?,?,?,?,?,'draft',?,?)''',
         (data.strategy,data.correction_mode,data.days,start,latest,
-         _data_fingerprint(rows),utc_now()))
+         _data_fingerprint(rows),utc_now(),prev['id'] if prev else None))
     rid = cur.lastrowid
     groups=defaultdict(list)
     for r in rows:
@@ -256,6 +262,50 @@ def generate(c, data:GenerateIn):
     c.execute('INSERT INTO synthetic_registry_audit(operation,run_id,detail,created_at) VALUES(?,?,?,?)',
               ('generate',rid,json.dumps(data.model_dump(),ensure_ascii=False),utc_now()))
     return present(c,_run(c,rid))
+
+
+
+def diff_runs(c, run_id):
+    """Compare simulated home assignments to the actual parent published run.
+
+    The parent reference survives publication/archiving. No real person identity
+    or Frigate track is ever used in these comparisons.
+    """
+    run = _run(c,run_id)
+    parent = _run(c,run['parent_run_id']) if run.get('parent_run_id') else None
+    before = {p['person']:p for p in _selection(c,parent)} if parent else {}
+    after = {p['person']:p for p in _selection(c,run)}
+    counts = {key:0 for key in ('added','removed','moved','unchanged','unresolved')}
+    changes=[]
+    for person in sorted(set(before)|set(after)):
+        old,new=before.get(person),after.get(person)
+        prev_place=old['place_id'] if old else None
+        next_place=new['place_id'] if new else None
+        if new and new['unresolved']:
+            kind='unresolved'
+        elif prev_place is None and next_place is not None:
+            kind='added'
+        elif prev_place is not None and next_place is None:
+            kind='removed'
+        elif prev_place != next_place:
+            kind='moved'
+        else:
+            kind='unchanged'
+        counts[kind]+=1
+        if kind != 'unchanged':
+            changes.append({'person':person,'kind':kind,
+                            'before_place_id':prev_place,'after_place_id':next_place,
+                            'basis':new['basis'] if new else None,
+                            'before_observation_ids':sorted({
+                                evidence for x in old['candidates'] for evidence in x['observation_ids']
+                            }) if old else [],
+                            'after_observation_ids':sorted({
+                                evidence for x in new['candidates'] for evidence in x['observation_ids']
+                            }) if new else []})
+    return {'mode':'synthetic_only','from_run_id':parent['id'] if parent else None,
+            'to_run_id':run_id,'state':run['state'],'stale':_is_stale(c,run),
+            'counts':counts,'changes':changes,
+            'note':'只比较合成 P### 主归属；原始匿名视频事件不参与人员身份分析。'}
 
 
 def decide(c, run_id, data:DecisionIn):
@@ -319,6 +369,10 @@ def register(app,db):
     @app.post('/api/base/generate')
     def create(data:GenerateIn):
         with db() as c: return generate(c,data)
+
+    @app.get('/api/base/runs/{run_id}/diff')
+    def diff(run_id:int):
+        with db() as c: return diff_runs(c,run_id)
 
     @app.get('/api/base/runs')
     def list_runs():

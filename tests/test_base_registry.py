@@ -129,3 +129,50 @@ def test_no_synthetic_input_and_inactive_place_are_rejected(context):
     assert bad.status_code==404
     assert context.post(f'/api/base/runs/{rid}/decide',json={
         'person':'INVALID','place_id':r['people'][0]['place_id'],'action':'assign','reason':'测试校验'}).status_code==422
+
+
+
+def test_version_diff_is_evidence_backed_and_survives_publish(context):
+    old=generate(context,strategy='earliest')
+    oldid=old['run']['id']
+    assert context.post(f'/api/base/runs/{oldid}/publish').status_code==200
+    new=generate(context,strategy='earliest')
+    newid=new['run']['id']
+    assert new['run']['parent_run_id']==oldid
+    original=assignment(old)['P001']['place_id']
+    other=next(p['id'] for p in context.get('/api/places').json() if p['id']!=original)
+    assert context.post(f'/api/base/runs/{newid}/decide',json={
+        'person':'P001','place_id':other,'action':'assign','reason':'人工改变虚构归属'}).status_code==200
+    assert context.post(f'/api/base/runs/{newid}/decide',json={
+        'person':'P002','place_id':None,'action':'remove','reason':'删除虚构底库主体'}).status_code==200
+    comparison=context.get(f'/api/base/runs/{newid}/diff').json()
+    assert comparison['from_run_id']==oldid
+    assert comparison['counts']['moved']==1
+    assert comparison['counts']['removed']==1
+    delta={x['person']:x for x in comparison['changes']}
+    assert delta['P001']['before_place_id']==original
+    assert delta['P001']['after_place_id']==other
+    assert delta['P001']['after_observation_ids']
+    assert delta['P002']['kind']=='removed'
+    assert context.post(f'/api/base/runs/{newid}/publish').status_code==200
+    after=context.get(f'/api/base/runs/{newid}/diff').json()
+    assert after['counts']==comparison['counts']
+    assert context.get('/api/base/active').json()['run']['id']==newid
+
+
+def test_newer_observations_do_not_invalidate_completed_historical_window(context):
+    old=generate(context)
+    rid=old['run']['id']
+    assert context.post(f'/api/base/runs/{rid}/publish').status_code==200
+    from datetime import datetime,timedelta
+    import app.main as main
+    with main.db() as conn:
+        observed_at=(datetime.fromisoformat(old['run']['window_end'])+timedelta(days=1)).isoformat()
+        conn.execute("""INSERT INTO synthetic_observations
+           (event_key,person_label,place_id,observed_at,origin)
+           VALUES(?,?,?,?, 'synthetic_only')""",('NEW-WINDOW','P099',old['people'][0]['place_id'],observed_at))
+    assert context.get('/api/base/active').json()['stale'] is False
+    fresh=generate(context)
+    assert assignment(fresh)['P099']['place_id'] is not None
+    diff=context.get(f'/api/base/runs/{fresh["run"]["id"]}/diff').json()
+    assert diff['counts']['added']==1
