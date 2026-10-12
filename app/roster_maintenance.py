@@ -68,12 +68,22 @@ def tick(c,*,now:datetime|None=None,force:bool=False):
         signature=base_registry._data_fingerprint(scoped)
         latest=base_registry._latest(c)
         pub=base_registry._published(c)
-        # Existing draft for these exact inputs is reusable, no duplicate.
-        if latest and latest['state']=='draft' and latest['input_signature']==signature and (
-            latest['window_start']==start and latest['window_end']==latest_time):
+        # Do not reuse a roster built with a DIFFERENT affiliation rule.
+        # Identical observations can lead to different assigned places when
+        # switching earliest/frequency/manual or rebuild/reconcile. A policy
+        # change is therefore a material input, not a no-op refresh.
+        def same_inputs_and_policy(run):
+            return bool(
+                run and run['input_signature']==signature
+                and run['window_start']==start and run['window_end']==latest_time
+                and run['days']==current['days']
+                and run['strategy']==current['strategy']
+                and run['correction_mode']==current['correction_mode']
+            )
+        # Reuse only a genuinely equivalent draft or published snapshot.
+        if latest and latest['state']=='draft' and same_inputs_and_policy(latest):
             action={'action':'draft_exists','run_id':latest['id']}
-        elif pub and pub['input_signature']==signature and pub['window_start']==start and (
-              pub['window_end']==latest_time):
+        elif same_inputs_and_policy(pub):
             action={'action':'unchanged','run_id':pub['id']}
         else:
             gen=base_registry.generate(c,base_registry.GenerateIn(

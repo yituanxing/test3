@@ -56,3 +56,45 @@ def test_scheduled_preview_never_autopublishes_or_touches_real_events(tmp_path,m
     assert client.get('/api/base/active').json()['ready']==False
     assert client.get('/api/monitoring/overview').json()['counts']['person_objects']==0
     assert client.get('/api/video/observations').json()['counts']['face_boxes']==0
+
+
+def test_policy_change_regenerates_draft_even_with_identical_observations(tmp_path,monkeypatch):
+    """Real SQLite: changing affiliation strategy MUST recompute rather than reuse.
+
+    A/B raw observations stay identical, but final ownership legitimately
+    changes between earliest and frequency. This is a functional regression
+    test, not a mock of scheduler responses.
+    """
+    import app.main as main
+    monkeypatch.setattr(main,'DB',tmp_path/'strategy-shift.sqlite3')
+    main.setup_db()
+    client=TestClient(main.app)
+    assert client.post('/api/base/demo/duplicates').json()['inserted']==103
+    initial={'enabled':True,'interval_hours':24,'days':7,
+             'strategy':'earliest','correction_mode':'rebuild'}
+    assert client.put('/api/base/maintenance/config',json=initial).status_code==200
+    with main.db() as c:
+        first=roster_maintenance.tick(c,now=datetime(2026,10,12,14,tzinfo=timezone.utc))
+        assert first['action']=='draft_created'
+        old_id=first['run_id']
+        old_place=next(p['place_id'] for p in base_registry.present(c,base_registry._run(c,old_id))['people']
+                       if p['person']=='P001')
+        base_registry.publish(c,old_id)
+    # Same observations, different ownership rule -> new editable draft.
+    updated={**initial,'strategy':'frequency'}
+    assert client.put('/api/base/maintenance/config',json=updated).status_code==200
+    with main.db() as c:
+        after=roster_maintenance.tick(c,now=datetime(2026,10,12,15,tzinfo=timezone.utc))
+        assert after['action']=='draft_created'
+        assert after['run_id']!=old_id
+        fresh=base_registry._run(c,after['run_id'])
+        assert fresh['strategy']=='frequency'
+        current_place=next(p['place_id'] for p in base_registry.present(c,fresh)['people']
+                           if p['person']=='P001')
+        assert current_place!=old_place
+        assert base_registry._published(c)['id']==old_id
+        # The new draft is reused when there was no policy or input change.
+        again=roster_maintenance.tick(c,now=datetime(2026,10,12,16,tzinfo=timezone.utc),
+                                       force=True)
+        assert again['action']=='draft_exists'
+        assert again['run_id']==after['run_id']
