@@ -33,6 +33,12 @@ def run():
         with main.db() as c:
             region = c.execute("SELECT id FROM regions WHERE level=1 LIMIT 1").fetchone()[0]
             access.create_user(c, "uismoke", password, region)
+            # The browser will invoke the real local video decoder and Haar
+            # classifier, then adjudicate a stored anonymous detection box.
+            face_source_id = c.execute(
+                "INSERT INTO sources(place_id,name,kind,uri) VALUES(?,?,?,?)",
+                (1, "browser-real-face-review", "file",
+                 str(ROOT / "samples" / "astronaut-face-test.mp4"))).lastrowid
         try:
             with (OUT / "ui-server.log").open("w") as log:
                 server = subprocess.Popen(
@@ -111,6 +117,34 @@ def run():
                         expect(page.locator("#kRunState")).to_contain_text("未发布草稿")
                         checks.append("real_browser_rolling_window_removes_absent_fictional_person")
                         page.screenshot(path=str(OUT/"ui-roster-expiry-diff.png"),full_page=True)
+                        # Real video and actual browser interaction: never rely
+                        # on a stubbed API or synthetic detector boxes.
+                        page.goto(base+"/monitor")
+                        actual = page.evaluate("""async sourceId => {
+                            const r=await fetch('/api/sources/'+sourceId+
+                              '/process?max_frames=10&sample_every=5',
+                              {method:'POST'});
+                            return {status:r.status,body:await r.json()};
+                        }""", face_source_id)
+                        assert actual['status']==200, actual
+                        assert actual['body']['face_detections']>0
+                        expect(page.locator("#faceQualityTotals")).to_contain_text(
+                            "检测框",timeout=12000)
+                        page.reload()
+                        expect(page.get_by_role("button",name="标记误检").first).to_be_visible(
+                            timeout=12000)
+                        page.get_by_role("button",name="标记误检").first.click()
+                        expect(page.locator("#faceQualityTotals")).to_contain_text(
+                            "人工标记误检 1 个",timeout=12000)
+                        page.screenshot(path=str(OUT/"ui-anonymous-face-review.png"),
+                                        full_page=True)
+                        page.get_by_role("button",name="恢复待复核").first.click()
+                        expect(page.locator("#faceQualityTotals")).to_contain_text(
+                            "人工标记误检 0 个",timeout=12000)
+                        with main.db() as check:
+                            assert check.execute(
+                                'SELECT COUNT(*) FROM face_box_reviews').fetchone()[0] == 2
+                        checks.append("real_video_face_box_append_only_review_ui")
                         page.goto(base+"/portal")
                         page.set_viewport_size({"width": 390, "height": 844})
                         page.screenshot(path=str(OUT / "ui-mobile.png"), full_page=True)
