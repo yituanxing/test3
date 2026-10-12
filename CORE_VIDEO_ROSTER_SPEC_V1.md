@@ -106,3 +106,8 @@ source_type=real_video、place_id、camera、upstream_event_id、started_at、en
 
 - `GET /api/video/observations/{sample_id}/preview` 仅适用于服务端已登记的文件视频，按真实 frame_index 回到原视频抽取帧，并全景像素化、检测到的脸部区域完全覆盖，再叠加绿色检测框；**不落盘原始截图、不提供身份信息，也不虚构不存在的人脸框**。不能定位的 RTSP 片段返回 409，而不是伪造截图。
 - 接口由服务端认证及辖区权限控制，响应禁止缓存；在 /monitor 可点击“看示意帧”。像素化示意图仅供证明几何框来源，不是人脸抓拍比对照片或生产证据。
+
+## 多摄像机匿名事件主键修正
+
+- Frigate 目标事件按 `(camera,event_id)` 复合主键幂等存储，不以事件 ID 字符串全局唯一来暗中覆盖其他相机的观测。同 ID 的两个不同摄像头是两条匿名目标事实，**不代表一个或两个人**。
+- 兼容旧 SQLite 的 `event_id PRIMARY KEY` 单主键迁移，保留旧事件并重建复合主键索引；真实跨相机身份归并仍未提供。

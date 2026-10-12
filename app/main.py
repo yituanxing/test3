@@ -97,7 +97,7 @@ def setup_db():
             place_id INTEGER NOT NULL REFERENCES places(id)
         );
         CREATE TABLE IF NOT EXISTS frigate_object_events (
-            event_id TEXT PRIMARY KEY,
+            event_id TEXT NOT NULL,
             camera TEXT NOT NULL REFERENCES frigate_camera_bindings(camera),
             place_id INTEGER NOT NULL REFERENCES places(id),
             label TEXT NOT NULL CHECK(label='person'),
@@ -105,7 +105,8 @@ def setup_db():
             ended_at TEXT,
             score REAL,
             has_snapshot INTEGER NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(camera,event_id)
         );
         CREATE INDEX IF NOT EXISTS frigate_place_date ON frigate_object_events(place_id,started_at);
         CREATE TABLE IF NOT EXISTS synthetic_observations (
@@ -157,6 +158,30 @@ def setup_db():
             c.execute("ALTER TABLE samples ADD COLUMN detector TEXT NOT NULL DEFAULT 'legacy'")
         # V1 observation event semantics: old rows keep NULL, meaning each
         # individual event_key was one explicit appearance event.
+        # Compatibility migration: older schema used event_id as a *global*
+        # primary key. A track ID is scoped to its actual upstream camera;
+        # similarly named events in distinct cameras must not overwrite.
+        event_cols = c.execute('PRAGMA table_info(frigate_object_events)').fetchall()
+        if any(r['name']=='event_id' and r['pk']==1 for r in event_cols) and not any(
+                r['name']=='camera' and r['pk']>0 for r in event_cols):
+            c.execute('ALTER TABLE frigate_object_events RENAME TO frigate_object_events_legacy')
+            c.execute('''CREATE TABLE frigate_object_events (
+                event_id TEXT NOT NULL,
+                camera TEXT NOT NULL REFERENCES frigate_camera_bindings(camera),
+                place_id INTEGER NOT NULL REFERENCES places(id),
+                label TEXT NOT NULL CHECK(label='person'),
+                started_at TEXT NOT NULL,
+                ended_at TEXT,
+                score REAL,
+                has_snapshot INTEGER NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY(camera,event_id))''')
+            c.execute('''INSERT INTO frigate_object_events
+                (event_id,camera,place_id,label,started_at,ended_at,score,has_snapshot,updated_at)
+                SELECT event_id,camera,place_id,label,started_at,ended_at,score,has_snapshot,updated_at
+                FROM frigate_object_events_legacy''')
+            c.execute('DROP TABLE frigate_object_events_legacy')
+            c.execute('CREATE INDEX IF NOT EXISTS frigate_place_date ON frigate_object_events(place_id,started_at)')
         observation_cols = [r['name'] for r in c.execute('PRAGMA table_info(synthetic_observations)')]
         if 'occurrence_key' not in observation_cols:
             c.execute('ALTER TABLE synthetic_observations ADD COLUMN occurrence_key TEXT')
@@ -646,12 +671,12 @@ def sync_frigate(limit: int = Query(100, ge=1, le=500)):
             if event is None or event.camera not in bindings:
                 skipped += 1
                 continue
-            exists = c.execute('SELECT 1 FROM frigate_object_events WHERE event_id=?', (event.event_id,)).fetchone()
+            exists = c.execute('SELECT 1 FROM frigate_object_events WHERE camera=? AND event_id=?', (event.camera,event.event_id)).fetchone()
             c.execute('''INSERT INTO frigate_object_events
               (event_id,camera,place_id,label,started_at,ended_at,score,has_snapshot,updated_at)
               VALUES(?,?,?,?,?,?,?,?,?)
-              ON CONFLICT(event_id) DO UPDATE SET
-                 camera=excluded.camera,place_id=excluded.place_id,
+              ON CONFLICT(camera,event_id) DO UPDATE SET
+                 place_id=excluded.place_id,
                  started_at=excluded.started_at,ended_at=excluded.ended_at,
                  score=excluded.score,has_snapshot=excluded.has_snapshot,
                  updated_at=excluded.updated_at''',
