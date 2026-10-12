@@ -49,6 +49,29 @@ window.addEventListener('load',async()=>{
 <section class="card wide"><div class="row"><div><h2>场所检测统计</h2><p class="hint">各场所视频检测独立汇总。Frigate person事件与OpenCV抽帧人脸检测是不同口径。</p></div><span class="status">已按来源隔离</span></div><div class="scroll"><table><thead><tr><th>场所</th><th>绑定Frigate摄像机</th><th>person 事件</th><th>抽样帧</th><th>人脸检测框</th></tr></thead><tbody id="places"></tbody></table></div></section>
 <section class="card"><h2>最新 Frigate 目标事件</h2><p class="hint">上游事件ID幂等写入；没有身份标识、照片或跨场所跟踪。</p><div class="scroll"><table><thead><tr><th>摄像机</th><th>场所</th><th>开始时间</th><th>置信度</th></tr></thead><tbody id="feed"></tbody></table></div></section>
 <section class="card"><h2>真实视频帧 · 人脸框与质量诊断（不存图片）</h2><p class="hint">由 OpenCV Haar 或选装 YuNet 真实推理产生。每条记录有视频源、帧号和框坐标；清晰度是未校准启发式指标，不表示识别准确率，也不用于跨镜头身份归并。</p><div class="stage"><div id="faceQualityTotals" class="stnote">加载全辖区质量统计中……</div></div><div class="scroll"><table><thead><tr><th>视频源</th><th>帧号</th><th>视频时间偏移</th><th>框坐标 (x,y,w,h)</th><th>清晰度诊断</th><th>人工复核</th><th>脱敏来源帧</th></tr></thead><tbody id="faceEvidence"></tbody></table></div><div id="previewEvidence" class="stage">选择“看示意帧”后显示真实文件视频帧经过强像素化、遮挡面部后叠加的检测框；不提供原始人脸照片。</div></section>
+<section class="card wide" id="gbPanel">
+<div class="row"><h2>GB28181 国标视频接入 · 复用 WVP-PRO + ZLMediaKit</h2><button class="subtle" onclick="gbRefresh()">刷新国标状态</button></div>
+<p class="hint">本平台不实现国标 SIP/RTP。WVP 完成设备注册、目录、实时点播及历史回放，ZLMediaKit 转为 RTSP；本页面把授权通道绑定到场所并登记真实 RTSP 视频源。真实设备尚未注册时会明确显示未接入，而不是模拟设备在线。</p>
+<div class="stage"><div id="gbStatus" class="stnote">读取国标网关配置……</div></div>
+<div id="gbManage" style="display:none">
+<div class="inline" style="margin:10px 0">
+<button class="subtle" onclick="gbDiscover()">查询 WVP 在线设备目录</button>
+<input id="gbDevice" placeholder="20位国标设备 ID" maxlength="20" aria-label="国标设备编号">
+<button class="subtle" onclick="gbDiscoverChannels()">查询通道</button>
+<input id="gbChannel" placeholder="20位国标通道 ID" maxlength="20" aria-label="国标通道编号">
+</div>
+<div class="inline" style="margin:10px 0">
+<select id="gbPlace" aria-label="绑定到场所"><option value="">选择场所</option></select>
+<input id="gbName" placeholder="通道名称，如：场所入口" aria-label="国标通道名称">
+<button onclick="gbBind()">绑定通道到场所</button>
+</div>
+<div class="inline" style="margin:10px 0">
+<span class="legend">历史回放时间：</span><input id="gbStart" type="datetime-local" aria-label="国标回放开始">
+<span class="legend">至</span><input id="gbEnd" type="datetime-local" aria-label="国标回放结束">
+</div><div id="gbCatalog" class="stnote">国标设备/通道目录来自 WVP 接口（管理员查询），不存储设备凭证。</div></div>
+<div class="scroll"><table><thead><tr><th>场所</th><th>设备及通道</th><th>名称</th><th>操作</th></tr></thead><tbody id="gbBindings"></tbody></table></div>
+<div class="scroll"><table><thead><tr><th>会话</th><th>模式</th><th>视频源 ID</th><th>状态</th><th>操作</th></tr></thead><tbody id="gbSessions"></tbody></table></div>
+<p class="hint">操作后需对新 RTSP 源做实际 ffprobe/解码，才能确认画面正常；WVP 返回地址并不等于真实 SIP+RTP 已验证。不会把匿名目标当作真实唯一人员。</p></section>
 <section class="card"><h2>真伪边界 · 测试矩阵</h2><div class="stage"><div><div class="stname">本地 MP4 → OpenCV → SQLite</div><div class="stnote">点击上方「验证本地视频」可实际解码与写入</div></div><span class="status good">可运行</span></div><div class="stage"><div><div class="stname">Frigate HTTP 适配 → SQLite</div><div class="stnote">使用本机真实HTTP回环服务器执行契约测试</div></div><span class="status good">自动化可测</span></div><div class="stage"><div><div class="stname">MediaMTX → Frigate 目标检测</div><div class="stnote">需Docker和合法人物录像；当前无此测试结果</div></div><span class="status warn">需现场验收</span></div><div class="stage"><div><div class="stname">GB28181 国标SIP接入</div><div class="stnote">WVP/ZLMediaKit仍待接入和设备联调</div></div><span class="status warn">未验证</span></div></section>
 </div><p class="note">本页面不显示“人员识别成功”或“出入到访人数”，因为当前视频模型和目标事件无法提供可靠的唯一身份。合成身份规则可到「合成业务闭环」完整演示配置、纠错、审核、审计。</p><footer>本地演示程序 · 默认无鉴权，请仅绑定127.0.0.1；涉及授权测试素材时遵守使用许可、数据最小化和保存期限要求。</footer>
 </main><div id="toast"></div><script>
@@ -93,6 +116,83 @@ async function markDetection(sampleId,boxId,decision){
     await reload();
   }catch(e){toast('复核失败：'+e.message,true)}
 }
+async function gbRefresh(){
+  try{
+    const [status,bindings,sessions,places,actor]=await Promise.all([
+      api('/api/gb28181/status'),api('/api/gb28181/bindings'),
+      api('/api/gb28181/sessions'),api('/api/places'),api('/api/auth/me')]);
+    $('gbStatus').textContent=status.configured
+      ? 'WVP 地址/API Key 已配置；请查询真实设备、点播并验证实际解码。SIP 注册尚未自动验收。'
+      : 'WVP 尚未配置：需先部署官方 WVP+ZLMediaKit 并在服务器设置 GB28181_WVP_URL / GB28181_WVP_API_KEY。';
+    const writable=actor.level===1;
+    $('gbManage').style.display=writable?'block':'none';
+    if(writable)$('gbPlace').innerHTML='<option value="">选择所属场所</option>'+
+      places.map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join('');
+    const linked=bindings.bindings||[];
+    const pmap=Object.fromEntries(places.map(p=>[p.id,p.name]));
+    $('gbBindings').innerHTML=linked.map(b=>'<tr><td>'+esc(pmap[b.place_id]||b.place_id)+
+      '</td><td class="code">'+esc(b.device_id)+' / '+esc(b.channel_id)+
+      '</td><td>'+esc(b.name)+'</td><td>'+
+      (writable?'<button class="subtle" onclick="gbPlay('+b.id+',&quot;live&quot;)">实时点播</button> '+
+      '<button class="subtle" onclick="gbPlay('+b.id+',&quot;playback&quot;)">历史回放</button>':'仅查看')+
+      '</td></tr>').join('')||'<tr><td colspan="4">尚无绑定的国标通道。仅显示实际配置的数据。</td></tr>';
+    $('gbSessions').innerHTML=(sessions.sessions||[]).map(z=>'<tr><td>'+z.id+
+      '</td><td>'+esc(z.mode)+'</td><td>'+z.source_id+
+      '</td><td>'+esc(z.state)+'</td><td>'+
+      (writable&&z.state==='active'?'<button class="subtle" onclick="gbProbe('+z.source_id+')">实际探测</button> <button class="subtle" onclick="gbStop('+z.id+')">停流</button>':'—')+
+      '</td></tr>').join('')||'<tr><td colspan="5">尚无上游成功返回的国标视频会话。</td></tr>';
+  }catch(e){$('gbStatus').textContent='国标状态获取失败：'+e.message}
+}
+async function gbDiscover(){
+  try{
+    const x=await api('/api/gb28181/devices');
+    $('gbCatalog').textContent='WVP 设备总数 '+x.total+'：'+x.devices.map(d=>d.device_id+' '+d.name+' ('+(d.online?'在线':'离线')+')').join('；');
+    if(x.devices.length)$('gbDevice').value=x.devices[0].device_id||'';
+  }catch(e){toast('查询WVP设备失败：'+e.message,true)}
+}
+async function gbDiscoverChannels(){
+  try{
+    const id=$('gbDevice').value.trim();
+    if(!/^[0-9]{20}$/.test(id)){toast('设备ID须为20位数字',true);return}
+    const x=await api('/api/gb28181/devices/'+id+'/channels');
+    $('gbCatalog').textContent='WVP 通道总数 '+x.total+'：'+x.channels.map(d=>d.channel_id+' '+d.name).join('；');
+    if(x.channels.length)$('gbChannel').value=x.channels[0].channel_id||'';
+  }catch(e){toast('查询WVP通道失败：'+e.message,true)}
+}
+async function gbBind(){
+  const body={place_id:+$('gbPlace').value,device_id:$('gbDevice').value.trim(),
+    channel_id:$('gbChannel').value.trim(),name:$('gbName').value.trim()};
+  if(!body.place_id||!/^[0-9]{20}$/.test(body.device_id)||
+       !/^[0-9]{20}$/.test(body.channel_id)||!body.name){
+    toast('请填写所属场所、20位设备/通道编号和通道名称',true);return}
+  try{await api('/api/gb28181/bindings','POST',body);toast('已绑定真实设备通道元数据');await gbRefresh()}
+  catch(e){toast('绑定失败：'+e.message,true)}
+}
+async function gbPlay(binding,mode){
+  try{
+    let data;
+    if(mode==='playback'){
+      const start=$('gbStart').value,end=$('gbEnd').value;
+      if(!start||!end){toast('历史回放必须指定起止时间',true);return}
+      data={start_at:new Date(start).toISOString(),end_at:new Date(end).toISOString()};
+    }
+    const x=await api('/api/gb28181/bindings/'+binding+'/'+mode,'POST',data||{});
+    toast('WVP 已返回 '+mode+' RTSP，已登记视频源 '+x.source_id+
+      '；可点“实际探测”确认画面。');
+    await gbRefresh();
+  }catch(e){toast('WVP '+mode+' 失败：'+e.message,true)}
+}
+async function gbProbe(id){
+  try{
+    const x=await api('/api/sources/'+id+'/probe');
+    toast('ffprobe 实测视频轨道 '+(x.video_streams||[]).length+'；'+
+      (x.video_streams||[]).map(v=>v.codec_name+' '+v.width+'×'+v.height).join(' / '));
+  }catch(e){toast('实际RTSP探测失败：'+e.message,true)}
+}
+async function gbStop(session){
+  try{await api('/api/gb28181/sessions/'+session+'/stop','POST',{});toast('已请求WVP停止本次流');await gbRefresh()}
+  catch(e){toast('停止流失败：'+e.message,true)}
+}
 let lastPreview=null;
 async function previewFrame(id){
   try{
@@ -107,4 +207,5 @@ async function previewFrame(id){
 async function runVideo(){let b=$('videoButton');b.disabled=true;try{let sources=await api('/api/sources');let src=sources.find(s=>s.kind==='file'&&s.name.includes('内置测试视频'));if(!src)throw Error('内置视频未找到');let a=await api('/api/sources/'+src.id+'/process?max_frames=80&sample_every=10','POST');toast(`实际解码 ${a.frames_decoded} 帧，模型分析 ${a.frames_analyzed} 帧，检测框 ${a.face_detections}。0张是正常结果（纯测试图案）。`);await reload()}catch(e){toast(e.message,true)}finally{b.disabled=false}}
 async function syncFrigate(){let b=$('syncButton');b.disabled=true;try{let x=await api('/api/frigate/sync?limit=200','POST');toast(`已同步：新增${x.inserted}、更新${x.updated}、跳过${x.skipped}。`);await reload()}catch(e){toast('同步失败：'+e.message,true)}finally{b.disabled=false}}
 reload();
+gbRefresh();
 </script></body></html>
