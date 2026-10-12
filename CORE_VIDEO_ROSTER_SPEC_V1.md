@@ -89,3 +89,10 @@ source_type=real_video、place_id、camera、upstream_event_id、started_at、en
 - 生成批次记录 `parent_run_id` 指向上一次已发布快照；`GET /api/base/runs/{id}/diff` 提供新增、移除、迁移、保持、未决计数和证据 ID，可在底库工作台查看。
 - 已发布快照的检验范围为 `[window_start,window_end]`；新的、晚于结束时间的观测属于下一次生成，不篡改旧版事实。窗口内的观测更正仍令旧版 stale。
 - 该版本差异只包含虚构 P###；不接入真实身份信息。
+
+## P0-B 视频事实实现（工程变更）
+
+- OpenCV Haar/YuNet 在每个真实采样帧输出检测框 (x,y,w,h)；同时保存视频源、帧号、文件时间偏移、检测器类型、框和 Laplacian 细节，数据为实际推理输出，非合成填充。
+- `GET /api/video/observations` 是受认证/辖区限制的查询，返回真实抽样帧/人脸框/大小/清晰度诊断；默认不存照片，不返回人脸向量、Person ID、跨镜头关系。
+- `quality_state=candidate` 只是未校准模糊度/大小启发式筛查，不是人员身份识别质量合格结论。人脸识别精度、检测检出率仍需人工标注真值数据集。
+- 开发 CI 用真实视频解码→OpenCV→SQLite→API 统计一致性和跨辖区 403 测试，必要时检查底库不被真实观测污染。

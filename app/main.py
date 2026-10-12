@@ -14,7 +14,7 @@ import cv2
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
-from app.detector import choose_detector, detector_info
+from app.detector import choose_detector, detector_info, box_quality
 from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
@@ -73,6 +73,18 @@ def setup_db():
             detector TEXT NOT NULL DEFAULT 'legacy'
         );
         CREATE INDEX IF NOT EXISTS samples_place ON samples(place_id, id);
+        CREATE TABLE IF NOT EXISTS face_boxes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sample_id INTEGER NOT NULL REFERENCES samples(id) ON DELETE CASCADE,
+            detector_score REAL,
+            x INTEGER NOT NULL, y INTEGER NOT NULL, w INTEGER NOT NULL, h INTEGER NOT NULL,
+            frame_width INTEGER NOT NULL, frame_height INTEGER NOT NULL,
+            quality_state TEXT NOT NULL CHECK(quality_state IN ('candidate','needs_review')),
+            quality_reasons TEXT NOT NULL,
+            sharpness REAL NOT NULL,
+            quality_assessment TEXT NOT NULL DEFAULT 'uncalibrated_heuristic'
+        );
+        CREATE INDEX IF NOT EXISTS face_boxes_by_sample ON face_boxes(sample_id);
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sample_id INTEGER NOT NULL REFERENCES samples(id),
@@ -356,7 +368,7 @@ def process_source(source_id: int, max_frames: int = Query(90, ge=1, le=600),
         cap.release()
         raise HTTPException(500, f'检测器初始化失败：{err}') from err
     read_count, sampled, faces_total = 0, 0, 0
-    detections = []
+    detections = []  # each item: sampled video fact, and real geometric boxes
     try:
         while read_count < max_frames:
             ok, frame = cap.read()
@@ -366,22 +378,82 @@ def process_source(source_id: int, max_frames: int = Query(90, ge=1, le=600),
             if (read_count - 1) % sample_every:
                 continue
             # Intentionally genuine CPU inference; no caching, no pre-filled results.
-            count = detector.detect_count(frame)
+            boxes = detector.detect(frame)
+            annotated = [(box,box_quality(frame,box)) for box in boxes]
+            count = len(boxes)
             sampled += 1
             faces_total += count
             video_offset_ms = round(cap.get(cv2.CAP_PROP_POS_MSEC)) if source['kind'] == 'file' else None
-            detections.append((source_id, source['place_id'], 'video', utcnow(),
-                               video_offset_ms, read_count, count, detector.name))
+            detections.append(((source_id, source['place_id'], 'video', utcnow(),
+                               video_offset_ms, read_count, count, detector.name),
+                               frame.shape[1],frame.shape[0],annotated))
     finally:
         cap.release()
     if not read_count:
         raise HTTPException(400, '视频已打开，但未读到帧')
     with db() as c:
-        c.executemany('''INSERT INTO samples(source_id,place_id,origin,ingested_at,video_offset_ms,frame_index,detected_faces,detector)
-                      VALUES (?,?,?,?,?,?,?,?)''', detections)
+        for sample,frame_width,frame_height,boxes in detections:
+            cur=c.execute('''INSERT INTO samples
+                   (source_id,place_id,origin,ingested_at,video_offset_ms,frame_index,detected_faces,detector)
+                   VALUES(?,?,?,?,?,?,?,?)''',sample)
+            for box,quality in boxes:
+                c.execute('''INSERT INTO face_boxes(sample_id,detector_score,x,y,w,h,
+                  frame_width,frame_height,quality_state,quality_reasons,sharpness)
+                  VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
+                  (cur.lastrowid,box['detector_score'],box['x'],box['y'],box['w'],box['h'],
+                   frame_width,frame_height,quality['quality_state'],
+                   json.dumps(quality['quality_reasons']),quality['sharpness_laplacian_var']))
     return {'source_id': source_id, 'frames_decoded': read_count,
             'frames_analyzed': sampled, 'face_detections': faces_total, 'detector': detector.name,
-            'note': '检测次数不是去重人数；未执行身份识别。'}
+            'structured_boxes_saved': faces_total,
+            'quality_assessment': 'uncalibrated_heuristic',
+            'note': '逐框几何数据是真实模型输出；没有脸照存储/身份识别/跨镜头去重。'}
+
+
+@app.get('/api/video/observations')
+def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
+                       source_id:int|None=Query(None,ge=1),
+                       region_id:int|None=Query(None,ge=1)):
+    """Authenticated, jurisdiction-filtered provenance with real face rectangles.
+
+    No images/embeddings/person identities are returned; quality labels are
+    uncalibrated blur/size heuristics, not actual recognition confidence.
+    """
+    with db() as c:
+        scope=access.effective_region(c,request,region_id)
+        allowed={p['id'] for p in admin.place_rows(c,scope)}
+        if source_id is not None:
+            src=c.execute('SELECT place_id FROM sources WHERE id=?',(source_id,)).fetchone()
+            if not src or src['place_id'] not in allowed:
+                raise HTTPException(403,'视频源不在当前辖区')
+        if not allowed:
+            return {'mode':'real_video_anonymous','observations':[],
+                    'counts':{'sampled_frames':0,'face_boxes':0}}
+        marks=','.join('?' for _ in allowed)
+        filter_source=' AND s.source_id=?' if source_id is not None else ''
+        rows=[dict(x) for x in c.execute(f'''SELECT s.id,s.source_id,s.place_id,
+            so.name AS source_name,p.name AS place_name,s.ingested_at,
+            s.frame_index,s.video_offset_ms,s.detector,s.detected_faces
+            FROM samples s JOIN sources so ON s.source_id=so.id
+            JOIN places p ON p.id=s.place_id
+            WHERE s.origin='video' AND s.place_id IN ({marks}){filter_source}
+            ORDER BY s.id DESC LIMIT ?''',
+            (*sorted(allowed),*((source_id,) if source_id is not None else ()),limit))]
+        for row in rows:
+            faces=[]
+            for v in c.execute('''SELECT x,y,w,h,frame_width,frame_height,detector_score,
+                        quality_state,quality_reasons,sharpness
+                        FROM face_boxes WHERE sample_id=? ORDER BY id''',(row['id'],)):
+                b=dict(v)
+                b['quality_reasons']=json.loads(b['quality_reasons'])
+                b['quality_assessment']='uncalibrated_heuristic'
+                faces.append(b)
+            row['boxes']=faces
+        return {'mode':'real_video_anonymous','observations':rows,
+                'counts':{'sampled_frames':len(rows),
+                          'face_boxes':sum(len(x['boxes']) for x in rows)},
+                'bounded_by_limit':limit,'snapshot_images_stored':False,
+                'note':'仅含视频抽样与真实人脸检测框；没有人物身份或人脸图片存储。'}
 
 
 @app.post('/api/demo/seed')
