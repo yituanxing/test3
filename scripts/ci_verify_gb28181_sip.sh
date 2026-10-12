@@ -186,6 +186,16 @@ EOF
 # WVP's container even while the host->container UDP packet appears sent.
 # Run the actual upstream Go simulator in the official compose project network.
 docker network inspect "${PROJECT}_media-net" >/dev/null
+# Deterministic, license-free moving frames, encoded H.264 in MPEG-PS
+# for the same simulator to send over genuine GB28181 RTP.
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq ffmpeg
+fi
+ffmpeg -hide_banner -loglevel error -nostdin -y -f lavfi \
+  -i 'testsrc2=size=320x240:rate=15' -t 8 -an \
+  -c:v libx264 -pix_fmt yuv420p -g 15 -f mpeg "$BASE/sim/test.dat"
+test -s "$BASE/sim/test.dat"
 docker run -d --rm --name "$SIM_CONTAINER" \
   --network "${PROJECT}_media-net" \
   --mount "type=bind,src=$BASE/sim,dst=/app" \
