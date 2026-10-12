@@ -34,6 +34,20 @@ jobs:
           ffmpeg -version | head -1
       - name: Test backend with isolated SQLite
         run: python -m pytest -q
+      - name: Chromium UI login and navigation smoke
+        run: |
+          python -m pip install 'playwright>=1.55,<2'
+          python -m playwright install --with-deps chromium
+          python -m scripts.browser_smoke
+      - name: Publish UI acceptance screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-acceptance
+          path: |
+            reports/ui-smoke-result.json
+            reports/ui-*.png
+          if-no-files-found: warn
       - name: Live CC0 pedestrian RTSP and Frigate integration
         run: bash scripts/ci_verify_frigate.sh
       - name: Publish evidence and verdict
