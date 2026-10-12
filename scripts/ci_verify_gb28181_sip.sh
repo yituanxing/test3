@@ -87,7 +87,44 @@ content=invite.read_text()
 old='Proto: "TCP/RTP/AVP",'
 new='Proto: func() string { if inv.remote.proto == "TCP" { return "TCP/RTP/AVP" }; return "RTP/AVP" }(),'
 if content.count(old)!=1:raise SystemExit('Upstream invite version changed')
-invite.write_text(content.replace(old,new))
+content=content.replace(old,new)
+# FFmpeg's generic MPEG-PS muxer emits PES stream-id E2 without a
+# GB28181 H.264 program-stream-map. Use the upstream simulator's own
+# GB packetizer (Send2data) on Annex-B H264 access units instead.
+start=content.index('func (inv *Invite) sendFile(')
+end=content.index('func isPsHead(', start)
+replacement='''func (inv *Invite) sendFile(buf []byte) {
+    delimiter := []byte{0, 0, 0, 1, 9} // Annex-B H264 AUD, one per access unit
+    if len(buf) < len(delimiter) || !bytes.Equal(buf[:len(delimiter)], delimiter) {
+        return
+    }
+    for len(buf) > 0 {
+        if atomic.LoadInt32(&inv.state) == idle { return }
+        n := len(buf)
+        if len(buf) > len(delimiter) {
+            next := bytes.Index(buf[len(delimiter):], delimiter)
+            if next >= 0 { n = len(delimiter) + next }
+        }
+        if n <= 0 { return }
+        frame := buf[:n]
+        // Emit PS pack + PSM(H264=0x1B, video PES=0xE0) on IDR access units.
+        isIDR := bytes.Contains(frame, []byte{0,0,0,1,0x65})
+        inv.rtp.Send2data(frame, isIDR, inv.pts)
+        inv.pts += 6000 // RTP clock 90 kHz / 15 fps
+        if inv.pts == 6000 { println("CI_GB_PS_RTP_FIRST_AU_SENT") }
+        time.Sleep(time.Millisecond * 67)
+        buf = buf[n:]
+    }
+}
+'''
+content=content[:start]+replacement+content[end:]
+imp='import (\\n\\t"io/ioutil"'
+assert content.count(imp)==1
+content=content.replace(imp,'import (\\n\\t"bytes"\\n\\t"io/ioutil"')
+old='\tbyed   chan bool'
+assert content.count(old)==1
+content=content.replace(old,old+'\\n\\tpts    uint64')
+invite.write_text(content)
 
 print('Pinned upstream simulator patched for case-insensitive MANSCDP MIME and full UDP datagrams.')
 PY
@@ -194,7 +231,9 @@ if ! command -v ffmpeg >/dev/null 2>&1; then
 fi
 ffmpeg -hide_banner -loglevel error -nostdin -y -f lavfi \
   -i 'testsrc2=size=320x240:rate=15' -t 45 -an \
-  -c:v libx264 -pix_fmt yuv420p -g 15 -f mpeg "$BASE/sim/test.dat"
+  -c:v libx264 -pix_fmt yuv420p -g 15 \
+  -x264-params 'aud=1:repeat-headers=1:scenecut=0' \
+  -f h264 "$BASE/sim/test.dat"
 test -s "$BASE/sim/test.dat"
 docker run -d --name "$SIM_CONTAINER" \
   --network "${PROJECT}_media-net" \
