@@ -48,6 +48,14 @@ jobs:
             reports/ui-smoke-result.json
             reports/ui-*.png
           if-no-files-found: warn
+      - name: Package clean local demonstration
+        run: python -m scripts.package_local_demo
+      - name: Upload source-only demo package
+        uses: actions/upload-artifact@v4
+        with:
+          name: zd-local-demo-source
+          path: dist/zd-demo-local-source.zip
+          if-no-files-found: error
       - name: Live CC0 pedestrian RTSP and Frigate integration
         run: bash scripts/ci_verify_frigate.sh
       - name: Publish evidence and verdict

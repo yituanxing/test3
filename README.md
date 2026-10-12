@@ -13,6 +13,12 @@
 - 视频生产链路仍需 Frigate/MediaMTX。主 Web 真实事件闭环由最新 `scripts/verify_portal_live.py` + GitHub Actions 验证。
 - 真实匿名人形目标事件与合成 P### 身份、到访、预警严格分离；不得宣称已经实现真实人员身份识别。
 
+## V1.4 本地演示交付
+
+Linux/macOS: 在仓库根目录执行 `bash scripts/start_local_demo.sh`。首次运行会创建 .venv、安装 Python 依赖并交互设置管理员 `demo_state` 的密码。启动后访问 `http://127.0.0.1:8001/login`，仅绑定 127.0.0.1，不支持直接公网部署。
+
+GitHub Actions 新增真实 Chromium 登录与导航验证（截图工件 `ui-acceptance`），并生成不含 SQLite、用户会话或凭证的源码包 `zd-local-demo-source`。可参见 `UI_ACCEPTANCE_V1.4.md`。源码包首次运行仍需要互联网安装依赖，且未自带 Frigate 服务。
+
 安装及运行：
 
 ```bash
