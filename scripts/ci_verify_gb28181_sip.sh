@@ -118,12 +118,12 @@ replacement='''func (inv *Invite) sendFile(buf []byte) {
 }
 '''
 content=content[:start]+replacement+content[end:]
-imp='import (\\n\\t"io/ioutil"'
+imp='import (\n\t"io/ioutil"'
 assert content.count(imp)==1
-content=content.replace(imp,'import (\\n\\t"bytes"\\n\\t"io/ioutil"')
+content=content.replace(imp,'import (\n\t"bytes"\n\t"io/ioutil"')
 old='\tbyed   chan bool'
 assert content.count(old)==1
-content=content.replace(old,old+'\\n\\tpts    uint64')
+content=content.replace(old,old+'\n\tpts    uint64')
 invite.write_text(content)
 
 print('Pinned upstream simulator patched for case-insensitive MANSCDP MIME and full UDP datagrams.')
