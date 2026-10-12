@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "annotation_kind": "frame_face_bbox_manually_marked",
+  "scope": "Geometry/localization smoke on a single reused still image and a no-human test pattern, NOT a representative accuracy benchmark",
+  "coordinate_reference": {
+    "width": 512,
+    "height": 512
+  },
+  "ground_truth_notes": "NASA public-domain astronaut still, face location manually estimated from source image; bounding box covers face, not helmet or hair; independent of Haar prediction.",
+  "cases": [
+    {
+      "path": "samples/astronaut-face-test.mp4",
+      "label": "single_visible_face_static_astronaut",
+      "frame_indices_zero_based": [
+        0,
+        12,
+        24
+      ],
+      "reference_face_boxes_xywh": [
+        [
+          180,
+          73,
+          89,
+          88
+        ]
+      ],
+      "scene_id": "astronaut_single_still_1"
+    },
+    {
+      "path": "samples/test-pattern.mp4",
+      "label": "no_person_test_pattern",
+      "frame_indices_zero_based": [
+        0,
+        25,
+        50
+      ],
+      "reference_face_boxes_xywh": [],
+      "scene_id": "abstract_test_pattern_1"
+    }
+  ]
+}
