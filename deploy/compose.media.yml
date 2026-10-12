@@ -1,0 +1,8 @@
+# Smallest RTSP simulation setup: upstream MediaMTX, no custom RTSP server.
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: zd-demo-mediamtx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8554:8554"
