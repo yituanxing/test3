@@ -111,3 +111,9 @@ source_type=real_video、place_id、camera、upstream_event_id、started_at、en
 
 - Frigate 目标事件按 `(camera,event_id)` 复合主键幂等存储，不以事件 ID 字符串全局唯一来暗中覆盖其他相机的观测。同 ID 的两个不同摄像头是两条匿名目标事实，**不代表一个或两个人**。
 - 兼容旧 SQLite 的 `event_id PRIMARY KEY` 单主键迁移，保留旧事件并重建复合主键索引；真实跨相机身份归并仍未提供。
+
+## 周期性矫正机制（虚构底库）
+
+- 管理 API `GET/PUT /api/base/maintenance/config` 持久化开关、周期（1-720h）、天数、策略和矫正模式；`POST /api/base/maintenance/tick` 可人工执行一次确定性检查。
+- 部署时需要显式 `ZD_RUN_ROSTER_SCHEDULER=1 bash scripts/start_local_demo.sh`，独立 Python 调度进程每分钟检查一次到期时间；新输入仅创建待审草稿，绝不自动发布，旧版本不会被定时覆盖。无源数据、无新变化时不会重复造数据。
+- 默认停用；脚本和 API 只操作 P### 合成观测，不处理真实视频身份数据。

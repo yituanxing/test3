@@ -14,6 +14,7 @@ from typing import Literal
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from app.occurrence_semantics import appearance_count
+from app import roster_maintenance
 
 
 def utc_now():
@@ -61,6 +62,7 @@ def initialize(c):
     run_cols = {row['name'] for row in c.execute('PRAGMA table_info(synthetic_registry_runs)')}
     if 'parent_run_id' not in run_cols:
         c.execute('ALTER TABLE synthetic_registry_runs ADD COLUMN parent_run_id INTEGER')
+    roster_maintenance.initialize(c)
     # Upgrade old published candidates without replacing their historical
     # raw event evidence. The existing 'appearances' values remain unchanged
     # for legacy records, as they had one event per raw observation.
@@ -369,6 +371,20 @@ def register(app,db):
     @app.post('/api/base/generate')
     def create(data:GenerateIn):
         with db() as c: return generate(c,data)
+
+    @app.get('/api/base/maintenance/config')
+    def maintenance_config():
+        with db() as c: return roster_maintenance.configuration(c)
+
+    @app.put('/api/base/maintenance/config')
+    def set_maintenance_config(policy:roster_maintenance.Policy):
+        with db() as c: return roster_maintenance.configure(c,policy)
+
+    @app.post('/api/base/maintenance/tick')
+    def maintenance_tick():
+        with db() as c:
+            c.execute('BEGIN IMMEDIATE')
+            return roster_maintenance.tick(c,force=True)
 
     @app.get('/api/base/runs/{run_id}/diff')
     def diff(run_id:int):
