@@ -85,6 +85,15 @@ SIP_Password=$PASSPHRASE
 RecordSip=false
 RecordPushLive=false
 EOF
+# Isolated, non-public CI-only WVP control-plane: disable only WVP HTTP
+# login enforcement so Catalog-sync can be requested from loopback without
+# seeding a privileged administrator password. Crucially, GB28181 SIP Digest
+# auth stays ENABLED with the randomly generated SIP_Password above.
+# Production deployments MUST keep interface-authentication=true.
+sed -i 's/interface-authentication: true/interface-authentication: false/' \
+  "$BASE/wvp/docker/wvp/wvp/application-docker.yml"
+grep -q 'interface-authentication: false' \
+  "$BASE/wvp/docker/wvp/wvp/application-docker.yml"
 # No external host ports are needed for media if only REGISTER and Catalog
 # are being tested. Do not advertise this as an RTP media test.
 echo "::group::Build/start ACTUAL WVP-PRO + MySQL/Redis/ZLMediaKit"
