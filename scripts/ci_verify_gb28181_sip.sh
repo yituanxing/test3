@@ -276,6 +276,23 @@ path.write_text(json.dumps(v,indent=2,ensure_ascii=False),encoding='utf-8')
 print('Diagnostic stage:',v['failure_stage'])
 print('Diagnostic signal counts:',json.dumps({k:v[k] for k in v if k.endswith('_signal_counts')},ensure_ascii=False))
 PY
+  # Snapshot WVP's own asynchronous Catalog state: HTTP /sync returned
+  # "started", not "finished". Print only safe status counters.
+  SYNC_STATUS="$(curl -sS --max-time 5 "http://127.0.0.1:18978/api/device/query/sync_status?deviceId=$DEVICE" || true)"
+  SYNC_STATUS_JSON="$SYNC_STATUS" python - <<'PY'
+import json,os
+try:
+    d=json.loads(os.environ.get('SYNC_STATUS_JSON',''))
+    state=d.get('data') if isinstance(d,dict) else None
+    state=state if isinstance(state,dict) else {}
+    print('WVP Catalog async state:',json.dumps({
+        'api_code':d.get('code'),'total':state.get('total'),
+        'current':state.get('current'),'running':state.get('syncIng'),
+        'has_error':bool(state.get('errorMsg'))
+    },ensure_ascii=False))
+except (TypeError,ValueError,AttributeError):
+    print('WVP Catalog async state: unavailable')
+PY
   echo "GB SIP REGISTER or Catalog not proven; WVP database requirements failed" >&2
   exit 1
 fi
