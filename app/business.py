@@ -28,9 +28,17 @@ DEFAULT_CONFIG = {
     'companion_min_episodes': 2,
     'gathering_min_people': 3,
     'gathering_min_episodes': 1,
+    'interaction_min_rounds': 1,
     'absence_days': 3,
+    'absence_mode': 'days',
+    'absence_check_interval_days': 1,
+    'absence_missed_checks': 3,
     'headcount_difference': 2,
+    'activity_start_hour': 8,
+    'activity_end_hour': 18,
+    'activity_timezone_offset_hours': 0,
     'watch_place_id': 0,
+    'enabled_rules': list(RULE_NAMES),
     'affiliation_mode': 'earliest',
 }
 
@@ -101,7 +109,8 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
             by_place[v['place_id']].append(v)
         if config['affiliation_mode'] == 'frequency':
             affiliation[person] = min(by_place, key=lambda p:
-                (-len(by_place[p]), min(v['start'] for v in by_place[p]), p))
+                (-sum(len(v['observation_ids']) for v in by_place[p]),
+                 min(v['start'] for v in by_place[p]), p))
         else:
             affiliation[person] = min(by_place, key=lambda p:
                 (min(v['start'] for v in by_place[p]), p))
@@ -165,12 +174,13 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
             if affiliation[a] != affiliation[b] and ep['place_id'] in (affiliation[a], affiliation[b]):
                 interaction[(a, b)][ep['place_id']].append(ep)
     for (a, b), loc in interaction.items():
-        if loc.get(affiliation[a]) and loc.get(affiliation[b]):
+        rounds = min(len(loc.get(affiliation[a], [])), len(loc.get(affiliation[b], [])))
+        if rounds >= config['interaction_min_rounds']:
             eps = loc[affiliation[a]] + loc[affiliation[b]]
             ids = [i for ep in eps for v in ep['visits'] if v['person'] in (a, b)
                    for i in v['observation_ids']]
             alerts.append(_hit('interaction', [a, b],
-                f"{a} 与 {b} 在双方主场所均有共同出现窗口", [a, b],
+                f"{a} 与 {b} 在双方主场所均有共同出现，达 {rounds} 轮", [a, b],
                 list(loc), ids, '这是人工虚构的双向出现示例，不证明实际交往。'))
 
     gathering = defaultdict(list)
@@ -191,9 +201,16 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
     for person, arr in groups.items():
         last = max(arr, key=lambda v: v['last'])
         days = (now-last['last']).total_seconds() / 86400
-        if days >= config['absence_days']:
+        missed = max(0, int(days // config['absence_check_interval_days']))
+        is_missing = (missed >= config['absence_missed_checks']
+                      if config['absence_mode'] == 'missed_checks'
+                      else days >= config['absence_days'])
+        if is_missing:
+            description = (f"已连续缺少 {missed} 个完整检查周期"
+                           if config['absence_mode'] == 'missed_checks'
+                           else f"已 {days:.1f} 天没有模拟观测")
             alerts.append(_hit('absence', [person],
-                f"{person} 已 {days:.1f} 天没有模拟观测", [person],
+                f"{person} {description}", [person],
                 [affiliation[person]], last['observation_ids'],
                 '无观测不代表实际未到访；设备离线和漏检均可导致缺失。'))
 
@@ -205,23 +222,34 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
                     f"{v['person']} 出现在演示指定场所 {watch}", [v['person']],
                     [watch], v['observation_ids'], '仅用于虚构样本的可配置位置事件示例。'))
 
-    # Count deduplicated synthetic visitors per place per UTC day, vs count
-    # of synthetic home assignments. Do not count raw detections as people.
-    residents = Counter(affiliation.values())
-    calendar = defaultdict(set)
-    calendar_ids = defaultdict(list)
-    for v in visits:
-        if v['start'].date() == now.date():
-            calendar[v['place_id']].add(v['person'])
-            calendar_ids[v['place_id']].extend(v['observation_ids'])
-    for place in sorted(set(residents) | set(calendar)):
-        actual = len(calendar[place])
-        baseline = residents[place]
-        if abs(actual-baseline) >= config['headcount_difference']:
-            alerts.append(_hit('headcount', [place, now.date()],
-                f"场所 {place} 当日去重人数 {actual}，底库 {baseline}，差值 {actual-baseline:+d}",
-                calendar[place], [place], calendar_ids[place],
-                '仅为合成事件估算，不能用于实际人数异常处置。'))
+    # Excel #12: activity headcount must be evaluated after closing time.
+    # Fixed UTC offset makes the demo stable on GitHub runners and local PCs.
+    offset = timedelta(hours=config['activity_timezone_offset_hours'])
+    local_now = now + offset
+    start_h = config['activity_start_hour']
+    end_h = config['activity_end_hour']
+    if local_now.hour >= end_h:
+        residents = Counter(affiliation.values())
+        calendar = defaultdict(set)
+        calendar_ids = defaultdict(list)
+        for v in visits:
+            local_start = v['start'] + offset
+            if local_start.date() == local_now.date() and start_h <= local_start.hour < end_h:
+                calendar[v['place_id']].add(v['person'])
+                calendar_ids[v['place_id']].extend(v['observation_ids'])
+        for place in sorted(set(residents) | set(calendar)):
+            actual = len(calendar[place])
+            baseline = residents[place]
+            if abs(actual-baseline) >= config['headcount_difference']:
+                alerts.append(_hit('headcount', [place, local_now.date(), start_h, end_h],
+                    f"场所 {place} 活动结束后去重人数 {actual}，底库 {baseline}，差值 {actual-baseline:+d}",
+                    calendar[place], [place], calendar_ids[place],
+                    f'合成观测活动时段 {start_h:02d}:00–{end_h:02d}:00，'
+                    '以配置时区的日期为准；真实漏检不代表真实缺席。'))
+
+    # Pausing rule types never changes immutable synthetic source observations.
+    enabled = set(config['enabled_rules'])
+    alerts = [alert for alert in alerts if alert['type'] in enabled]
 
     response_visits = [{**{k:v[k] for k in ('person','place_id','observation_ids')},
                         'started_at':v['start'].isoformat(), 'ended_at':v['last'].isoformat(),

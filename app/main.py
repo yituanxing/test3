@@ -155,7 +155,7 @@ def setup_db():
 
 
 setup_db()
-app = FastAPI(title='ZD Business Pipeline Demo', version='1.0.0')
+app = FastAPI(title='ZD Business Pipeline Demo', version='1.1.0')
 admin.register(app,db)
 base_registry.register(app,db)
 
@@ -554,8 +554,18 @@ class SyntheticConfig(BaseModel):
     companion_min_episodes: int = Field(default=2, ge=1, le=20)
     gathering_min_people: int = Field(default=3, ge=2, le=100)
     gathering_min_episodes: int = Field(default=1, ge=1, le=20)
+    interaction_min_rounds: int = Field(default=1, ge=1, le=20)
     absence_days: int = Field(default=3, ge=1, le=365)
+    absence_mode: Literal['days', 'missed_checks'] = 'days'
+    absence_check_interval_days: int = Field(default=1, ge=1, le=365)
+    absence_missed_checks: int = Field(default=3, ge=1, le=365)
     headcount_difference: int = Field(default=2, ge=1, le=1000)
+    activity_start_hour: int = Field(default=8, ge=0, le=22)
+    activity_end_hour: int = Field(default=18, ge=1, le=23)
+    activity_timezone_offset_hours: int = Field(default=0, ge=-12, le=14)
+    enabled_rules: list[Literal['cross_place', 'companion', 'interaction', 'gathering',
+                                'absence', 'appearance', 'headcount']] = Field(
+        default_factory=lambda: list(RULE_NAMES))
     watch_place_id: int = Field(default=0, ge=0)
     affiliation_mode: Literal['earliest', 'frequency'] = 'earliest'
 
@@ -629,6 +639,10 @@ def get_synthetic_config():
 def put_synthetic_config(data: SyntheticConfig):
     with db() as c:
         cfg = data.model_dump()
+        if cfg['activity_start_hour'] >= cfg['activity_end_hour']:
+            raise HTTPException(422, '活动结束时间必须晚于开始时间；目前仅支持同日时段')
+        if len(cfg['enabled_rules']) != len(set(cfg['enabled_rules'])):
+            raise HTTPException(422, '规则列表不得重复')
         if cfg['watch_place_id'] and not c.execute('SELECT 1 FROM places WHERE id=?',(cfg['watch_place_id'],)).fetchone():
             raise HTTPException(404, '指定关注场所不存在')
         c.execute('INSERT INTO synthetic_settings(id,json_value) VALUES(1,?) '
