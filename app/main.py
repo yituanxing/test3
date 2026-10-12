@@ -13,7 +13,7 @@ from typing import Literal
 import cv2
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from app.detector import choose_detector, detector_info, box_quality
 from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
@@ -408,6 +408,61 @@ def process_source(source_id: int, max_frames: int = Query(90, ge=1, le=600),
             'structured_boxes_saved': faces_total,
             'quality_assessment': 'uncalibrated_heuristic',
             'note': '逐框几何数据是真实模型输出；没有脸照存储/身份识别/跨镜头去重。'}
+
+
+
+@app.get('/api/video/observations/{sample_id}/preview')
+def preview_video_sample(sample_id:int,request:Request):
+    """Generate a temporary privacy-redacted geometric overlay on SOURCE frame.
+
+    Authenticated location scope; only an explicitly registered local video
+    file may be decoded. Never stores/serves an unredacted face image.
+    """
+    with db() as c:
+        row=c.execute('''SELECT s.*,v.kind,v.uri
+          FROM samples s JOIN sources v ON v.id=s.source_id
+          WHERE s.id=? AND s.origin='video' ''',(sample_id,)).fetchone()
+        if not row:
+            raise HTTPException(404,'该真实视频帧不存在')
+        sample=dict(row)
+        access.check_place(c,request,sample['place_id'])
+        boxes=[dict(x) for x in c.execute('''SELECT x,y,w,h FROM face_boxes
+                              WHERE sample_id=? ORDER BY id''',(sample_id,))]
+    if sample['kind']!='file':
+        raise HTTPException(409,'直播来源没有可离线定位的文件帧；不能伪造抓拍')
+    if not Path(sample['uri']).is_file():
+        raise HTTPException(409,'原始视频文件已不可用；请检查原始来源')
+    cap=cv2.VideoCapture(sample['uri'])
+    try:
+        if not cap.isOpened():
+            raise HTTPException(409,'原始视频无法打开')
+        cap.set(cv2.CAP_PROP_POS_FRAMES,max(0,int(sample['frame_index'])-1))
+        ok,frame=cap.read()
+    finally:
+        cap.release()
+    if not ok:
+        raise HTTPException(409,'源视频帧定位失败')
+    height,width=frame.shape[:2]
+    # Full-scene pixelation, and completely covered face regions. This is
+    # geometric evidence only, never an original/identifying face image.
+    reduced=cv2.resize(frame,(max(1,width//28),max(1,height//28)),
+                       interpolation=cv2.INTER_AREA)
+    redacted=cv2.resize(reduced,(width,height),interpolation=cv2.INTER_NEAREST)
+    for box in boxes:
+        x,y,w,h=(int(box[field]) for field in ('x','y','w','h'))
+        x=max(0,x);y=max(0,y)
+        right=min(width,x+w);bottom=min(height,y+h)
+        cv2.rectangle(redacted,(x,y),(right,bottom),(25,25,25),-1)
+        cv2.rectangle(redacted,(x,y),(right,bottom),(80,230,85),3)
+    cv2.putText(redacted,'REDACTED FACE GEOMETRY - NOT IDENTITY',
+                (8,min(height-8,28)),cv2.FONT_HERSHEY_SIMPLEX,0.56,
+                (245,245,245),2,cv2.LINE_AA)
+    ok,jpg=cv2.imencode('.jpg',redacted,[cv2.IMWRITE_JPEG_QUALITY,82])
+    if not ok:
+        raise HTTPException(500,'绘制脱敏检测示意图失败')
+    return Response(content=jpg.tobytes(),media_type='image/jpeg',
+                    headers={'Cache-Control':'no-store, private',
+                             'X-Content-Type-Options':'nosniff'})
 
 
 @app.get('/api/video/observations')

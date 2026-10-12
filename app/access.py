@@ -132,7 +132,8 @@ def permitted(actor: dict, method: str, path: str) -> bool:
                  '/api/monitoring/overview', '/api/frigate/events',
                  '/api/frigate/cameras', '/api/frigate/summary',
                  '/api/insights/overview', '/api/insights/people',
-                 '/api/insights/relationships'}
+                 '/api/insights/relationships', '/api/video/observations'}
+        or re.fullmatch(r'/api/video/observations/\d+/preview',path)
         or re.fullmatch(r'/api/insights/people/P[0-9]{3}',path)
     )
     if read and scope_reads:

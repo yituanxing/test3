@@ -99,3 +99,52 @@ def test_sqlite_samples_correlate_with_actual_boxes_and_authenticated_scope(tmp_
     with main.db() as c:
         recorded=c.execute('SELECT count(*) FROM face_boxes').fetchone()[0]
         assert recorded==data['face_detections']
+
+
+
+def test_authenticated_pixelated_frame_is_real_derived_and_not_original(tmp_path,monkeypatch):
+    import app.main as main
+    from app import access
+    monkeypatch.delenv('ZD_AUTH_TEST_COMPAT',raising=False)
+    monkeypatch.setattr(main,'DB',tmp_path/'preview.sqlite3')
+    main.setup_db()
+    with main.db() as conn:
+        state=conn.execute('SELECT id FROM regions WHERE level=1 LIMIT 1').fetchone()[0]
+        leaf=conn.execute('SELECT id FROM regions WHERE level=4 LIMIT 1').fetchone()[0]
+        access.create_user(conn,'previewadmin','preview-test-password-2026',state)
+        access.create_user(conn,'previewleaf','preview-test-password-2026',leaf)
+    client=TestClient(main.app)
+    def headers(name):
+        login=client.post('/api/auth/login',json={
+            'username':name,'password':'preview-test-password-2026'})
+        return {'Authorization':'Bearer '+login.json()['access_token']}
+    admin=headers('previewadmin');community=headers('previewleaf')
+    path=Path(__file__).resolve().parents[1]/'samples'/'astronaut-face-test.mp4'
+    with main.db() as conn:
+        state=conn.execute('SELECT id FROM regions WHERE level=1 LIMIT 1').fetchone()[0]
+        county=conn.execute("INSERT INTO regions(name,parent_id,level) VALUES(?,?,2)",('证据隔离县',state)).lastrowid
+        street=conn.execute("INSERT INTO regions(name,parent_id,level) VALUES(?,?,3)",('证据隔离街道',county)).lastrowid
+        leaf=conn.execute("INSERT INTO regions(name,parent_id,level) VALUES(?,?,4)",('证据隔离社区',street)).lastrowid
+        place=conn.execute('INSERT INTO places(name,region_id) VALUES(?,?)',('证据隔离场所',leaf)).lastrowid
+    source=client.post('/api/sources',headers=admin,json={
+        'kind':'file','name':'仅用于可授权示意帧','uri':str(path),'place_id':place})
+    assert source.status_code==200,source.text
+    result=client.post(f"/api/sources/{source.json()['id']}/process?max_frames=5&sample_every=5",headers=admin)
+    assert result.status_code==200,result.text
+    rows=client.get('/api/video/observations',headers=admin).json()['observations']
+    one=next(v for v in rows if v['source_id']==source.json()['id'])
+    url=f"/api/video/observations/{one['id']}/preview"
+    assert client.get(url).status_code==401
+    assert client.get(url,headers=community).status_code==403
+    resp=client.get(url,headers=admin)
+    assert resp.status_code==200,resp.text[:150]
+    assert resp.headers['content-type']=='image/jpeg'
+    assert 'no-store' in resp.headers['cache-control']
+    image=cv2.imdecode(np.frombuffer(resp.content,dtype=np.uint8),cv2.IMREAD_COLOR)
+    cap=cv2.VideoCapture(str(path))
+    cap.set(cv2.CAP_PROP_POS_FRAMES,one['frame_index']-1)
+    ok,orig=cap.read()
+    cap.release()
+    assert ok and image.shape==orig.shape
+    # Actual derived pixels, but NOT the original frame bytes:
+    assert float(np.abs(image.astype(np.float32)-orig.astype(np.float32)).mean())>3
