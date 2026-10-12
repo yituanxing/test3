@@ -23,6 +23,8 @@ motion:
   enabled: true
   threshold: 10
   contour_area: 5
+  # CI-only: do not suppress large real motion as a lightning scene change.
+  lightning_threshold: 1.0
 
 record:
   enabled: false
