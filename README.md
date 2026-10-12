@@ -36,3 +36,11 @@ python -m uvicorn app.main:app --port 8001
 ## 需求 1 / 3 核心设计与计数口径
 
 参见 [CORE_VIDEO_ROSTER_SPEC_V1.md](CORE_VIDEO_ROSTER_SPEC_V1.md)：区分原始帧检测、连续事件、有效出现、到访会话及底库人员。次数优先依据明确事件分组后的有效出现数；已发布快照不可直接修改，必须生成新草稿后裁决发布。真实视频匿名事件不能冒充已确认人员身份。
+
+## GB28181 国标视频接入（WVP-PRO + ZLMediaKit，非自行实现SIP）
+
+现有 `/monitor` 页面已增加设备/通道查询、绑定辖区场所、实时点播、历史录像回放和 RTSP 实测探测。由 [648540858/wvp-GB28181-pro](https://github.com/648540858/wvp-GB28181-pro) 执行 SIP 注册、目录、INVITE/Playback，由 [ZLMediaKit](https://github.com/ZLMediaKit/ZLMediaKit) 收 RTP/PS 并转成 RTSP；test3 只做受控 WVP API 适配和现有匿名视频分析，**不创建虚构摄像头或真实人员身份**。
+
+独立部署 WVP/ZLMediaKit 与安全配置、环境变量、实际需要的设备验收步骤，请阅读 [deploy/GB28181_WVP_GUIDE.md](deploy/GB28181_WVP_GUIDE.md)。需要设置 `GB28181_WVP_URL`、`GB28181_WVP_API_KEY` 和 `GB28181_RTSP_HOSTS`；API Key 不应进入公开仓库。设备注册成功、国标 RTP PS 收流、历史录像回放均须通过真实授权设备联调才能标注完成。
+
+CI 另验证 WVP HTTP 契约与正确角色权限，并验证“WVP API 适配 → 正在直播的真实 RTSP → OpenCV → SQLite”数据链路；其中 **WVP SIP 控制面在 CI 中由本地 HTTP 测试服务替代，并不证明 GB28181 REGISTER/INVITE 实机成功**。

@@ -84,6 +84,7 @@ jobs:
           path: |
             reports/verify-live-frigate.json
             reports/verify-portal-live.json
+            reports/verify-wvp-rtsp-bridge.json
             reports/motion-diagnostics.json
             reports/frigate-frame-*.jpg
           if-no-files-found: warn

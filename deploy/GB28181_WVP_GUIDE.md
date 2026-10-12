@@ -85,3 +85,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 | E. 场所/权限 | 同一设备多路通道归属、下级用户拒绝跨辖区、会话结束与断线 | 业务整合验收 |
 
 **当前已实现的是 A；C/D 尚待接入合法设备或兼容 GB28181 SIP/RTP 测试设备实际验证。** B 可以单独以 ZLMediaKit 官方 `openRtpServer` + FFmpeg `rtp_mpegts` 验证媒体格式转换，但不能拿 FFmpeg 假装有 GB SIP 设备。应在有设备条件后再填完 C/D，绝不声称 RTSP 代表 GB28181 端到端已经完成。
+
+### 增加的一条真实媒体集成验证
+
+GitHub 的完整视频 CI 在 MediaMTX 和 FFmpeg 正在推送 Intel 许可样片的前提下，通过本地 HTTP 测试服务模拟 *WVP 的控制面 API*，让正式的 `app/gb28181.py` 注册 `rtsp://127.0.0.1:8554/demo`，随后从已登记的 `source_id` **真正解码运动画面，并将匿名观测写入主 Web SQLite**。该阶段的实际帧数、抽帧数、模型检测结果保存在 `reports/verify-wvp-rtsp-bridge.json`。这比纯模拟响应更深入，但仍然**没有验证 GB28181 SIP、实际 PS/RTP 或历史设备录像**。不会把该测试当作 C/D 完成。

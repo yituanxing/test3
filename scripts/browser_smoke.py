@@ -126,6 +126,12 @@ def run():
                         # Real video and actual browser interaction: never rely
                         # on a stubbed API or synthetic detector boxes.
                         page.goto(base+"/monitor")
+                        # The GB28181 status must be truthful even without SIP
+                        # hardware or a WVP upstream: no simulated online device.
+                        expect(page.locator("#gbStatus")).to_contain_text("尚未配置")
+                        expect(page.locator("#gbPanel")).to_contain_text(
+                            "WVP-PRO + ZLMediaKit")
+                        checks.append("gb28181_not_configured_shown_as_unverified")
                         actual = page.evaluate("""async sourceId => {
                             const r=await fetch('/api/sources/'+sourceId+
                               '/process?max_frames=10&sample_every=5',

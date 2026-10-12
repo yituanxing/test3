@@ -12,3 +12,9 @@ The host operator is responsible for upstream license notices, consent for any r
 
 - `samples/astronaut-public-domain.png`：来自 scikit-image `skimage.data.astronaut()`，原始图片属于 NASA Great Images 项目，scikit-image 文档注明无已知版权限制、公共领域；原图为宇航员 Eileen Collins，供**人脸检测测试**而非身份识别使用。
 - `samples/astronaut-face-test.mp4`：用 FFmpeg 从上述图片生成的静态图像循环 H.264 视频；不属于人员监控录像。
+
+## GB28181 协议栈复用（上游依赖，不将源码混入 test3）
+
+- WVP-GB28181-PRO，https://github.com/648540858/wvp-GB28181-pro ，GitHub 仓库标记 MIT，自维护 SIP 注册、Catalog、Play、Playback；在上游独立启动，不把服务内置代码复制进 test3。test3 的 `app/gb28181.py` 只使用其公开 API。
+- ZLMediaKit，https://github.com/ZLMediaKit/ZLMediaKit ，MIT 类许可证及额外保留软件标识要求；它负责 GB28181 的 RTP PS/TS 收流与 RTSP 分发。官方项目建议商用前另行确认第三方库依赖许可证。
+- 不提交国标设备密码、SIP 登录信息、WVP API Key、生产相机录像或人脸特征。GitHub CI 的 RTSP 公共样例不构成对真实 GB SIP 设备的协议一致性认证。
