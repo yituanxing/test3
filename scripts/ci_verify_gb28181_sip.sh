@@ -392,17 +392,45 @@ print('WVP reported a local RTSP endpoint after real SIP INVITE')
 PY
 echo "::endgroup::"
 
+echo "::group::Decode real GB RTP/PS video through ZLMediaKit RTSP"
+RTSP_URL="$(cat "$BASE/gb-rtsp.url")"
+decoded=0
+for attempt in 1 2 3 4; do
+  if timeout 18 ffmpeg -hide_banner -loglevel error -nostdin -y \
+       -rtsp_transport tcp -rw_timeout 8000000 -i "$RTSP_URL" \
+       -frames:v 1 "$BASE/gb-decoded.jpg" >/dev/null 2>&1 \
+       && test -s "$BASE/gb-decoded.jpg"; then
+    decoded=1
+    break
+  fi
+  sleep 2
+done
+if [ "$decoded" != 1 ]; then
+  echo "No decoded frame from WVP/ZLMediaKit RTSP after real GB RTP/PS" >&2
+  exit 1
+fi
+python - "$BASE/gb-decoded.jpg" <<'PY'
+from pathlib import Path
+import sys
+b=Path(sys.argv[1]).read_bytes()
+if len(b)<1000 or not b.startswith(bytes.fromhex('ffd8ff')):
+    raise SystemExit('GB media frame is not a valid nonempty JPEG')
+print('Decoded GB RTP/PS moving-video frame, JPEG bytes:',len(b))
+PY
+cp "$BASE/gb-decoded.jpg" reports/gb28181-decoded-ci.jpg
+echo "::endgroup::"
+
 python - <<'PY'
 import json,os
 from datetime import datetime,timezone
 from pathlib import Path
 path=Path(os.environ["REPORT"])
 v=json.loads(path.read_text(encoding="utf-8"))
-v.update({"verdict":"PASS","live_sip_registration":True,
+v.update({"verdict":"PASS","sip_invite_rtp_ps_video":"PASS","live_sip_registration":True,
           "wvp_persisted_online_device":True,"catalog_channel_received":True,
           "check_time_utc":datetime.now(timezone.utc).isoformat(),
           "evidence":"WVP live MySQL wvp_device.on_line=1 AND wvp_device_channel.data_device_id=parent.id AND channel.device_id matches; independent upstream GB SIP simulator running",
-          "note":"Real SIP control-plane only; no GB PS/RTP decoded or historical playback."})
+          "note":"Real SIP REGISTER/Catalog/INVITE, PS/RTP to ZLM and an actual decoded frame; historical playback not tested."})
 path.write_text(json.dumps(v,indent=2,ensure_ascii=False),encoding="utf-8")
 print("Real upstream GB28181 SIP verdict:",v["verdict"])
 PY
