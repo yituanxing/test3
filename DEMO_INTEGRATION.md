@@ -2,7 +2,7 @@
 
 业务服务：`python -m uvicorn app.main:app --host 127.0.0.1 --port 8001`。
 
-前端页面：`/`, `/monitor`, `/admin`, `/business`；接口：`/docs`。使用 `requirements-business.txt`。
+前端页面：`/`, `/monitor`, `/admin`, `/business`, `/base`；接口：`/docs`。使用 `requirements-business.txt`。
 
 真实视频事件的接入（须在 Frigate 运行中）：
 
@@ -18,4 +18,9 @@
 CI: 本仓库同一 workflow 下分别执行业务30+测试和 Frigate 真推理/RTSP 验收。成功的媒体验收要求真实 person 事件来自上游实际 API，不能模拟出结果。
 
 
-底库归并演示：见 `BASE_REGISTRY_V0.9.md`，`/base` 为虚构身份底库的快照生成、人工归属与增删矫正。与匿名 Frigate person 目标事件隔离。
+底库归并演示：见 `BASE_REGISTRY_V0.9.md`；/base 为模拟人物底库的版本化生成、人工归属、增删矫正与发布，和匿名实际 Frigate person 事件隔离。
+
+
+## V1.0 态势与检索
+
+打开 `/insights` 进入独立合成身份态势分析，支持图表、场所筛选、按 P### 编码检索、人员时间线、基于模拟同地同时段的共同出现关系，以及分开的真实视频匿名检测计数。详见 `INSIGHTS_V1.0.md`。

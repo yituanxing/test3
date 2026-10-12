@@ -18,7 +18,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview
-from app import admin, base_registry
+from app import admin, base_registry, insights
 import httpx
 from pydantic import BaseModel, Field
 
@@ -30,6 +30,7 @@ STATIC = ROOT / 'static' / 'index.html'
 BUSINESS_STATIC = ROOT / 'static' / 'business.html'
 MONITOR_STATIC = ROOT / 'static' / 'monitor.html'
 ADMIN_STATIC = ROOT / 'static' / 'admin.html'
+INSIGHTS_STATIC = ROOT / 'static' / 'insights.html'
 
 
 def utcnow():
@@ -154,7 +155,7 @@ def setup_db():
 
 
 setup_db()
-app = FastAPI(title='ZD Business Pipeline Demo', version='0.7.0')
+app = FastAPI(title='ZD Business Pipeline Demo', version='1.0.0')
 admin.register(app,db)
 base_registry.register(app,db)
 
@@ -198,6 +199,11 @@ def monitor_home():
 @app.get('/admin')
 def admin_home():
     return FileResponse(ADMIN_STATIC)
+
+
+@app.get('/insights')
+def insights_home():
+    return FileResponse(INSIGHTS_STATIC)
 
 
 @app.get('/api/monitoring/overview')
@@ -748,3 +754,64 @@ def frigate_status():
         return {'connected':False, 'upstream_version':None,
                 'inference_verified':False,
                 'note':f'Frigate无响应：{type(e).__name__}；查看容器状态和5000端口绑定。'}
+
+
+# Synthetic-only operational dashboard + people/visit search. Never join a
+# Frigate object event to a synthetic identity. Real metrics remain separate.
+@app.get('/api/insights/overview')
+def get_insights_overview(days: int = Query(7, ge=1, le=31),
+                          region_id: int | None = Query(None, ge=1),
+                          place_id: int | None = Query(None, ge=1)):
+    with db() as c:
+        allowed = admin.subtree_ids(c, region_id)
+        rows = admin.place_rows(c,region_id)
+        if place_id is not None:
+            if place_id not in {p['id'] for p in rows}:
+                raise HTTPException(404, '场所不在当前查询范围')
+            rows = [p for p in rows if p['id']==place_id]
+        synth = insights.overview(_analyze_synthetic(c),rows,days=days)
+        # Don't silently mix source-based event counts and fictitious people.
+        video = monitoring_overview(c,days=days,region_id=region_id,
+                                    allowed_region_ids=allowed)
+        if place_id is not None:
+            video['places']=[v for v in video['places'] if v['place_id']==place_id]
+            video['counts']={k:sum(v[k] for v in video['places'])
+                             for k in ('person_objects','sampled_frames','face_detections')}
+            video['timeline']=[]  # avoid exposing unscoped aggregate day data
+        return {'synthetic':synth,'real_video':video,
+                'note':'真实视频聚合与合成人员统计严格隔离；不做身份对应。'}
+
+
+@app.get('/api/insights/people')
+def search_insights_people(q: str = Query('',max_length=40),
+                           days: int = Query(30,ge=1,le=365),
+                           place_id: int | None = Query(None,ge=1),
+                           region_id: int | None = Query(None,ge=1)):
+    with db() as c:
+        return insights.people_search(_analyze_synthetic(c), admin.place_rows(c,region_id),
+                                      days=days,query=q,place_id=place_id)
+
+
+@app.get('/api/insights/people/{person}')
+def get_insights_person(person: str, days: int = Query(30,ge=1,le=365),
+                        region_id: int | None = Query(None,ge=1)):
+    if not __import__('re').fullmatch(r'P[0-9]{3}',person):
+        raise HTTPException(422, '只能查询虚构的 P### 人员编号')
+    with db() as c:
+        return insights.person_detail(_analyze_synthetic(c),admin.place_rows(c,region_id),
+                                      person,days=days)
+
+
+@app.get('/api/insights/relationships')
+def get_insights_relationships(days: int = Query(30,ge=1,le=365),
+                               region_id: int | None = Query(None,ge=1),
+                               place_id: int | None = Query(None,ge=1),
+                               person: str | None = Query(None,pattern=r'^P[0-9]{3}$')):
+    with db() as c:
+        rows=admin.place_rows(c,region_id)
+        place_ids={p['id'] for p in rows}
+        if place_id is not None:
+            if place_id not in place_ids: raise HTTPException(404,'场所不在查询范围')
+            place_ids={place_id}
+        return insights.relationships(_analyze_synthetic(c),place_ids=place_ids,
+                                      days=days,person=person)
