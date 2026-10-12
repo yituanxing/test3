@@ -78,7 +78,7 @@ def test_policy_change_regenerates_draft_even_with_identical_observations(tmp_pa
         assert first['action']=='draft_created'
         old_id=first['run_id']
         old_place=next(p['place_id'] for p in base_registry.present(c,base_registry._run(c,old_id))['people']
-                       if p['person']=='P001')
+                       if p['person']=='P099')
         base_registry.publish(c,old_id)
     # Same observations, different ownership rule -> new editable draft.
     updated={**initial,'strategy':'frequency'}
@@ -90,7 +90,7 @@ def test_policy_change_regenerates_draft_even_with_identical_observations(tmp_pa
         fresh=base_registry._run(c,after['run_id'])
         assert fresh['strategy']=='frequency'
         current_place=next(p['place_id'] for p in base_registry.present(c,fresh)['people']
-                           if p['person']=='P001')
+                           if p['person']=='P099')
         assert current_place!=old_place
         assert base_registry._published(c)['id']==old_id
         # The new draft is reused when there was no policy or input change.
