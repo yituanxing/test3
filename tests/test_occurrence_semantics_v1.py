@@ -113,3 +113,34 @@ def test_published_roster_cannot_be_mutated_after_release(tmp_path, monkeypatch)
                                                   'correction_mode':'rebuild'})
     assert second.status_code==200
     assert second.json()['run']['id'] != run_id
+
+
+
+def test_clickable_truth_scenario_is_idempotent_and_drives_both_strategies(tmp_path,monkeypatch):
+    import app.main as main
+    monkeypatch.setattr(main,'DB',tmp_path/'dedup_truth.sqlite3')
+    main.setup_db()
+    client=TestClient(main.app)
+    response=client.post('/api/base/demo/duplicates')
+    assert response.status_code==200,response.text
+    assert response.json()['inserted']==103
+    assert client.post('/api/base/demo/duplicates').json()['inserted']==0
+    freq=client.post('/api/base/generate',json={'days':7,'strategy':'frequency',
+            'correction_mode':'rebuild'}).json()
+    person=next(p for p in freq['people'] if p['person']=='P099')
+    places={x['name']:x['id'] for x in client.get('/api/places').json()}
+    by_place={x['place_id']:x for x in person['candidates']}
+    a,b=places['测试场所 A'],places['测试场所 B']
+    assert person['place_id']==b
+    assert (by_place[a]['raw_observations'],by_place[a]['appearances'])==(100,1)
+    assert (by_place[b]['raw_observations'],by_place[b]['appearances'])==(3,3)
+    assert len(by_place[a]['observation_ids'])==100
+    assert client.post(f"/api/base/runs/{freq['run']['id']}/publish").status_code==200
+    earliest=client.post('/api/base/generate',json={'days':7,'strategy':'earliest',
+                     'correction_mode':'rebuild'}).json()
+    assert next(p for p in earliest['people'] if p['person']=='P099')['place_id']==a
+    delta=client.get(f"/api/base/runs/{earliest['run']['id']}/diff").json()
+    changed=next(x for x in delta['changes'] if x['person']=='P099')
+    assert changed['kind']=='moved'
+    assert changed['before_place_id']==b and changed['after_place_id']==a
+    assert len(changed['after_observation_ids'])==103

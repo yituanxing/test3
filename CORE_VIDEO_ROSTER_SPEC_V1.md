@@ -96,3 +96,8 @@ source_type=real_video、place_id、camera、upstream_event_id、started_at、en
 - `GET /api/video/observations` 是受认证/辖区限制的查询，返回真实抽样帧/人脸框/大小/清晰度诊断；默认不存照片，不返回人脸向量、Person ID、跨镜头关系。
 - `quality_state=candidate` 只是未校准模糊度/大小启发式筛查，不是人员身份识别质量合格结论。人脸识别精度、检测检出率仍需人工标注真值数据集。
 - 开发 CI 用真实视频解码→OpenCV→SQLite→API 统计一致性和跨辖区 403 测试，必要时检查底库不被真实观测污染。
+
+## 核心演示数据入口（实际代码）
+
+- `POST /api/base/demo/duplicates` 仅建立 P099 合成真值案例，A 100 条观测共享 1 个事件键、B 3 条观测独立，幂等且不删除其他底库记录。管理工作台按钮“重复采集真值：100帧 vs 3次”可点击重算。
+- Chromium 实际点击：准备反例→生成频次底库（归 B）→发布→切换时间优先（归 A）→V1→V2 差异含迁移 P099，并截图保存；不依赖伪造响应。

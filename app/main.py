@@ -782,6 +782,46 @@ def put_synthetic_config(data: SyntheticConfig):
             'alert_count':len(result['alerts']),'note':'未改变原始合成事件或Frigate真实观测。'}
 
 
+
+@app.post('/api/base/demo/duplicates')
+def seed_dedup_synthetic():
+    """Deterministic 100-captures-versus-three-events synthetic truth case.
+
+    This fixture exists solely to prove that frame count does not bias a
+    fictional roster. It has NO input from OpenCV, Frigate or real people.
+    Idempotent event keys; never removes existing observation/history.
+    """
+    with db() as c:
+        ids={}
+        for name in ('测试场所 A','测试场所 B'):
+            c.execute('INSERT OR IGNORE INTO places(name,region_id) VALUES(?,?)',
+                      (name,admin.demo_leaf(c)))
+            ids[name]=c.execute('SELECT id FROM places WHERE name=?',(name,)).fetchone()['id']
+        start=datetime.now(timezone.utc).replace(hour=9,minute=0,second=0,microsecond=0)
+        rows=[]
+        for index in range(1,101):
+            rows.append((f'DEDUP-A-{index:03}', 'DEDUP-A-TRACK', 'P099',
+                         ids['测试场所 A'],
+                         (start+timedelta(seconds=index)).isoformat(),'synthetic_only'))
+        for index in range(1,4):
+            rows.append((f'DEDUP-B-{index:03}', f'DEDUP-B-{index:03}', 'P099',
+                         ids['测试场所 B'],
+                         (start+timedelta(hours=index+1)).isoformat(),'synthetic_only'))
+        before=c.total_changes
+        c.executemany('''INSERT OR IGNORE INTO synthetic_observations(
+            event_key,occurrence_key,person_label,place_id,observed_at,origin)
+            VALUES (?,?,?,?,?,?)''',rows)
+        inserted=c.total_changes-before
+        c.execute('INSERT INTO synthetic_audit(operation,detail,created_at) VALUES(?,?,?)',
+                  ('seed_dedup_truth_case',f'inserted={inserted}; P099 A:100/1 B:3/3',utcnow()))
+        return {'mode':'synthetic_only','inserted':inserted,
+                'expected':{'A_raw_observations':100,'A_appearances':1,
+                            'B_raw_observations':3,'B_appearances':3,
+                            'frequency_home':'测试场所 B',
+                            'earliest_home':'测试场所 A'},
+                'note':'P099是虚构身份，100段帧级抓拍来自确定性合成案例；并非真实视频身份聚类。'}
+
+
 @app.post('/api/business/seed')
 def seed_synthetic_business(reset: bool = False):
     # Create explicitly fake observation data. No external camera input.
