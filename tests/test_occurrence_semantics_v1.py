@@ -89,3 +89,27 @@ def test_legacy_migration_preserves_published_signature(tmp_path,monkeypatch):
         person=base_registry.present(c,base_registry._published(c))['people'][0]
         assert person['candidates'][0]['appearances']==1
         assert person['candidates'][0]['raw_observations']==1
+
+
+def test_published_roster_cannot_be_mutated_after_release(tmp_path, monkeypatch):
+    """Publishing is a durable snapshot; edits must target a NEW draft."""
+    import app.main as main
+    monkeypatch.setattr(main,'DB',tmp_path/'immutable.sqlite3')
+    main.setup_db()
+    client=TestClient(main.app)
+    assert client.post('/api/business/seed').status_code == 200
+    draft=client.post('/api/base/generate',json={'days':7, 'strategy':'earliest',
+                                                  'correction_mode':'rebuild'}).json()
+    run_id=draft['run']['id']
+    assert client.post(f'/api/base/runs/{run_id}/publish').status_code == 200
+    snapshot=client.get('/api/base/active').json()
+    proposed_place=client.get('/api/places').json()[0]['id']
+    denied=client.post(f'/api/base/runs/{run_id}/decide',json={
+        'person':'P001','place_id':proposed_place,'action':'assign',
+        'reason':'不允许修改已发布快照'})
+    assert denied.status_code == 409
+    assert client.get('/api/base/active').json() == snapshot
+    second=client.post('/api/base/generate',json={'days':7, 'strategy':'frequency',
+                                                  'correction_mode':'rebuild'})
+    assert second.status_code==200
+    assert second.json()['run']['id'] != run_id

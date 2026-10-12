@@ -260,8 +260,8 @@ def generate(c, data:GenerateIn):
 
 def decide(c, run_id, data:DecisionIn):
     run = _run(c,run_id)
-    if run['state']=='archived':
-        raise HTTPException(409,'归档底库不可修改')
+    if run['state']!='draft':
+        raise HTTPException(409,'只有草稿底库允许人工裁决；请新建矫正草稿，不可直接修改已发布版本')
     if _is_stale(c,run):
         raise HTTPException(409,'原始模拟观测已修改，请重新生成底库再做人工矫正')
     if data.action=='assign':
