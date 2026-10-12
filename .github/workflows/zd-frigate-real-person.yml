@@ -1,0 +1,41 @@
+name: ZD Frigate Real Person CI
+
+"on":
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zd-frigate-real-person-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-media:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install Python and verify Docker
+        run: |
+          python -m pip install -r requirements.txt
+          docker --version
+          docker compose version
+          ffmpeg -version | head -1
+      - name: Test backend with isolated SQLite
+        run: python -m pytest -q
+      - name: Live CC0 pedestrian RTSP and Frigate integration
+        run: bash scripts/ci_verify_frigate.sh
+      - name: Publish evidence and verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-video-pipeline
+          path: reports/verify-live-frigate.json
+          if-no-files-found: warn
