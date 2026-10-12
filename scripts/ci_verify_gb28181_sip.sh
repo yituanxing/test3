@@ -472,7 +472,7 @@ print('GB media RTSP diagnostic:',{'port':port,'tcp_reachable':reachable,
    'ffmpeg_failures':{k:len(re.findall(p,s,re.I)) for k,p in errors.items()}})
 # FFmpeg's public error strings are useful, but never print an RTSP URL or
 # query tokens which could contain a WVP media playback grant.
-clean=re.sub(r'rtsp://[^\\s\\]\\[()]+','rtsp://[redacted]',s,flags=re.I)
+clean=re.sub(r'rtsp://\S+','rtsp://[redacted]',s,flags=re.I)
 for line in clean.splitlines()[-10:]:
     if re.search('error|timed out|stream|could not|refused|input|rtsp',line,re.I):
         print('GB sanitized FFmpeg stderr:',line[:260])
