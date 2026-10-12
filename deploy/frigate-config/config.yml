@@ -13,6 +13,13 @@ objects:
   track:
     - person
 
+# CI diagnostic profile: allow modest motion to trigger the normal
+# Frigate object detector. Not a permissive person confidence threshold.
+motion:
+  enabled: true
+  threshold: 10
+  contour_area: 5
+
 record:
   enabled: false
 
