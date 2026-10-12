@@ -137,3 +137,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8001   >.ci-data/main-web
 WEB_PID=$!
 python -m scripts.verify_portal_live   --frigate http://127.0.0.1:5000 --backend http://127.0.0.1:8001   --camera demo --report reports/verify-portal-live.json
 echo "::endgroup::"
+
+echo "::group::WVP API adapter -> actual moving RTSP -> OpenCV -> authenticated Web SQLite"
+python -m scripts.verify_wvp_rtsp_bridge
+echo "::endgroup::"
