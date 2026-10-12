@@ -32,7 +32,7 @@ def main():
     args = p.parse_args()
     root = Path(args.report).parent
     root.mkdir(parents=True, exist_ok=True)
-    result = {"video_source": "CC0 pedestrian source", "valid_frames": 0,
+    result = {"video_source": "Intel one-by-one-person-detection (CC-BY-4.0)", "valid_frames": 0,
               "frame_change_fractions": [], "stats": [], "errors": []}
     raw_frames = []
     try:
