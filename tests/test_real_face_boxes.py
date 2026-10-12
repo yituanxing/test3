@@ -32,7 +32,7 @@ def test_actual_opencv_face_detector_returns_rectangles_not_fictional_people():
             assert b['w']>0 and b['x']+b['w']<=frame.shape[1]
             assert b['h']>0 and b['y']+b['h']<=frame.shape[0]
             qual=box_quality(frame,b)
-            assert qual['quality_assessment']=='uncalibrated_heuristic'
+            assert qual['assessment']=='uncalibrated_heuristic'
             assert qual['face_area_px']==b['w']*b['h']
     cap.release()
     assert decoded>=10,'must analyze real frames, not skip the model'
