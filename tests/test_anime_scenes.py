@@ -193,3 +193,78 @@ def test_raw_video_browser_upload_reuses_real_decode_and_scope(env):
     assert len(shots.json()['segments'])==3
     summary=client.get(f"/api/anime/scenes/sources/{data['id']}/graph",headers=state)
     assert summary.status_code==200 and summary.json()['characters']=={}
+
+
+def test_same_cartoon_place_groups_many_shots_but_not_same_camera(env):
+    """Original Excel is SITE based; animated shots are not site identities."""
+    main,client,movie,source,source_other,state,county,other=env
+    root=f'/api/anime/scenes/sources/{source}'
+    onto='/api/anime/ontology'
+    assert client.get(onto,headers=county).status_code==403
+    assert client.post(onto+'/venues',headers=county,json={'name':'学校A'}).status_code==403
+    vids=[]
+    for name in ['学校A','学校B']:
+        res=client.post(onto+'/venues',headers=state,json={'name':name})
+        assert res.status_code==201,res.text
+        vids.append(res.json()['id'])
+    a,b=vids
+    groups=[]
+    for venue,name in [(a,'教室'),(a,'走廊'),(b,'教室')]:
+        res=client.post(f'{onto}/venues/{venue}/scenes',headers=state,json={'name':name})
+        assert res.status_code==201,res.text
+        groups.append(res.json()['id'])
+    a_class,a_hall,b_class=groups
+    assert a_class!=b_class  # same ordinary word does NOT mean same place
+    duplicate=client.post(f'{onto}/venues/{a}/scenes',headers=state,
+                          json={'name':'教室'})
+    assert duplicate.status_code==409
+    segments=[]
+    for i,label in enumerate(['教室近景','走廊','教室远景']):
+        response=client.post(root+'/segments',headers=state,json={
+            'label':label,'start_ms':i*1000,'end_ms':(i+1)*1000})
+        assert response.status_code==201,response.text
+        segments.append(response.json()['id'])
+    def tag(i,group):
+        return client.put(f'{onto}/segments/{segments[i]}/group',
+            headers=state,json={'scene_group_id':group,
+                                'reason':'核对动画背景和室内地标确认'})
+    assert tag(0,a_class).status_code==200
+    assert tag(1,a_hall).status_code==200
+    assert tag(2,b_class).status_code==200
+    graph=client.get(root+'/graph',headers=county)
+    assert graph.status_code==200,graph.text
+    data=graph.json()
+    assert data['unclassified_segments']==0
+    assert len(data['canonical_venues'])==2
+    assert len(data['canonical_scenes'])==3
+    assert len(data['canonical_scene_transitions'])==2
+    assert data['cross_venue_edit_transitions']==[
+        {'from_venue_id':a,'to_venue_id':b,'shot_cuts':1,
+         'relation':'edit_sequence_only_not_a_visit'}]
+    assert not data['characters']
+    assert data['scene_vs_source'].startswith('源视频所属场所仅用于文件权限')
+    assert client.delete(f'/api/anime/scenes/segments/{segments[0]}',
+                         headers=state).status_code==409
+    assert client.put(f'{onto}/segments/{segments[1]}/group',headers=county,json={
+        'scene_group_id':a_hall,'reason':'非管理员不允许修改'}).status_code==403
+
+    # Reviewer discovers 3rd classroom belongs to school A, not school B.
+    updated=tag(2,a_class)
+    assert updated.status_code==200
+    assert updated.json()['previous_scene_group_id']==b_class
+    revised=client.get(root+'/graph',headers=state).json()
+    assert len(revised['canonical_venues'])==1
+    assert sorted([x['segments'] for x in revised['canonical_scenes']])==[1,2]
+    assert not revised['cross_venue_edit_transitions']
+    with main.db() as c:
+        assert c.execute('SELECT COUNT(*) FROM anime_segment_group_reviews').fetchone()[0]==4
+    assert client.get('/api/business/analysis',headers=state).json()['visit_count']==0
+    # Source is a single local file owned by an administrative inventory place
+    # but the storyworld graph can contain several different fictional places.
+    with main.db() as c:
+        assert c.execute('SELECT COUNT(*) FROM sources WHERE id=?',(source,)).fetchone()[0]==1
+    make_clip(movie,frames_each=10)
+    assert tag(0,a_class).status_code==409
+    stale=client.get(root+'/graph',headers=state).json()
+    assert stale['canonical_venues']==[]
+    assert stale['stale_segment_count']==3
