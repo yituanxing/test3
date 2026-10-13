@@ -433,7 +433,8 @@ def probe_source(source_id: int):
 
 
 def _process_source_impl(source_id: int, max_frames: int = 90,
-                         sample_every: int = 10, *, worker_mode: bool = False):
+                         sample_every: int = 10, *, worker_mode: bool = False,
+                         _capture=None, _detector=None, _frame_base: int = 0):
     with db() as c:
         if not worker_mode and c.execute(
                 'SELECT 1 FROM capture_jobs WHERE source_id=? AND desired_enabled=1',
@@ -457,14 +458,17 @@ def _process_source_impl(source_id: int, max_frames: int = 90,
         except OSError as exc:
             raise HTTPException(400, '无法读取视频文件以验证来源完整性') from exc
     capture_arg = int(source['uri']) if source['kind'] == 'camera' else source['uri']
-    cap = cv2.VideoCapture(capture_arg)
+    owns_capture = _capture is None
+    cap = cv2.VideoCapture(capture_arg) if owns_capture else _capture
     if not cap.isOpened():
-        cap.release()
+        if owns_capture:
+            cap.release()
         raise HTTPException(400, '视频无法打开：检查摄像头权限、视频文件路径或RTSP流状态')
     try:
-        detector = choose_detector()
+        detector = _detector if _detector is not None else choose_detector()
     except Exception as err:
-        cap.release()
+        if owns_capture:
+            cap.release()
         raise HTTPException(500, f'检测器初始化失败：{err}') from err
     read_count, sampled, faces_total = 0, 0, 0
     detections = []  # each item: sampled video fact, and real geometric boxes
@@ -484,10 +488,11 @@ def _process_source_impl(source_id: int, max_frames: int = 90,
             faces_total += count
             video_offset_ms = round(cap.get(cv2.CAP_PROP_POS_MSEC)) if source['kind'] == 'file' else None
             detections.append(((source_id, source['place_id'], 'video', utcnow(),
-                               video_offset_ms, read_count, count, detector.name),
+                               video_offset_ms, _frame_base + read_count, count, detector.name),
                                frame.shape[1],frame.shape[0],annotated))
     finally:
-        cap.release()
+        if owns_capture:
+            cap.release()
     if not read_count:
         raise HTTPException(400, '视频已打开，但未读到帧')
     if revision is not None:
@@ -1260,6 +1265,65 @@ def get_insights_relationships(request:Request, days: int = Query(30,ge=1,le=365
                                       days=days,person=person)
 
 
-# Register after process_source is defined; worker reuses its tested inference path.
-continuous_capture.register(app, db, lambda source_id: _process_source_impl(
-    source_id, max_frames=90, sample_every=10, worker_mode=True))
+class LiveCaptureSession:
+    """Keep RTSP/USB decode handle open across bounded, durable SQLite batches.
+
+    Ownership is worker-thread-local: closing the session happens on failure,
+    disable, or worker shutdown; routine successful batches never re-open RTSP.
+    """
+
+    def __init__(self, source_id: int, *, batch_frames: int = 90, sample_every: int = 10):
+        self.source_id = source_id
+        self.batch_frames = batch_frames
+        self.sample_every = sample_every
+        self._capture = None
+        self._detector = None
+        self._frame_base = 0
+
+    def next_batch(self):
+        if self._capture is None:
+            with db() as c:
+                source = c.execute("SELECT * FROM sources WHERE id=?", (self.source_id,)).fetchone()
+                if not source or not source["enabled"]:
+                    raise HTTPException(409, "视频源已停用")
+                admin._active_place(c, source["place_id"])
+                if source["kind"] not in ("rtsp", "camera"):
+                    raise HTTPException(422, "持续采集仅支持 RTSP/摄像头")
+                uri = source["uri"]
+                kind = source["kind"]
+            capture_arg = int(uri) if kind == "camera" else uri
+            self._capture = cv2.VideoCapture(capture_arg)
+            if not self._capture.isOpened():
+                self.close()
+                raise HTTPException(400, "视频无法打开：检查摄像头权限、视频文件路径或RTSP流状态")
+            try:
+                self._detector = choose_detector()
+            except Exception:
+                self.close()
+                raise
+        try:
+            batch = _process_source_impl(
+                self.source_id, max_frames=self.batch_frames,
+                sample_every=self.sample_every, worker_mode=True,
+                _capture=self._capture, _detector=self._detector,
+                _frame_base=self._frame_base)
+        except Exception:
+            self.close()
+            raise
+        self._frame_base += batch["frames_decoded"]
+        return batch
+
+    def close(self):
+        if self._capture is not None:
+            self._capture.release()
+            self._capture = None
+        self._detector = None
+
+
+# The API route and persistent worker share the exact same inference/insert code;
+# only the worker owns a multi-batch open capture handle.
+continuous_capture.register(
+    app, db,
+    lambda source_id: _process_source_impl(
+        source_id, max_frames=90, sample_every=10, worker_mode=True),
+    make_session=LiveCaptureSession)
