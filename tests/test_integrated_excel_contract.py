@@ -143,6 +143,28 @@ def test_one_database_real_observations_through_qa_and_synthetic_business_isolat
     assert analysis['visit_count']>0 and analysis['alerts']
     assert all(a['people'] and a['place_ids'] for a in analysis['alerts'])
 
+    # Excel #22: real workflow uses the same old seven-rule evaluator and
+    # published synthetic roster, never the anonymous Frigate track IDs.
+    rule=client.post('/api/business/rule-instances',headers=state,json={
+        'type':'appearance','name':'完整验收的虚构人员出现规则',
+        'enabled':True,'parameters':{},
+        'target_place_ids':[other_place],
+        'target_synthetic_people':['P001']})
+    assert rule.status_code==201,rule.text
+    rule_id=rule.json()['id']
+    ruled=client.get('/api/business/analysis',headers=state).json()
+    hits=[a for a in ruled['alerts']
+          if a['type']=='appearance' and a.get('rule_instance_id')==rule_id]
+    assert hits and all(a['people']==['P001'] and other_place in a['place_ids']
+                        for a in hits)
+    check=client.post('/api/business/alerts/'+hits[0]['key']+'/review',
+        headers=state,json={'decision':'confirmed',
+                            'reason':'依据明确的P001合成到访及规则实例核对'})
+    assert check.status_code==200,check.text
+    assert next(a for a in client.get('/api/business/analysis',headers=state).json()['alerts']
+                if a['key']==hits[0]['key'])['status']=='confirmed'
+    assert not any('local-track-1' in str(x) for x in ruled['alerts'])
+
     insight=client.get('/api/insights/overview?days=7',headers=county)
     assert insight.status_code==200,insight.text
     model=insight.json()
