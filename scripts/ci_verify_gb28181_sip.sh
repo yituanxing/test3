@@ -86,9 +86,11 @@ transport.write_text(content.replace(old,'const sipMaxPacketSize = 65535'))
 # must also fit in the MPEG-PS 16-bit packet-length field.
 packet=root/'internal/streams/packet/common.go'
 packet_content=packet.read_text()
-old='PESLoadLength     int = 0xFFFF'
-if packet_content.count(old)!=1:raise SystemExit('Upstream PES size pin changed')
-packet.write_text(packet_content.replace(old,'PESLoadLength     int = 0xFF00'))
+import re
+packet_content,n=re.subn(r'PESLoadLength\\s+int = 0xFFFF',
+    'PESLoadLength     int = 0xFF00',packet_content)
+if n!=1:raise SystemExit('Upstream PES size pin changed')
+packet.write_text(packet_content)
 # Use SDP transport matching the actual offer, not the legacy TCP-only reply.
 invite=root/'internal/invite/invite.go'
 content=invite.read_text()
