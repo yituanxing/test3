@@ -244,6 +244,20 @@ ffmpeg -hide_banner -loglevel error -nostdin -y -stream_loop -1 \
   -x264-params 'aud=1:repeat-headers=1:scenecut=0' \
   -f h264 "$BASE/sim/test.dat"
 test -s "$BASE/sim/test.dat"
+# The pinned Go GB sender assumes the H264 file starts with an Annex-B
+# AUD and sends access units separately. Prove these properties BEFORE WVP.
+python - "$BASE/sim/test.dat" <<'PY'
+import sys
+from pathlib import Path
+p=Path(sys.argv[1]); b=p.read_bytes()
+aud=b.count(bytes.fromhex('0000000109'))
+idr=b.count(bytes.fromhex('00000165'))
+print('GB face fixture H264 preflight:',{'bytes':len(b),
+    'aud_access_units':aud,'idr_nals':idr,
+    'starts_with_aud':b.startswith(bytes.fromhex('0000000109'))})
+assert b.startswith(bytes.fromhex('0000000109')), 'GB PS sender needs first Annex-B AUD'
+assert aud>=30 and idr>=1, 'GB face fixture must contain access units and IDR NALs'
+PY
 docker run -d --name "$SIM_CONTAINER" \
   --network "${PROJECT}_media-net" \
   --mount "type=bind,src=$BASE/sim,dst=/app" \
@@ -431,6 +445,20 @@ response=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
 data=response.get('data') or {}
 uri=data.get('rtsp') if isinstance(data,dict) else None
 if response.get('code')!=0 or not isinstance(uri,str):
+    import subprocess,re
+    logs=subprocess.run(['docker','logs','zdgb-sim-device'],
+        capture_output=True,text=True,timeout=8,check=False)
+    device_log=logs.stdout+'\\n'+logs.stderr
+    print('GB face INVITE timeout signals:',{
+        'wvp_result_code':response.get('code'),
+        'invite_received':len(re.findall('Sever.*Invite',device_log,re.I)),
+        'ack_received':len(re.findall('Server.*ACK',device_log,re.I)),
+        'ps_access_unit_started':len(re.findall('CI_GB_PS_RTP_FIRST_AU_SENT',device_log)),
+        'rtp_sender_started':len(re.findall('stream data will be write',device_log,re.I)),
+        'rtp_connection_errors':len(re.findall('connect failed|dial tcp|write data by udp error',device_log,re.I)),
+        'file_open_errors':len(re.findall('read file error',device_log,re.I)),
+        'panic_mentions':len(re.findall('panic:|runtime error:',device_log,re.I)),
+    })
     raise SystemExit('WVP did not complete real SIP INVITE/stream activation')
 parsed=urlsplit(uri)
 if parsed.scheme!='rtsp' or parsed.hostname not in ('127.0.0.1','localhost') or parsed.username or parsed.password:
