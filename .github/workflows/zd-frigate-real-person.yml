@@ -35,6 +35,26 @@ jobs:
         run: |
           python -m compileall -q app tests
           python -m pytest -q
+      # One targeted UI acceptance for the open P0 capture branch. Do not
+      # launch the heavy Docker/Frigate suite for ordinary PRs.
+      - name: Verify real Chromium RTSP start/stop and synthetic roster demo
+        if: contains(github.event.pull_request.head.ref, 'continuous-capture')
+        run: |
+          python -m pip install 'playwright>=1.55,<2'
+          python -m playwright install --with-deps chromium
+          python -m scripts.browser_smoke
+      - name: Publish tested local demo browser screenshots
+        if: always() && contains(github.event.pull_request.head.ref, 'continuous-capture')
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0-capture-browser-acceptance
+          path: |
+            reports/ui-smoke-result.json
+            reports/ui-capture-start-stop.png
+            reports/ui-roster-v2-diff.png
+            reports/ui-anonymous-face-review.png
+            reports/ui-server.log
+          if-no-files-found: warn
 
   real-media:
     # GB28181 protocol-only changes should not repeat the unrelated
