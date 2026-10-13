@@ -32,77 +32,122 @@ def _key(provider,source_key,track_key):
     return sha256((provider+'\x00'+source_key+'\x00'+track_key).encode('utf-8')).hexdigest()[:24]
 
 
-def occurrences(c,allowed,*,limit=MAX_PAGE):
-    """Return deterministic, bounded, traceable LOCAL observations only.
+def _scoped_rows(c,allowed,*,limit=500,offset=0):
+    """Single deterministic SQL query. Scope restriction happens BEFORE LIMIT.
 
-    The provider-local ID is intentionally NOT joined to another camera's ID.
-    The video-local and UTC times are separate typed fields.
+    Avoid the old global LIMIT 1500 that silently discarded a county's
+    legitimate events when other jurisdictions had more recent recordings.
     """
-    if not 1 <= limit <= MAX_PAGE:
-        raise ValueError('limit must be 1..200')
-    out=[]
-    for r in c.execute("""SELECT camera,event_id,place_id,started_at,ended_at,
-           score,has_snapshot FROM frigate_object_events
-           ORDER BY started_at DESC,camera,event_id LIMIT 1500"""):
-        if r['place_id'] not in allowed:
-            continue
-        row=dict(r)
-        camera=row['camera']
-        out.append({
-          'occurrence_key':_key('frigate',camera,row['event_id']),
-          'provider':'frigate','evidence_kind':'upstream_anonymous_person_event',
-          'camera_key':camera,'source_id':None,
-          'track_id':row['event_id'],'venue_id':row['place_id'],
-          'venue_name':allowed[row['place_id']]['name'],
-          'first_seen':row['started_at'],'last_seen':row['ended_at'],
-          'time_basis':'UTC_event_clock','unit':'utc_timestamp',
-          'annotation_frames':None,'confidence':row['score'],
-          'evidence_link':None,
-          'subject_id':None,'identity_confirmed':False,
-          'counts_as_unique_person':False,'counts_as_visit':False})
-    for r in c.execute("""SELECT i.source_id,i.camera_view,i.video_sha256,
-            s.place_id,b.camera_local_track_id,
-            MIN(b.frame_number) AS first_frame,
-            MAX(b.frame_number) AS last_frame,COUNT(*) AS boxes
-         FROM public_cctv_track_boxes b
-         JOIN public_cctv_imports i ON b.source_id=i.source_id
-         JOIN sources s ON s.id=b.source_id
-         GROUP BY i.source_id,i.camera_view,i.video_sha256,
-             s.place_id,b.camera_local_track_id
-         ORDER BY i.source_id,b.camera_local_track_id LIMIT 1500"""):
-        if r['place_id'] not in allowed:
-            continue
-        row=dict(r)
-        # Track key MUST include source and original file digest, so equal
-        # local IDs in a second camera/video can never collide.
-        out.append({
-          'occurrence_key':_key('caviar',f"{row['source_id']}:{row['video_sha256']}",
-                                str(row['camera_local_track_id'])),
-          'provider':'caviar_ground_truth',
-          'evidence_kind':'published_manual_local_tracking_annotation',
-          'camera_key':row['camera_view'],'source_id':row['source_id'],
-          'track_id':str(row['camera_local_track_id']),
-          'venue_id':row['place_id'],
-          'venue_name':allowed[row['place_id']]['name'],
-          'first_seen':row['first_frame'],'last_seen':row['last_frame'],
-          'time_basis':'archival_video_frame_number',
-          'unit':'frame_index_1_based','annotation_frames':row['boxes'],
-          'confidence':None,
-          'evidence_link':f"/api/cctv/sources/{row['source_id']}/activity",
-          'subject_id':None,'identity_confirmed':False,
-          'counts_as_unique_person':False,'counts_as_visit':False})
-    out.sort(key=lambda x:(x['provider'],str(x['source_id'] or ''),x['camera_key'],x['track_id']))
-    return out[:limit],len(out)>limit
+    if not allowed:
+        return []
+    keys=sorted(allowed)
+    marks=','.join('?' for _ in keys)
+    query=f"""WITH scoped AS (
+        SELECT 'caviar_ground_truth' AS provider,
+          i.source_id AS source_id, i.camera_view AS camera_key,
+          i.video_sha256 AS file_sha, s.place_id AS venue_id,
+          b.camera_local_track_id AS track_id,
+          MIN(b.frame_number) AS first_seen,MAX(b.frame_number) AS last_seen,
+          COUNT(*) AS annotation_frames,NULL AS score
+        FROM public_cctv_track_boxes b
+        JOIN public_cctv_imports i ON i.source_id=b.source_id
+        JOIN sources s ON s.id=b.source_id
+        WHERE s.place_id IN ({marks})
+        GROUP BY i.source_id,i.camera_view,i.video_sha256,s.place_id,
+                 b.camera_local_track_id
+        UNION ALL
+        SELECT 'frigate',NULL,e.camera,NULL,e.place_id,e.event_id,
+               e.started_at,e.ended_at,NULL,e.score
+        FROM frigate_object_events e
+        WHERE e.place_id IN ({marks})
+    )
+    SELECT * FROM scoped
+    ORDER BY provider,COALESCE(source_id,0),camera_key,track_id
+    LIMIT ? OFFSET ?"""
+    return [dict(x) for x in c.execute(query,(*keys,*keys,limit,offset))]
+
+
+def _project(row,allowed):
+    source_id=row['source_id']
+    if row['provider']=='frigate':
+        key=_key('frigate',row['camera_key'],str(row['track_id']))
+        return {
+            'occurrence_key':key,'provider':'frigate',
+            'evidence_kind':'upstream_anonymous_person_event',
+            'camera_key':row['camera_key'],'source_id':None,
+            'track_id':row['track_id'],'venue_id':row['venue_id'],
+            'venue_name':allowed[row['venue_id']]['name'],
+            'first_seen':row['first_seen'],'last_seen':row['last_seen'],
+            'time_basis':'UTC_event_clock','unit':'utc_timestamp',
+            'annotation_frames':None,'confidence':row['score'],
+            'evidence_link':None,'subject_id':None,'identity_confirmed':False,
+            'counts_as_unique_person':False,'counts_as_visit':False,
+        }
+    return {
+        'occurrence_key':_key('caviar',f"{source_id}:{row['file_sha']}",
+                               str(row['track_id'])),
+        'provider':'caviar_ground_truth',
+        'evidence_kind':'published_manual_local_tracking_annotation',
+        'camera_key':row['camera_key'],'source_id':source_id,
+        'track_id':str(row['track_id']),'venue_id':row['venue_id'],
+        'venue_name':allowed[row['venue_id']]['name'],
+        'first_seen':row['first_seen'],'last_seen':row['last_seen'],
+        'time_basis':'archival_video_frame_number',
+        'unit':'frame_index_1_based',
+        'annotation_frames':row['annotation_frames'],
+        'confidence':None,
+        'evidence_link':f"/api/cctv/sources/{source_id}/activity",
+        'subject_id':None,'identity_confirmed':False,
+        'counts_as_unique_person':False,'counts_as_visit':False,
+    }
+
+
+def occurrences(c,allowed,*,limit=MAX_PAGE,offset=0):
+    """Stable page of visible camera-local evidence, never a global sample."""
+    if not 1<=limit<=MAX_PAGE or offset<0:
+        raise ValueError('limit 1..200 and offset>=0 are required')
+    fetched=_scoped_rows(c,allowed,limit=limit+1,offset=offset)
+    return [_project(x,allowed) for x in fetched[:limit]],len(fetched)>limit
+
+
+def iter_occurrences(c,allowed,*,batch=500):
+    """Full authorized enumeration for QA lookups and honest summary counts.
+
+    This is deliberately independent of the UI's first 200 results.
+    """
+    offset=0
+    while True:
+        page=_scoped_rows(c,allowed,limit=batch,offset=offset)
+        for row in page:
+            yield _project(row,allowed)
+        if len(page)<batch:
+            break
+        offset+=len(page)
+
+
+def occurrence_by_key(c,allowed,key):
+    """Authorized key lookup spanning ALL pages, not just page 1.
+
+    No submitted key can grant access to out-of-jurisdiction events because
+    the SQL cursor is scoped before each page. Index-backed key projection
+    may replace this sequential lookup for large production deployments.
+    """
+    for row in iter_occurrences(c,allowed):
+        if row['occurrence_key']==key:
+            return row
+    return None
 
 
 @router.get('/api/site/occurrences')
-def occurrence_list(request:Request,limit:int=Query(100,ge=1,le=MAX_PAGE)):
+def occurrence_list(request:Request,limit:int=Query(100,ge=1,le=MAX_PAGE),
+                    offset:int=Query(0,ge=0)):
     with _db() as c:
         allowed=_allowed(c,request)
-        rows,has_more=occurrences(c,allowed,limit=limit)
+        rows,has_more=occurrences(c,allowed,limit=limit,offset=offset)
         return {
             'mode':'camera_local_occurrence_only','occurrences':rows,
             'returned':len(rows),'truncated':has_more,
+            'offset':offset,'next_offset':offset+len(rows) if has_more else None,
             'identity_verification':'not_performed',
             'site_visit_generation':'not_performed',
             'key_contract':'SHA256(provider, camera/source+file-revision, camera-local-track)',
