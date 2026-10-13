@@ -434,7 +434,8 @@ def probe_source(source_id: int):
 
 def _process_source_impl(source_id: int, max_frames: int = 90,
                          sample_every: int = 10, *, worker_mode: bool = False,
-                         _capture=None, _detector=None, _frame_base: int = 0):
+                         _capture=None, _detector=None, _frame_base: int = 0,
+                         _expected_source=None):
     with db() as c:
         if not worker_mode and c.execute(
                 'SELECT 1 FROM capture_jobs WHERE source_id=? AND desired_enabled=1',
@@ -444,6 +445,11 @@ def _process_source_impl(source_id: int, max_frames: int = 90,
         if not row:
             raise HTTPException(404, '视频源不存在')
         source = dict(row)
+        # A held-open RTSP decoder must never silently attribute old camera
+        # frames to a newly rebound source or a different physical stream.
+        if _expected_source is not None and (
+                source['kind'], source['uri'], source['place_id']) != _expected_source:
+            raise HTTPException(409, '视频源配置已更改，请重新打开采集连接')
         if not source['enabled']:
             raise HTTPException(409,'视频源已停用')
         admin._active_place(c,source['place_id'])
@@ -1278,6 +1284,7 @@ class LiveCaptureSession:
         self.sample_every = sample_every
         self._capture = None
         self._detector = None
+        self._source_signature = None
         # RTSP has no immutable content digest. The ordinal indexes ingested
         # observations for this source, and must not repeat after reconnect or
         # process restart. Reserve the remainder of the last sampling stride.
@@ -1300,6 +1307,7 @@ class LiveCaptureSession:
                     raise HTTPException(422, "持续采集仅支持 RTSP/摄像头")
                 uri = source["uri"]
                 kind = source["kind"]
+                self._source_signature = (kind, uri, source["place_id"])
             capture_arg = int(uri) if kind == "camera" else uri
             self._capture = cv2.VideoCapture(capture_arg)
             if not self._capture.isOpened():
@@ -1315,7 +1323,7 @@ class LiveCaptureSession:
                 self.source_id, max_frames=self.batch_frames,
                 sample_every=self.sample_every, worker_mode=True,
                 _capture=self._capture, _detector=self._detector,
-                _frame_base=self._frame_base)
+                _frame_base=self._frame_base, _expected_source=self._source_signature)
         except Exception:
             self.close()
             raise
@@ -1327,6 +1335,7 @@ class LiveCaptureSession:
             self._capture.release()
             self._capture = None
         self._detector = None
+        self._source_signature = None
 
 
 # The API route and persistent worker share the exact same inference/insert code;
