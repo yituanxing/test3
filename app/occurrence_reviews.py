@@ -13,9 +13,9 @@ import json
 import re
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from app import access, admin, occurrences
+from app import access, admin, occurrences, monitoring
 
 router=APIRouter()
 _db=None
@@ -159,20 +159,43 @@ def review_quality(occurrence_key:str,data:QualityReviewIn,request:Request):
 
 
 @router.get('/api/site/quality/summary')
-def quality_summary(request:Request):
-    """Current QA counts only. Does NOT count people, visits or biometric IDs."""
+def quality_summary(request:Request,days:int|None=Query(default=None,ge=1,le=31)):
+    """QA overlays match monitoring calendar days without changing RAW counts.
+
+    CAVIAR is archival research GT and never counted as a calendar-day
+    observation. 'valid_local_target' is NOT a unique verified natural person.
+    """
+    statuses=('not_reviewed','valid_local_target','false_positive',
+              'needs_review','stale_review')
     with _db() as c:
-        rows=occurrences.iter_occurrences(c,_allowed(c,request))
-        counts={'not_reviewed':0,'valid_local_target':0,'false_positive':0,
-                'needs_review':0,'stale_review':0}
+        start,end=monitoring.utc_day_window(days) if days is not None else (None,None)
+        rows=occurrences.iter_occurrences(c,_allowed(c,request),
+            live_start=start,live_end=end)
+        counts={x:0 for x in statuses}
+        by_provider={}
         scanned=0
         for row in rows:
             state=_state(c,row)
-            counts[state['quality_status']]+=1
+            status=state['quality_status']
+            counts[status]+=1
+            provider_counts=by_provider.setdefault(
+                row['provider'],{x:0 for x in statuses})
+            provider_counts[status]+=1
             scanned+=1
+        for group in by_provider.values():
+            group['local_occurrences']=sum(group[x] for x in statuses)
+            group['accepted_local_targets']=group['valid_local_target']
+            group['counts_unique_people']=False
         return {'mode':'anonymous_evidence_quality_only',
-                'counts':counts,'camera_local_events_scanned':scanned,
+                'counts':counts,'by_provider':by_provider,
+                'window':({'start_utc':start.isoformat(),
+                          'end_exclusive_utc':end.isoformat(),'days':days}
+                           if start is not None else None),
+                'frigate_time_scope':'UTC_calendar_days' if start is not None else 'all_time',
+                'research_time_scope':'archival_clip_frames_all_time_not_calendar_days',
+                'camera_local_events_scanned':scanned,
                 'scan_bounded':False,
                 'counts_real_people':False,'counts_site_visits':False,
                 'reviewed_is_verified_identity':False,
-                'note':'仅审核局部目标是否为合理人形目标，不确认真人身份；修改源证据后旧审核标记为过时。'}
+                'raw_event_counts_unchanged_by_quality_review':True,
+                'note':'同一窗口原始匿名事件总数不因误检或质检被删除；合格目标、误检、待审与过期仅是额外的质量视图。研究视频原片帧号不属于UTC日窗口。'}
