@@ -292,6 +292,30 @@ def run():
                         expect(page.locator("#characters")).to_contain_text("没有任何人工绑定到真实视频帧的虚构角色")
                         checks.append("real_file_scene_cut_to_manual_storyboard_no_fake_character")
                         page.screenshot(path=str(OUT/"ui-anime-storyboard.png"),full_page=True)
+                        # Canonical grouping acceptance: a shot is NOT a venue,
+                        # and the entire movie is NOT bound to the camera source place.
+                        page.locator("#venueName").fill("动画学校A")
+                        page.locator("#createVenue").click()
+                        expect(page.locator("#venueSelect")).to_contain_text(
+                            "动画学校A",timeout=12000)
+                        page.locator("#groupName").fill("教室")
+                        page.locator("#createGroup").click()
+                        expect(page.locator("#assignGroup")).to_contain_text(
+                            "动画学校A / 教室",timeout=12000)
+                        page.locator("#assign").click()
+                        expect(page.locator("#segments")).to_contain_text(
+                            "动画学校A / 教室",timeout=12000)
+                        graph=page.evaluate("""async(sourceId)=>{
+                            const r=await fetch('/api/anime/scenes/sources/'+sourceId+'/graph',
+                                                {headers:{Authorization:'Bearer '+
+                                                sessionStorage.getItem('zd_access_token')}});
+                            return await r.json();
+                        }""",face_source_id)
+                        assert graph['canonical_venues'][0]['name']=="动画学校A",graph
+                        assert graph['canonical_scenes'][0]['name']=="教室",graph
+                        assert graph['characters']=={},graph
+                        checks.append("manual_canonical_anime_venue_and_scene_group_browser")
+                        page.screenshot(path=str(OUT/"ui-anime-canonical-groups.png"),full_page=True)
                         page.goto(base+"/portal")
                         page.set_viewport_size({"width": 390, "height": 844})
                         page.screenshot(path=str(OUT / "ui-mobile.png"), full_page=True)
