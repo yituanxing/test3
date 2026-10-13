@@ -145,6 +145,7 @@ def run(video: Path, out: Path, *,
     try:
         with requests.Session() as http:
             if reference is None:
+                (out / "source").mkdir(exist_ok=True)
                 reference = download_image(CASES[0], out / "source", http)
         image = Image.open(reference).convert("RGB")
         detector = PretrainedBoxDetector()
@@ -159,6 +160,7 @@ def run(video: Path, out: Path, *,
         report["reference_detection"] = reference_box
         candidate_items = []
         decoded = 0
+        summary_video = None
         for timestamp, bgr in choose_video_frames(
                 video, stride_seconds=interval, max_frames=max_frames):
             decoded += 1
@@ -196,7 +198,18 @@ def run(video: Path, out: Path, *,
                             (x0, max(16, y0 - 5)),
                             cv2.FONT_HERSHEY_SIMPLEX, .47, shade, 1)
             cv2.imwrite(str(out / "frames" / f"t{timestamp:.2f}.jpg"), bgr)
+            if summary_video is None:
+                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+                summary_video = cv2.VideoWriter(
+                    str(out / "annotated_samples.mp4"), fourcc, 2.0,
+                    (bgr.shape[1], bgr.shape[0]))
+                if not summary_video.isOpened():
+                    raise RuntimeError("Cannot encode annotated sample video")
+            summary_video.write(bgr)
             report["frames"].append(entry)
+        if summary_video is not None:
+            summary_video.release()
+            summary_video = None
         report.update({
             "frames_decoded": decoded,
             "detected_boxes": sum(x["detections"] for x in report["frames"]),
@@ -214,6 +227,10 @@ def run(video: Path, out: Path, *,
         report["error_detail"] = str(exc)[:240]
         raise
     finally:
+        # The preview is only sampled annotated frames; original duration and
+        # rate are NOT reconstructed, so never label it full original footage.
+        if "summary_video" in locals() and summary_video is not None:
+            summary_video.release()
         result_file.write_text(json.dumps(report, indent=2, ensure_ascii=False),
                                encoding="utf-8")
 
