@@ -421,8 +421,13 @@ def probe_source(source_id: int):
 
 @app.post('/api/sources/{source_id}/process')
 def process_source(source_id: int, max_frames: int = Query(90, ge=1, le=600),
-                   sample_every: int = Query(10, ge=1, le=60)):
+                   sample_every: int = Query(10, ge=1, le=60),
+                   worker_mode: bool = False):
     with db() as c:
+        if not worker_mode and c.execute(
+                'SELECT 1 FROM capture_jobs WHERE source_id=? AND desired_enabled=1',
+                (source_id,)).fetchone():
+            raise HTTPException(409, '该源正在持续采集；请先停止任务后再手动分析')
         row = c.execute('SELECT * FROM sources WHERE id=?', (source_id,)).fetchone()
         if not row:
             raise HTTPException(404, '视频源不存在')
@@ -1239,4 +1244,4 @@ def get_insights_relationships(request:Request, days: int = Query(30,ge=1,le=365
 
 # Register after process_source is defined; worker reuses its tested inference path.
 continuous_capture.register(app, db, lambda source_id: process_source(
-    source_id, max_frames=90, sample_every=10))
+    source_id, max_frames=90, sample_every=10, worker_mode=True))
