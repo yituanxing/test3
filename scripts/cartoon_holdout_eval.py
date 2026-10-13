@@ -27,9 +27,19 @@ BASELINE = ROOT / "reports" / "cartoon-video-proof"
 SOURCES = {
     # Other sourced excerpts from the SAME open movie. No tuning on these
     # exact clips occurred in the previous trials.
-    "unseen_buck": (
+    # VIDEO A: originally selected as an unseen positive, but visual audit
+    # showed eight sampled frames contain ONLY a tree/forest, not Buck!
+    # KEEP as a same-film absent-target NEGATIVE, no threshold retuning.
+    "scenic_no_buck": (
         "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/"
         "Big_Buck_Bunny_720_10s_1MB.mp4"
+    ),
+    # VIDEO B: 30 seconds from separately published original animation.
+    # This source has never been used for threshold/prompt/model tuning.
+    # Do not assume sampled frames actually contain Buck until manually seen.
+    "unseen_30s_buck_movie": (
+        "https://raw.githubusercontent.com/chthomos/video-media-samples/"
+        "master/big-buck-bunny-480p-30sec.mp4"
     ),
     # Independently created Blender Open Movie with NO Big Buck Bunny
     # character (negative control, no rabbit identity should be returned).
@@ -135,8 +145,9 @@ def main():
         "evaluation": "first-use holdout; absolutely no parameter fitting",
         "locked_parameters": LOCKED_PARAMETERS,
         "ground_truth": (
-            "Sintel film has no Big Buck Bunny character; positive film "
-            "contains Buck somewhere but sampled-frame truth not yet manually labeled"
+            "Sintel is unrelated to Buck; 10-second scenic Big Buck Bunny "
+            "excerpt was VISUALLY CONFIRMED not to contain Buck in eight "
+            "sampled frames; 30-second new clip has unreviewed sampled-frame truth"
         ),
         "precision_recall_valid_without_manual_frame_truth": False,
         "video_examples": {},
@@ -184,8 +195,12 @@ def main():
             else "FALSE_MATCH_DETECTED"
         )
         result["holdout_has_new_visual_frames"] = (
-            result["video_examples"]["unseen_buck"]
+            result["video_examples"]["unseen_30s_buck_movie"]
             ["possible_source_overlap"]["frames_without_close_duplicate"] > 0)
+        result["scenic_negative_result"] = (
+            "NO_FALSE_MATCH" if not result["video_examples"]
+            ["scenic_no_buck"]["any_buck_candidate"]
+            else "FALSE_MATCH_DETECTED")
         result["status"] = "MEASURED_NOT_TUNED"
         return 0
     finally:
