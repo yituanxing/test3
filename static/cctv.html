@@ -141,7 +141,9 @@ async function refreshQuality(){
    const saved=$('qaOccurrence').value;
    $('qaOccurrence').innerHTML=response.occurrences.map(x=>
      '<option value="'+x.occurrence_key+'">'+esc(x.provider)+' / '+esc(x.camera_key)+
-     ' / '+esc(x.track_id)+'（'+esc(x.venue_name)+'）</option>').join('');
+     ' / '+esc(x.track_id)+
+     (x.run_key?' / '+esc(x.run_key.slice(0,12)):'')+
+     '（'+esc(x.venue_name)+'）</option>').join('');
    if(response.occurrences.some(x=>x.occurrence_key===saved))$('qaOccurrence').value=saved;
    if(response.occurrences.length)await loadOccurrenceQuality();
    else{$('qaStatus').textContent='没有可供审核的真实匿名局部目标；未生成模拟数据。';
@@ -221,14 +223,22 @@ async function refreshOccurrences(){
    const gt=summary.by_provider.caviar_ground_truth||{cameras:0,camera_local_occurrences:0,annotated_frames:0};
    const live=summary.by_provider.frigate||{cameras:0,camera_local_occurrences:0,annotated_frames:0};
    const reviewed=quality.by_provider.frigate||{valid_local_target:0,false_positive:0,needs_review:0,stale_review:0,not_reviewed:0};
+   const yolo=summary.by_provider.yolo_bytetrack||{cameras:0,camera_local_occurrences:0,annotated_frames:0};
+   const yoloQA=quality.by_provider.yolo_bytetrack||{valid_local_target:0,false_positive:0,needs_review:0,stale_review:0,not_reviewed:0};
    $('occurrenceCounts').innerHTML=
      '<span class="badge">历史研究整片 '+gt.cameras+' 路 / '+gt.camera_local_occurrences+' 条局部轨迹</span>'+
      '<span class="badge yellow">官方整片人工框 '+gt.annotated_frames+' 条（不是人数）</span>'+
      '<span class="badge">Frigate近7个UTC自然日 '+live.cameras+' 路 / '+live.camera_local_occurrences+' 条原始匿名事件</span>'+
      '<span class="badge">同期局部目标质检：合理 '+reviewed.valid_local_target+' / 误检 '+reviewed.false_positive+
-       ' / 待审 '+(reviewed.not_reviewed+reviewed.needs_review)+' / 过期 '+reviewed.stale_review+'</span>';
+       ' / 待审 '+(reviewed.not_reviewed+reviewed.needs_review)+' / 过期 '+reviewed.stale_review+'</span>'+
+     '<span class="badge">真实YOLO11n+ByteTrack历史研究：'+yolo.camera_local_occurrences+
+       ' 段本机目标 / '+yolo.annotated_frames+' 个模型帧框（不是独立真人）</span>'+
+     '<span class="badge">YOLO目标复核：合理 '+yoloQA.valid_local_target+
+       ' / 误检 '+yoloQA.false_positive+' / 待审 '+
+       (yoloQA.not_reviewed+yoloQA.needs_review)+' / 过期 '+yoloQA.stale_review+'</span>';
    $('occurrenceRows').innerHTML=summary.by_camera.map(x=>
-     '<tr><td>'+esc(x.provider==='caviar_ground_truth'?'CAVIAR研究标注':'Frigate匿名事件')+
+     '<tr><td>'+esc(x.provider==='caviar_ground_truth'?'CAVIAR研究标注':
+       x.provider==='yolo_bytetrack'?'YOLO11n→ByteTrack自动本机跟踪':'Frigate匿名事件')+
      '</td><td>'+esc(x.venue_name)+'</td><td>'+esc(x.camera_key)+
      '</td><td>'+x.local_occurrences+'</td><td>'+(x.annotated_frames??'—')+
      '</td><td>'+esc(x.time_basis==='archival_video_frame_number'?'原片帧号':'UTC事件时间')+
@@ -273,6 +283,17 @@ async function evaluateRealPersonDetector(){
     '\n同帧官方人工框（独立参考，绝未喂给YOLO）：'+r.published_gt_boxes_on_inferred_frames+
     '\n原始模型目标已进入统一匿名事件、来源与人工QA；没有跨机身份识别或真实到访。许可：'+r.model_license;
   await refreshOccurrences();await refreshQuality();
+  const marker=r.run_key.slice(0,12);
+  const target=[...$('qaOccurrence').options].find(x=>
+      x.textContent.includes('yolo_bytetrack')&&x.textContent.includes(marker));
+  if(target){
+     $('qaOccurrence').value=target.value;
+     await loadOccurrenceQuality();
+     $('qaOccurrence').focus();
+     $('trackerBaseline').textContent+='\n已选择本次真实模型的首条本机轨迹供质量复核。';
+  }else{
+     $('trackerBaseline').textContent+='\n本次运行没有可见的本机轨迹，或事件在下一页；绝不伪造检测目标。';
+  }
  }catch(e){$('trackerBaseline').textContent='现成人体检测链路未通过：'+e.message}
  finally{btn.disabled=false}
 }
