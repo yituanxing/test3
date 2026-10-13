@@ -141,8 +141,17 @@ jobs:
         run: python -m scripts.verify_cartoon_character
       - name: Install existing pretrained open-vocabulary video detector
         run: python -m pip install -r requirements-cartoon-video.txt
-      - name: Feed genuine 15-second Big Buck Bunny video and auto-detect rabbit boxes
-        run: python -m scripts.cartoon_video_recognize --demo-video --interval 1.25 --max-frames 10
+      - name: Ensure actual browser-compatible H.264 encoder is available
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          ffmpeg -hide_banner -encoders | grep -q 'libx264'
+      - name: Feed genuine Big Buck Bunny video and auto-detect rabbit boxes
+        run: |
+          python -m scripts.cartoon_video_recognize --demo-video --interval 1.25 --max-frames 10
+          test "$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 reports/cartoon-video-proof/annotated_samples.mp4)" = h264
       - name: Install existing video-upload UI library
         run: python -m pip install 'gradio>=5.49,<6'
       - name: Upload complete film through real localhost Gradio API and verify H.264 video preview
