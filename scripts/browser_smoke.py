@@ -116,6 +116,23 @@ def run():
                         page.get_by_role("button", name="新建账号").click()
                         expect(page.locator("#accountsBody")).to_contain_text("smokecommunity")
                         checks.append("admin_four_tier_account_creation")
+                        # Same school supports two cameras and one zone; real
+                        # administration writes actual SQLite binding history.
+                        expect(page.get_by_role("heading",name="公共场所—内部场景—摄像机关系")).to_be_visible()
+                        page.locator("#sitePlace").select_option(label="测试场所 A")
+                        page.locator("#siteZoneName").fill("学校西校门")
+                        page.locator("#siteCategory").select_option("entrance")
+                        page.get_by_role("button", name="创建场景区域").click()
+                        expect(page.locator("#siteZonesRows")).to_contain_text(
+                            "学校西校门",timeout=10000)
+                        page.locator("#siteSource").select_option(label="browser-added-RTSP（测试场所 A）")
+                        page.locator("#siteZone").select_option(label="学校西校门")
+                        page.get_by_role("button",name="确认设备区域").click()
+                        expect(page.locator("#siteHistory")).to_contain_text("学校西校门",timeout=12000)
+                        page.reload()
+                        expect(page.locator("#siteZonesRows")).to_contain_text("学校西校门",timeout=12000)
+                        checks.append("real_browser_canonical_place_zone_camera_binding_persists")
+                        page.screenshot(path=str(OUT / "ui-shared-site-zone-binding.png"), full_page=True)
                         page.screenshot(path=str(OUT / "ui-admin-operations.png"), full_page=True)
 
                         # Business-critical browser acceptance: actual server DB
