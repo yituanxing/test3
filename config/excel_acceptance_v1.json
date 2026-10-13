@@ -17,7 +17,7 @@
     {
       "id": 1,
       "excel_row": 7,
-      "title": "前端视频流人脸解析",
+      "title": "人脸解析",
       "status": "partial",
       "verified_scope": "国标设备接入与部分真人媒体处理已有验证；多路实时/历史28181人脸解析、聚类比对与特征全链未通过",
       "evidence_files": [
@@ -29,7 +29,7 @@
     {
       "id": 2,
       "excel_row": 8,
-      "title": "四级架构",
+      "title": "州、市县、街道和社区四级",
       "status": "verified_real",
       "verified_scope": "四级角色登录、分辖区权限及不同平台视图已有API/浏览器回归",
       "evidence_files": [
@@ -42,7 +42,7 @@
     {
       "id": 3,
       "excel_row": 9,
-      "title": "陌生人底库建立与矫正",
+      "title": "各场所陌生人底库建立",
       "status": "synthetic_only",
       "verified_scope": "指定天数、最早出现/次数优先/人工裁决、底库矫正发布链路在P###合成身份上通过",
       "evidence_files": [
@@ -160,7 +160,7 @@
     {
       "id": 13,
       "excel_row": 19,
-      "title": "场所出入口抓拍与识别",
+      "title": "场所出入口",
       "status": "partial",
       "verified_scope": "场所摄像机、视频源、帧截图及人工标注可查询",
       "evidence_files": [
@@ -172,7 +172,7 @@
     {
       "id": 14,
       "excel_row": 20,
-      "title": "跨场所人脸检索",
+      "title": "人脸检索",
       "status": "missing",
       "verified_scope": "未提供经验证的人脸照片输入到真人跨摄像机识别检索闭环",
       "evidence_files": [
@@ -183,7 +183,7 @@
     {
       "id": 15,
       "excel_row": 21,
-      "title": "人脸+编码人员检索",
+      "title": "人员检索",
       "status": "partial",
       "verified_scope": "合成人员编码搜索与已知P###历史出现可查",
       "evidence_files": [
@@ -206,7 +206,7 @@
     {
       "id": 17,
       "excel_row": 23,
-      "title": "地图轨迹回放",
+      "title": "轨迹回放",
       "status": "missing",
       "verified_scope": "缺乏原片证据支持的真人GPS/地理轨迹；不生成虚假地图移动",
       "evidence_files": [
@@ -275,7 +275,7 @@
     {
       "id": 23,
       "excel_row": 29,
-      "title": "账号角色权限管理",
+      "title": "账号管理",
       "status": "verified_real",
       "verified_scope": "账户创建、禁用/软删除、密码重置与四级权限隔离有真实API测试",
       "evidence_files": [
