@@ -59,6 +59,7 @@ jobs:
             reports/ui-roster-v2-diff.png
             reports/ui-anonymous-face-review.png
             reports/ui-admin-operations.png
+            reports/ui-shared-analytics.png
             reports/ui-server.log
           if-no-files-found: warn
       - name: Build auditable local demo ZIP
