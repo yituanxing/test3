@@ -32,7 +32,8 @@ def analyze_uploaded_video(video_filepath: str):
             result)
 
 
-def main():
+def build_demo():
+    """The SAME genuine video-upload interface used by CI acceptance."""
     import gradio as gr
     with gr.Blocks(title="动画片：自动找角色并判断是否为 Buck") as demo:
         gr.Markdown(
@@ -46,8 +47,13 @@ def main():
         images = gr.Gallery(label="逐帧实际检测框", columns=3)
         report = gr.JSON(label="真实检测位置、分数及原始帧时间")
         button.click(fn=analyze_uploaded_video, inputs=video,
-                     outputs=[preview, images, report])
-    demo.launch(server_name="127.0.0.1", share=False)
+                     outputs=[preview, images, report],
+                     api_name="recognize_cartoon_video")
+    return demo
+
+
+def main():
+    build_demo().launch(server_name="127.0.0.1", share=False)
 
 
 if __name__ == "__main__":
