@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -272,7 +274,7 @@ def run(video: Path, out: Path, *,
             if summary_video is None:
                 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 summary_video = cv2.VideoWriter(
-                    str(out / "annotated_samples.mp4"), fourcc, 2.0,
+                    str(out / "annotated_samples_raw.mp4"), fourcc, 2.0,
                     (bgr.shape[1], bgr.shape[0]))
                 if not summary_video.isOpened():
                     raise RuntimeError("Cannot encode annotated sample video")
@@ -281,6 +283,26 @@ def run(video: Path, out: Path, *,
         if summary_video is not None:
             summary_video.release()
             summary_video = None
+            raw_preview = out / "annotated_samples_raw.mp4"
+            final_preview = out / "annotated_samples.mp4"
+            if shutil.which("ffmpeg"):
+                try:
+                    subprocess.run([
+                        "ffmpeg", "-hide_banner", "-loglevel", "error",
+                        "-nostdin", "-y", "-i", str(raw_preview),
+                        "-an", "-c:v", "libx264", "-preset", "veryfast",
+                        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                        str(final_preview)
+                    ], check=True, timeout=90, capture_output=True)
+                    raw_preview.unlink()
+                    report["preview_codec"] = "h264_browser_compatible"
+                except (OSError, subprocess.SubprocessError) as error:
+                    raw_preview.rename(final_preview)
+                    report["preview_codec"] = "mpeg4_fallback_unverified_in_browser"
+                    report["preview_transcode_error"] = type(error).__name__
+            else:
+                raw_preview.rename(final_preview)
+                report["preview_codec"] = "mpeg4_fallback_unverified_in_browser"
         report.update({
             "frames_decoded": decoded,
             "detected_boxes": sum(x["detections"] for x in report["frames"]),
