@@ -280,7 +280,7 @@ def run():
                         expect(page.locator("#segments")).to_contain_text(
                             "测试镜头（人工命名）",timeout=12000)
                         assert page.locator("#graph").locator("svg").count()==1
-                        assert page.locator("#characters").inner_text().find("暂无人工标注角色")>=0
+                        expect(page.locator("#characters")).to_contain_text("没有任何人工绑定到真实视频帧的虚构角色")
                         checks.append("real_file_scene_cut_to_manual_storyboard_no_fake_character")
                         page.screenshot(path=str(OUT/"ui-anime-storyboard.png"),full_page=True)
                         page.goto(base+"/portal")
