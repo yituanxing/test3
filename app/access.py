@@ -144,6 +144,7 @@ def permitted(actor: dict, method: str, path: str) -> bool:
                     '/api/site/quality/summary'}
         or re.fullmatch(r'/api/site/occurrences/[0-9a-f]{24}/quality',path)
         or re.fullmatch(r'/api/site/sources/\d+/bindings',path)
+        or re.fullmatch(r'/api/site/frigate/[a-zA-Z0-9_-]{1,100}/bindings',path)
         or re.fullmatch(r'/api/cctv/sources/\d+/(activity|frame)',path)
     )
     if read and scope_reads:
