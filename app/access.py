@@ -203,8 +203,7 @@ def logout(request: Request):
 # Excel #23: state administrator can manage demo accounts without a shell.
 # Deactivation is a soft delete: retain audit and revoke all live sessions.
 class AccountCreateIn(BaseModel):
-    username: str = Field(min_length=3, max_length=32, pattern=r'^[a-z][a-z0-9_.-]{2,31}DUMMY_HASH = HASHER.hash('invalid-dummy-password-not-an-account')
-)
+    username: str = Field(min_length=3, max_length=32, pattern=r'^[a-z][a-z0-9_.-]{2,31}$')
     password: str = Field(min_length=12, max_length=256)
     region_id: int = Field(ge=1)
 
