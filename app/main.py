@@ -256,7 +256,7 @@ admin.register(app,db)
 base_registry.register(app,db)
 access.register(app,db)
 rule_instances.register(app,db)
-anime_scenes.register(app,db,_file_revision)
+anime_scenes.register(app,db,_file_revision,DATA_DIR / 'anime_uploads')
 gb28181.register(app,db)
 
 
