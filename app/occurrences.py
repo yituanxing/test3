@@ -84,7 +84,7 @@ def _scoped_rows(c,allowed,*,limit=500,offset=0,live_start=None,live_end=None):
     SELECT * FROM scoped
     ORDER BY provider,COALESCE(source_id,0),camera_key,track_id
     LIMIT ? OFFSET ?"""
-    return [dict(x) for x in c.execute(query,(*keys,*keys,*time_args,limit,offset))]
+    return [dict(x) for x in c.execute(query,(*keys,*keys,*keys,*time_args,limit,offset))]
 
 
 def _project(row,allowed):
