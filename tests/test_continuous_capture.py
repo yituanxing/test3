@@ -22,8 +22,9 @@ def context(tmp_path, monkeypatch):
     jobs.shutdown()
     # Previous test workers must be closed before swapping the database.
     with jobs._guard:
-        for thread in list(jobs._workers.values()):
-            thread.join(timeout=1)
+        old_threads = list(jobs._workers.values())
+    for thread in old_threads:
+        thread.join(timeout=1)
     jobs._shutdown.clear()
     monkeypatch.setattr(main, "DB", tmp_path / "capture.sqlite3")
     main.setup_db()
@@ -42,8 +43,9 @@ def context(tmp_path, monkeypatch):
     yield TestClient(main.app), main, jobs, src, file_source
     jobs.shutdown()
     with jobs._guard:
-        for thread in list(jobs._workers.values()):
-            thread.join(timeout=1)
+        old_threads = list(jobs._workers.values())
+    for thread in old_threads:
+        thread.join(timeout=1)
     jobs._shutdown.clear()
 
 
