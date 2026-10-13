@@ -12,6 +12,7 @@ FILES = (
     "README.md", "THIRD_PARTY.md", "DEMO_INTEGRATION.md",
     "PRODUCT_FLOW_V1.3.md", "ACCESS_CONTROL_V1.2.md",
     "RULE_AUDIT_V1.1.md", "BASE_REGISTRY_V0.9.md",
+    "CORE_VIDEO_ROSTER_SPEC_V1.md", "DELIVERY_SCOPE_20261013.md",
     "INSIGHTS_V1.0.md", "UI_ACCEPTANCE_V1.4.md",
     "requirements.txt", "requirements-business.txt",
 )
