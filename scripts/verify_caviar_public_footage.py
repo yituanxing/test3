@@ -88,7 +88,21 @@ def main():
                 assert ocsort_metrics['automatic_tracking_ran'] is True
                 assert ocsort_metrics['cross_camera_matching_ran'] is False
                 assert ocsort_metrics['ground_truth_boxes']==tracker_metrics['ground_truth_boxes']
+                # REAL pretrained person detector on independent VIDEO frames,
+                # not CVML GT boxes fed as detections. Keep bounded for CPU CI.
+                from app.person_detection_adapter import run_real_person_detector
+                with server.db() as db:
+                    detector_metrics=run_real_person_detector(
+                        db,got['source_id'],max_frames=24,sample_every=1)
+                assert detector_metrics['frames_inferred']==24
+                assert detector_metrics['frames_decoded']==24
+                assert detector_metrics['real_pretrained_person_detector_ran'] is True
+                assert detector_metrics['detector_received_ground_truth_boxes'] is False
+                assert detector_metrics['existing_automatic_tracker_ran'] is True
+                assert detector_metrics['cross_camera_identity_matching_ran'] is False
                 report['verified_cameras'].append({
+                    'real_yolo_person_detector_to_existing_bytetrack':detector_metrics,
+
                     'existing_bytetrack_baseline':tracker_metrics,
                     'existing_ocsort_baseline':ocsort_metrics,
                     'camera_view':view,'source_id':got['source_id'],
@@ -133,13 +147,16 @@ def main():
                 'uses_actual_downloaded_official_media':True,
                 'cross_camera_identity_matching_ran':False
             }
+            report['real_person_detector_vendor']='Ultralytics pretrained YOLO11n / person class'
+            report['real_detector_evidence']='independent native MPEG frames; never injected GT boxes'
             report['tracker_vendor']='Roboflow trackers 2.6.0 / ByteTrack + OC-SORT'
             report['baseline_kind']='published manual CVML detection boxes fed to existing ByteTrack'
             report['global_id_ground_truth']='NOT PRESENT; cross-camera ReID MUST NOT be scored'
-            report['auto_detector_evaluated']=False
+            report['auto_detector_evaluated']=True
+            report['auto_detector_precision_recall_evaluated']=False
             report['verdict']='PASS'
             report['not_proven']=[
-                'automatic human detection or precision/recall',
+                'person detection precision/recall beyond the bounded real MPEG inference',
                 'face identity recognition','cross-camera real-person re-identification',
                 'two different venues or cross-venue movements',
                 'persons per day, missing persons or personal risk'
