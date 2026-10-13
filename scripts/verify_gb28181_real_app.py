@@ -188,6 +188,38 @@ def main():
                 result["face_activity_window_is_unique_person_count"] = False
                 result["face_activity_source_scope_verified"] = True
 
+                # Verify a persistent RTSP decoder across TWO actual inference
+                # batches on the SAME WVP/ZLMediaKit stream. This does not
+                # replay pre-recorded JSON or manufacture boxes.
+                held = demo.LiveCaptureSession(source_id, batch_frames=18,
+                                               sample_every=3)
+                try:
+                    first_batch = held.next_batch()
+                    second_batch = held.next_batch()
+                finally:
+                    held.close()
+                assert first_batch["frames_decoded"] >= 12
+                assert second_batch["frames_decoded"] >= 12
+                assert first_batch["new_samples"] >= 4
+                assert second_batch["new_samples"] >= 4
+                assert first_batch["face_detections"] >= 1
+                assert second_batch["face_detections"] >= 1
+                with demo.db() as c:
+                    actual = c.execute(
+                        "SELECT count(*) FROM samples WHERE source_id=?",
+                        (source_id,)).fetchone()[0]
+                assert actual == (processed["new_samples"] +
+                                  first_batch["new_samples"] +
+                                  second_batch["new_samples"]), (
+                    "persistent source must produce distinct new SQLite frames"
+                )
+                result["live_open_decoder_batches"] = 2
+                result["live_open_decoder_new_frames"] = (first_batch["new_samples"] +
+                                                          second_batch["new_samples"])
+                result["live_open_decoder_real_face_boxes"] = (
+                    first_batch["face_detections"] + second_batch["face_detections"])
+                result["live_decoder_proves_unique_people"] = False
+
             finally:
                 if session_id is not None:
                     stopped = expect(client.post(
