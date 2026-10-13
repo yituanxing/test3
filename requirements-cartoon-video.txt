@@ -6,3 +6,5 @@ numpy>=1.26,<3
 opencv-python-headless>=4.9,<5
 Pillow>=10,<13
 requests>=2.31,<3
+# Existing ByteTrack implementation for temporal consistency, not a model we train.
+supervision==0.25.1
