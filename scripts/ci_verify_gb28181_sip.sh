@@ -225,15 +225,22 @@ EOF
 # WVP's container even while the host->container UDP packet appears sent.
 # Run the actual upstream Go simulator in the official compose project network.
 docker network inspect "${PROJECT}_media-net" >/dev/null
-# Deterministic, license-free moving frames, encoded H.264 in MPEG-PS
-# for the same simulator to send over genuine GB28181 RTP.
+# NASA public-domain astronaut-face fixture with an independently annotated
+# face rectangle in samples/face_box_truth_v1.json. The video repeats ONE
+# astronaut still: proves detection after GB28181 transport, NOT population
+# recall, distinct persons, motion tracking, or unique-person counting.
+# Convert it to Annex-B H264 with AUD markers for the pinned GB PS sender.
 if ! command -v ffmpeg >/dev/null 2>&1; then
   sudo apt-get update -qq
   sudo apt-get install -y -qq ffmpeg
 fi
-ffmpeg -hide_banner -loglevel error -nostdin -y -f lavfi \
-  -i 'testsrc2=size=320x240:rate=15' -t 45 -an \
-  -c:v libx264 -pix_fmt yuv420p -g 15 \
+# Fail if the positive real-human source was accidentally removed.
+test -s samples/astronaut-face-test.mp4
+test -s samples/face_box_truth_v1.json
+ffmpeg -hide_banner -loglevel error -nostdin -y -stream_loop -1 \
+  -i samples/astronaut-face-test.mp4 -t 45 -an \
+  -vf 'fps=15,scale=512:512:flags=bicubic,format=yuv420p' \
+  -c:v libx264 -preset ultrafast -crf 18 -g 15 \
   -x264-params 'aud=1:repeat-headers=1:scenecut=0' \
   -f h264 "$BASE/sim/test.dat"
 test -s "$BASE/sim/test.dat"
