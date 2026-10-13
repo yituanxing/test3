@@ -75,7 +75,13 @@ window.addEventListener('load',async()=>{
 <p class="hint">操作后需对新 RTSP 源做实际 ffprobe/解码，才能确认画面正常；WVP 返回地址并不等于真实 SIP+RTP 已验证。不会把匿名目标当作真实唯一人员。</p></section>
 <section class="card wide" id="capturePanel">
 <div class="row"><h2>持续采集任务 · 断流重试与运行状态</h2><button class="subtle" onclick="captureRefresh()">刷新任务</button></div>
-<p class="hint">先通过国标实时点播获取视频源，再在国标会话行点击“持续采集”。同源与同国标通道禁止重复运行；发生 OpenCV 解码异常时指数退避并重试原 RTSP 源。暂不自动重新 INVITE，网关旧流失效后需重新点播。检测框仍然不是独立人数。</p>
+<p class="hint">可从下方选择已登记的授权 RTSP 视频源开始持续采集，或通过国标实时点播后在会话行点击“持续采集”。同源与同国标通道禁止重复运行；OpenCV 解码异常时退避重试原 RTSP 地址，失效国标流需重新点播。检测框和采集批次不是独立人数。</p>
+<div class="inline" id="captureStartControls" style="margin:12px 0;display:none">
+  <label for="captureSource">RTSP 视频源</label>
+  <select id="captureSource" aria-label="选择已有RTSP视频源"><option value="">载入中…</option></select>
+  <button id="captureStart" onclick="captureStartSelected()" disabled>开始持续采集</button>
+  <span class="legend">只列出本人辖区内已启用的 RTSP 源；不创建虚构在线摄像机。</span>
+</div>
 <div class="scroll"><table><thead><tr><th>源 ID</th><th>运行状态</th><th>成功批次</th><th>新入库抽样帧</th><th>连续失败</th><th>最后成功</th><th>错误码</th><th>操作</th></tr></thead><tbody id="captureJobs"><tr><td colspan="8">读取任务状态中……</td></tr></tbody></table></div>
 </section>
 <section class="card"><h2>真伪边界 · 测试矩阵</h2><div class="stage"><div><div class="stname">本地 MP4 → OpenCV → SQLite</div><div class="stnote">点击上方「验证本地视频」可实际解码与写入</div></div><span class="status good">可运行</span></div><div class="stage"><div><div class="stname">Frigate HTTP 适配 → SQLite</div><div class="stnote">使用本机真实HTTP回环服务器执行契约测试</div></div><span class="status good">自动化可测</span></div><div class="stage"><div><div class="stname">MediaMTX → Frigate 目标检测</div><div class="stnote">需Docker和合法人物录像；当前无此测试结果</div></div><span class="status warn">需现场验收</span></div><div class="stage"><div><div class="stname">GB28181 国标SIP接入</div><div class="stnote">开源WVP + ZLMediaKit + GB设备模拟器已经CI验证完整视频解码及OpenCV人脸框入库；当前实例连通性需独立验证</div></div><span class="status good">CI已验证</span></div></section>
@@ -153,16 +159,31 @@ async function gbRefresh(){
 }
 async function captureRefresh(){
   try {
-    const [data,actor]=await Promise.all([api('/api/capture/jobs'),api('/api/auth/me')]);
+    const [data,actor,sources]=await Promise.all([
+      api('/api/capture/jobs'),api('/api/auth/me'),api('/api/sources')]);
     const writable=actor.level===1;
+    $('captureStartControls').style.display=writable?'flex':'none';
+    if(writable){
+      const previous=$('captureSource').value;
+      const available=sources.filter(x=>x.kind==='rtsp'&&x.enabled&&x.place_active);
+      $('captureSource').innerHTML='<option value="">选择已启用的 RTSP 源</option>'+
+        available.map(x=>'<option value="'+Number(x.id)+'">'+esc(x.name)+' (源 #'+Number(x.id)+')</option>').join('');
+      if([...$('captureSource').options].some(o=>o.value===previous))$('captureSource').value=previous;
+      $('captureStart').disabled=!available.length;
+    }
     $('captureJobs').innerHTML=(data.jobs||[]).map(j=>'<tr><td>'+j.source_id+
       '</td><td>'+esc(j.state)+(j.desired_enabled?' · 已启用':' · 已停用')+
       '</td><td>'+j.successful_batches+'</td><td>'+j.sampled_frames+
       '</td><td>'+j.failure_count+'</td><td>'+t(j.last_success_at)+
       '</td><td>'+esc(j.last_error_code||'—')+'</td><td>'+
       (writable&&j.desired_enabled?'<button class="subtle" onclick="captureAction('+j.source_id+',&quot;stop&quot;)">停止任务</button>':'—')+
-      '</td></tr>').join('')||'<tr><td colspan="8">没有持续采集任务；先通过国标实时点播获得 RTSP 源。</td></tr>';
+      '</td></tr>').join('')||'<tr><td colspan="8">没有持续采集任务；可先选择已登记的 RTSP 源或从国标通道实时点播。</td></tr>';
   }catch(e){$('captureJobs').innerHTML='<tr><td colspan="8">'+esc('读取失败：'+e.message)+'</td></tr>'}
+}
+async function captureStartSelected(){
+  const id=Number($('captureSource').value);
+  if(!Number.isInteger(id)||id<1){toast('请选择已登记、已启用的 RTSP 视频源',true);return}
+  await captureAction(id,'start');
 }
 async function captureAction(sourceId,action){
   try{
