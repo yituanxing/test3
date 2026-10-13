@@ -13,6 +13,7 @@ name: ZD Frigate Real Person CI
       # The expensive gb-sip-protocol job remains opt-in via gb-e2e label.
       - "scripts/ci_verify_gb28181_sip.sh"
       - "scripts/verify_gb28181_real_app.py"
+      - "scripts/package_local_demo.py"
       - ".github/workflows/zd-frigate-real-person.yml"
 
 permissions:
@@ -57,8 +58,17 @@ jobs:
             reports/ui-capture-start-stop.png
             reports/ui-roster-v2-diff.png
             reports/ui-anonymous-face-review.png
+            reports/ui-admin-operations.png
             reports/ui-server.log
           if-no-files-found: warn
+      - name: Build auditable local demo ZIP
+        run: python -m scripts.package_local_demo
+      - name: Upload demo deliverable for Excel review
+        uses: actions/upload-artifact@v4
+        with:
+          name: zd-p0-excel-demo-source
+          path: dist/zd-demo-local-source.zip
+          if-no-files-found: error
 
   real-media:
     # GB28181 protocol-only changes should not repeat the unrelated
