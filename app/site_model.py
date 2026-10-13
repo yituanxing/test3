@@ -7,7 +7,7 @@ source.place_id or a legacy backfill.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -130,8 +130,12 @@ def set_frigate_binding(c,camera,place_id,*,at=None):
         c.execute('INSERT INTO frigate_camera_bindings(camera,place_id) VALUES(?,?)',
                   (camera,place_id))
     if not current and original is not None:
+        # The legacy pointer is only observed NOW; do not invent years of
+        # ownership. One microsecond is enough to make the transition valid.
+        legacy_start=(datetime.fromisoformat(stamp)-timedelta(microseconds=1)).isoformat(
+            timespec='microseconds')
         record_frigate_initial(c,camera,original['place_id'],
-                               provenance='legacy_backfill',at=stamp)
+                               provenance='legacy_backfill',at=legacy_start)
         current=c.execute("""SELECT * FROM frigate_site_binding_history
             WHERE camera=? AND valid_until IS NULL""",(camera,)).fetchone()
     if current and current['place_id']==place_id:
@@ -330,6 +334,30 @@ def assign_binding(source_id:int,data:BindingChange,request:Request):
             c.execute('UPDATE sources SET place_id=? WHERE id=?',
                       (data.place_id,source_id))
         return binding
+
+
+@router.get('/api/site/frigate/{camera}/bindings')
+def frigate_binding_history(camera:str,request:Request):
+    """Conservative historical camera location read: require EVERY venue.
+
+    A camera transferred across counties cannot leak the previous county's
+    address through its history, even to the current custodian.
+    """
+    with _db() as c:
+        current=c.execute('SELECT place_id FROM frigate_camera_bindings WHERE camera=?',
+                          (camera,)).fetchone()
+        if not current:
+            raise HTTPException(404,'Frigate摄像机不存在')
+        access.check_place(c,request,current['place_id'])
+        epochs=[dict(r) for r in c.execute("""SELECT h.*,p.name AS place_name
+            FROM frigate_site_binding_history h JOIN places p ON p.id=h.place_id
+            WHERE h.camera=? ORDER BY h.id""",(camera,))]
+        for row in epochs:
+            access.check_place(c,request,row['place_id'])
+        return {'camera':camera,'epochs':epochs,
+                'clock':'UTC half-open [valid_from,valid_until)',
+                'prior_to_first_epoch':'unknown',
+                'legacy_event_place_id_preserved':True}
 
 
 @router.get('/api/site/anonymous-events')
