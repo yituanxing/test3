@@ -263,6 +263,12 @@ def test_real_pretrained_detector_endpoint_is_scoped_and_never_fakes_missing_mod
                       headers=county).status_code==404
     def model_unavailable():
         raise HTTPException(503,'YOLO11n研究模型尚未安装')
+    from app import tracker_adapters
+    # Base CI intentionally omits *both* optional existing external libs.
+    # Stub only the dependency loader so the test reaches the missing YOLO
+    # failure; this does NOT mock actual inference or report model success.
+    monkeypatch.setattr(tracker_adapters,'_dependencies',
+                        lambda:(object(),object(),object()))
     monkeypatch.setattr(person_detection_adapter,'_model',model_unavailable)
     missing=client.get(route,headers=county)
     assert missing.status_code==503,missing.text
