@@ -84,7 +84,11 @@ def test_one_database_real_observations_through_qa_and_synthetic_business_isolat
         bound=client.post('/api/frigate/cameras',headers=state,json={
             'camera':camera,'place_id':place})
         assert bound.status_code==200,bound.text
-    event_time=datetime.now(timezone.utc).timestamp()-40
+    # Upstream event time must be AFTER camera binding was first registered.
+    # Older footage without historic location evidence remains unlocated.
+    import time
+    time.sleep(0.012)
+    event_time=datetime.now(timezone.utc).timestamp()
     raw=[{'id':'local-track-1','camera':camera,'label':'person',
           'start_time':event_time,'false_positive':False,
           'data':{'top_score':0.87},'has_snapshot':True}
