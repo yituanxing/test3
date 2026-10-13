@@ -76,15 +76,21 @@ def main():
                 from app import tracker_adapters
                 with server.db() as db:
                     tracker_metrics=tracker_adapters.run_caviar_tracking(
-                        db,got['source_id'],max_frames=500)
+                        db,got['source_id'],max_frames=500,algorithm="bytetrack")
+                    ocsort_metrics=tracker_adapters.run_caviar_tracking(
+                        db,got['source_id'],max_frames=500,algorithm="ocsort")
                 assert tracker_metrics['frames_processed']>=300
                 assert tracker_metrics['ground_truth_boxes']>=100
                 assert tracker_metrics['automatic_tracking_ran'] is True
                 assert tracker_metrics['automatic_person_detection_ran'] is False
                 assert tracker_metrics['cross_camera_matching_ran'] is False
                 assert tracker_metrics['assignment_coverage'] is not None
+                assert ocsort_metrics['automatic_tracking_ran'] is True
+                assert ocsort_metrics['cross_camera_matching_ran'] is False
+                assert ocsort_metrics['ground_truth_boxes']==tracker_metrics['ground_truth_boxes']
                 report['verified_cameras'].append({
                     'existing_bytetrack_baseline':tracker_metrics,
+                    'existing_ocsort_baseline':ocsort_metrics,
                     'camera_view':view,'source_id':got['source_id'],
                     'video_bytes':len(data),
                     'video_sha256':hashlib.sha256(data).hexdigest(),
@@ -99,7 +105,7 @@ def main():
                 })
             assert len(report['verified_cameras'])==2
             assert len({x['source_id'] for x in report['verified_cameras']})==2
-            report['tracker_vendor']='Roboflow trackers 2.6.0 / ByteTrack'
+            report['tracker_vendor']='Roboflow trackers 2.6.0 / ByteTrack + OC-SORT'
             report['baseline_kind']='published manual CVML detection boxes fed to existing ByteTrack'
             report['global_id_ground_truth']='NOT PRESENT; cross-camera ReID MUST NOT be scored'
             report['auto_detector_evaluated']=False
