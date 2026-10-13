@@ -165,6 +165,7 @@ def test_gb_same_binding_can_enable_only_one_source_and_stops_with_session(conte
             VALUES(?,?,'live','stream_b','active',?)""",
                   (binding,second,main.utcnow()))
     assert client.post(f"/api/capture/jobs/{first_source}/start").status_code == 200
+    assert client.post(f"/api/sources/{first_source}/process?max_frames=1").status_code == 409
     blocked = client.post(f"/api/capture/jobs/{second}/start")
     assert blocked.status_code == 409
     stopped = client.post(f"/api/gb28181/sessions/{session_a}/stop")
