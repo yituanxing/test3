@@ -139,6 +139,8 @@ def permitted(actor: dict, method: str, path: str) -> bool:
         or re.fullmatch(r'/api/insights/people/P[0-9]{3}',path)
         or re.fullmatch(r'/api/anime/scenes/sources/\d+/(suggest|graph)',path)
         or path in {'/api/cctv/datasets','/api/cctv/sources'}
+        or path in {'/api/site/zones','/api/site/anonymous-events'}
+        or re.fullmatch(r'/api/site/sources/\d+/bindings',path)
         or re.fullmatch(r'/api/cctv/sources/\d+/(activity|frame)',path)
     )
     if read and scope_reads:
@@ -149,6 +151,12 @@ def permitted(actor: dict, method: str, path: str) -> bool:
         if method == 'PUT' and re.fullmatch(r'/api/(places|sources)/\d+',path):
             return True
         if method == 'PATCH' and re.fullmatch(r'/api/sources/\d+/state',path):
+            return True
+        if (method,path) == ('POST','/api/site/zones'):
+            return True
+        if method == 'PATCH' and re.fullmatch(r'/api/site/zones/\d+/state',path):
+            return True
+        if method == 'PUT' and re.fullmatch(r'/api/site/sources/\d+/binding',path):
             return True
     return False
 
