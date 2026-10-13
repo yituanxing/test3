@@ -92,7 +92,9 @@ def run_caviar_tracking(c, source_id: int, max_frames: int = 400,
         )
         result = tracker.update(detections)
         ids = result.tracker_id
-        original_indices = result.data.get("input_index")
+        # The vendor deliberately returns a fresh EMPTY detections object
+        # without custom .data when no boxes are present. That is normal.
+        original_indices = ([] if not frame else result.data.get("input_index"))
         if (ids is None or original_indices is None or
             len(ids)!=len(original_indices) or len(ids)!=len(frame)):
             raise RuntimeError("External tracker omitted or duplicated detections; cannot attribute a GT ID")
