@@ -66,8 +66,8 @@ def register(app, get_db, process):
     global _db, _process
     _db, _process = get_db, process
     app.include_router(router)
-    app.add_event_handler("startup", start_pending)
-    app.add_event_handler("shutdown", shutdown)
+    # Server-owned lifespan in app.main starts and stops capture workers.
+    # FastAPI >= 0.143 removed add_event_handler.
 
 
 def _row(c, source_id):
