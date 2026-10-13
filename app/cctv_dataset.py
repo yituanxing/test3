@@ -360,6 +360,57 @@ def tracking_baseline(source_id:int,request:Request,
         return run_caviar_tracking(c,source_id,max_frames=max_frames,algorithm=algorithm)
 
 
+@router.get('/api/cctv/sources/{source_id}/pair-tracking-baseline')
+def compare_caviar_pair(source_id:int,request:Request,
+                        max_frames:int=Query(400,ge=1,le=600)):
+    """ONE venue, TWO cameras, TWO mature trackers; ZERO inferred global IDs.
+
+    This is not two venues and camera-local GT object IDs are not shared
+    identity labels. Do not emit pairwise matches without ground-truth IDs.
+    """
+    from app.tracker_adapters import run_caviar_tracking
+    with _db() as c:
+        access.check_source(c,request,source_id)
+        selected=c.execute("""SELECT s.place_id,i.dataset,i.scenario FROM sources s
+          JOIN public_cctv_imports i ON i.source_id=s.id WHERE s.id=?""",
+          (source_id,)).fetchone()
+        if selected is None:
+            raise HTTPException(404,'先导入官方CAVIAR固定摄像机素材')
+        pair=[dict(r) for r in c.execute("""SELECT s.id,i.camera_view
+          FROM sources s JOIN public_cctv_imports i ON i.source_id=s.id
+          WHERE s.place_id=? AND i.dataset=? AND i.scenario=?
+          ORDER BY i.camera_view,s.id""",
+          (selected['place_id'],selected['dataset'],selected['scenario']))]
+        views={r['camera_view'] for r in pair}
+        if len(pair)!=2 or views!={'corridor','front'}:
+            raise HTTPException(409,'场所内必须导入两个官方固定机位，才能进行双机位跟踪实验')
+        for camera in pair:
+            access.check_source(c,request,camera['id'])
+        results=[]
+        for camera in pair:
+            results.append({'camera_view':camera['camera_view'],
+                 'source_id':camera['id'],
+                 'algorithms':[
+                     run_caviar_tracking(c,camera['id'],max_frames=max_frames,
+                                         algorithm=algorithm)
+                     for algorithm in ('bytetrack','ocsort')]})
+        return {
+            'mode':'existing_trackers_two_camera_one_venue_research_baseline',
+            'place_id':selected['place_id'],
+            'scenario':selected['scenario'],
+            'cameras':results,
+            'algorithms':['bytetrack','ocsort'],
+            'camera_count':2,
+            'automatic_camera_local_tracking_ran':True,
+            'automatic_person_detection_ran':False,
+            'cross_camera_identity_matching_ran':False,
+            'shared_global_identity_ground_truth':False,
+            'counts_as_independent_real_people':False,
+            'eligible_for_real_roster_or_alerts':False,
+            'note':'对同一走廊两个摄像机分别使用现成ByteTrack和OC-SORT评估本机跟踪，严格不根据本机轨迹编号断言跨镜头同一自然人。研究素材没有足够的全局身份真值。',
+        }
+
+
 @router.get('/api/cctv/sources/{source_id}/frame')
 def annotated_frame(source_id:int,request:Request,
                     frame:int=Query(1,ge=1,le=25000)):
