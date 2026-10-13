@@ -38,6 +38,7 @@ CASES = [
     {"name": "buck_with_bow", "file": "Big.Buck.Bunny.-.Bunny.with.Bow.png",
      "role": "candidate", "truth": "Buck", "crop": [0.0, 0.0, 1.0, 1.0]},
     {"name": "group_frank_negative", "file": "Big.Buck.Bunny.-.Frank.Rinky.Gimera.png",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/2/2b/Big.Buck.Bunny.-.Frank.Rinky.Gimera.png",
      "role": "candidate", "truth": "other", "crop": [0.07, 0.0, 0.50, 0.92]},
     {"name": "ricky_negative", "file": "Big.Buck.Bunny.-.Ricky.png",
      "role": "candidate", "truth": "other", "crop": [0.0, 0.0, 1.0, 1.0]},
