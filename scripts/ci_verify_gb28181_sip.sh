@@ -541,17 +541,44 @@ PY
 cp "$BASE/gb-decoded.jpg" reports/gb28181-decoded-ci.jpg
 echo "::endgroup::"
 
+# Preserve protocol proof separately before testing the application, so any
+# application regression cannot be misreported as a failed GB media demux.
+python - <<'PY'
+import json,os
+from pathlib import Path
+p=Path(os.environ['REPORT'])
+data=json.loads(p.read_text(encoding='utf-8'))
+data.update({'gb_protocol_verdict':'PASS','sip_invite_rtp_ps_video':'PASS',
+             'test3_business_integration':'NOT_YET_PASSED'})
+p.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8')
+PY
+
+echo "::group::Real WVP device discovery -> test3 place binding -> OpenCV -> SQLite"
+# Same disposable WVP+ZLM+Go process from preceding *real* SIP proof. No fake
+# WVP HTTP server, copied JPEG, or unrelated MediaMTX fixture in this test.
+python -m pip install -q -r requirements-business.txt
+export ZD_DATA_DIR="$BASE/zd-app-data"
+mkdir -p "$ZD_DATA_DIR"
+export GB28181_WVP_URL="http://127.0.0.1:18978"
+# WVP's HTTP login is disabled ONLY for this isolated CI instance. SIP Digest
+# remains enabled. The adapter still requires a non-empty API key setting.
+export GB28181_WVP_API_KEY="ci-local-wvp-control-plane"
+export GB28181_RTSP_HOSTS="127.0.0.1"
+export OPENCV_FFMPEG_CAPTURE_OPTIONS="rtsp_transport;tcp"
+timeout 100 python -m scripts.verify_gb28181_real_app
+echo "::endgroup::"
+
 python - <<'PY'
 import json,os
 from datetime import datetime,timezone
 from pathlib import Path
 path=Path(os.environ["REPORT"])
 v=json.loads(path.read_text(encoding="utf-8"))
-v.update({"verdict":"PASS","sip_invite_rtp_ps_video":"PASS","live_sip_registration":True,
+v.update({"verdict":"PASS","test3_business_integration":"PASS","sip_invite_rtp_ps_video":"PASS","live_sip_registration":True,
           "wvp_persisted_online_device":True,"catalog_channel_received":True,
           "check_time_utc":datetime.now(timezone.utc).isoformat(),
           "evidence":"WVP live MySQL wvp_device.on_line=1 AND wvp_device_channel.data_device_id=parent.id AND channel.device_id matches; independent upstream GB SIP simulator running",
-          "note":"Real SIP REGISTER/Catalog/INVITE, PS/RTP to ZLM and an actual decoded frame; historical playback not tested."})
+          "note":"Real SIP and video decoding plus actual WVP HTTP -> test3/RTSP/OpenCV/SQLite; historical playback and person truth NOT tested."})
 path.write_text(json.dumps(v,indent=2,ensure_ascii=False),encoding="utf-8")
 print("Real upstream GB28181 SIP verdict:",v["verdict"])
 PY
