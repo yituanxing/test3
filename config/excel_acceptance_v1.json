@@ -162,12 +162,13 @@
       "excel_row": 19,
       "title": "场所出入口",
       "status": "partial",
-      "verified_scope": "场所摄像机、视频源、帧截图及人工标注可查询",
+      "verified_scope": "场所摄像机、视频源、帧截图及人工标注可查询；新增按场所/视频源/UTC入库时间、实际检测框及最新人工复核状态检索帧级证据；可溯源展示脱敏原片几何框，不以此代替真人身份识别",
       "evidence_files": [
         "tests/test_cctv_dataset.py",
-        "tests/test_integrated_excel_contract.py"
+        "tests/test_integrated_excel_contract.py",
+        "tests/test_video_evidence_search.py"
       ],
-      "remaining_gap": "真实人脸抓拍和识别结果全链、真人检索未完成"
+      "remaining_gap": "真实人脸抓拍和识别结果全链、真人检索未完成；没有实名人脸比对、自动去重或能保存并检索的原始识别人脸图"
     },
     {
       "id": 14,
@@ -196,12 +197,13 @@
       "excel_row": 22,
       "title": "抓拍结果查询",
       "status": "partial",
-      "verified_scope": "视频抽样帧、研究监控底图/人工框和来源时间可追溯",
+      "verified_scope": "视频抽样帧、研究监控底图/人工框和来源时间可追溯；新增源级/场所级/UTC入库时间及最新审核状态筛选、全范围匹配条数、分页、脱敏原始帧，SQLite实际OpenCV正样片与跨县权限回归验证",
       "evidence_files": [
         "tests/test_cctv_dataset.py",
-        "tests/test_real_face_boxes.py"
+        "tests/test_real_face_boxes.py",
+        "tests/test_video_evidence_search.py"
       ],
-      "remaining_gap": "抓拍人脸图、真人特征/身份仍不完整"
+      "remaining_gap": "抓拍人脸图、真人特征/身份仍不完整；查询是帧与几何框，不是图片相似度人脸检索；直播无可重放原片时不能伪造源帧快照"
     },
     {
       "id": 17,
