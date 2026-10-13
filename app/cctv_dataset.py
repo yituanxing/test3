@@ -344,6 +344,20 @@ def camera_activity(source_id:int,request:Request,
                 'license':entry['license_note'],
                 'warning':'单摄像头人工标注轨迹不是唯一自然人；两个摄像头计数不可相加为去重人数，未做跨镜身份关联或风险认定。'}
 
+@router.get('/api/cctv/sources/{source_id}/tracking-baseline')
+def tracking_baseline(source_id:int,request:Request,
+                      max_frames:int=Query(400,ge=1,le=600)):
+    """Real EXISTING ByteTrack on published per-camera GT, not cross-cam ReID.
+
+    Optional tracker dependency absent => explicit 503. Never silently fake
+    tracking IDs or contaminate real Frigate counts or simulated P### roster.
+    """
+    from app.tracker_adapters import run_caviar_tracking
+    with _db() as c:
+        access.check_source(c,request,source_id)
+        return run_caviar_tracking(c,source_id,max_frames=max_frames)
+
+
 @router.get('/api/cctv/sources/{source_id}/frame')
 def annotated_frame(source_id:int,request:Request,
                     frame:int=Query(1,ge=1,le=25000)):
