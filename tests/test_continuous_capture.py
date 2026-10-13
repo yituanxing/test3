@@ -258,3 +258,33 @@ def test_stop_start_during_old_worker_exit_rearms_capture(context, monkeypatch):
     finally:
         allow_exit.set()
         client.post(f"/api/capture/jobs/{src}/stop")
+
+
+def test_open_capture_does_not_misattribute_frames_after_source_rebind(context, monkeypatch):
+    """A camera URI/place change must close the old decoder, not reuse it."""
+    client, main, jobs, src, _ = context
+    footage = main.ROOT / "samples" / "test-pattern.mp4"
+    assert footage.is_file()
+    open_real = main.cv2.VideoCapture
+    monkeypatch.setattr(main.cv2, "VideoCapture",
+                        lambda uri: open_real(str(footage)))
+    with main.db() as c:
+        first_place = c.execute(
+            "SELECT place_id FROM sources WHERE id=?", (src,)).fetchone()[0]
+    held = main.LiveCaptureSession(src, batch_frames=10, sample_every=5)
+    try:
+        assert held.next_batch()["new_samples"] == 2
+        with main.db() as c:
+            c.execute(
+                "UPDATE sources SET uri=? WHERE id=?",
+                ("rtsp://127.0.0.1:8554/new-camera", src))
+        with pytest.raises(HTTPException) as exc:
+            held.next_batch()
+        assert exc.value.status_code == 409
+        assert held._capture is None, "stale decoder must be closed"
+        with main.db() as c:
+            rows = c.execute(
+                "SELECT place_id FROM samples WHERE source_id=?", (src,)).fetchall()
+        assert [x[0] for x in rows] == [first_place, first_place]
+    finally:
+        held.close()
