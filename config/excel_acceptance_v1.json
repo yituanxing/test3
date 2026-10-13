@@ -19,12 +19,13 @@
       "excel_row": 7,
       "title": "人脸解析",
       "status": "partial",
-      "verified_scope": "国标设备接入与部分真人媒体处理已有验证；多路实时/历史28181人脸解析、聚类比对与特征全链未通过",
+      "verified_scope": "国标设备接入与部分真人媒体处理已有验证；多路实时/历史28181人脸解析、聚类比对与特征全链未通过；真实官方CAVIAR双机位CVML框作为输入，已运行Roboflow ByteTrack v2.6本机时序跟踪的独立Owner验收（检测本身未运行）",
       "evidence_files": [
         "tests/test_gb28181_wvp_adapter.py",
-        "tests/test_real_face_boxes.py"
+        "tests/test_real_face_boxes.py",
+        "tests/test_cctv_dataset.py"
       ],
-      "remaining_gap": "多路历史国标+真人身份聚类/比对需真实端到端验收"
+      "remaining_gap": "多路历史国标+真人身份聚类/比对需真实端到端验收；ByteTrack对官方GT的分配覆盖率不能替代实际人体检测的召回率或跨机位真实人物匹配精度"
     },
     {
       "id": 2,
@@ -163,13 +164,13 @@
       "excel_row": 19,
       "title": "场所出入口",
       "status": "partial",
-      "verified_scope": "场所摄像机、视频源、帧截图及人工标注可查询；新增按场所/视频源/UTC入库时间、实际检测框及最新人工复核状态检索帧级证据；可溯源展示脱敏原片几何框，不以此代替真人身份识别",
+      "verified_scope": "场所摄像机、视频源、帧截图及人工标注可查询；新增按场所/视频源/UTC入库时间、实际检测框及最新人工复核状态检索帧级证据；可溯源展示脱敏原片几何框，不以此代替真人身份识别；真实官方CAVIAR双机位CVML框作为输入，已运行Roboflow ByteTrack v2.6本机时序跟踪的独立Owner验收（检测本身未运行）",
       "evidence_files": [
         "tests/test_cctv_dataset.py",
         "tests/test_integrated_excel_contract.py",
         "tests/test_video_evidence_search.py"
       ],
-      "remaining_gap": "真实人脸抓拍和识别结果全链、真人检索未完成；没有实名人脸比对、自动去重或能保存并检索的原始识别人脸图"
+      "remaining_gap": "真实人脸抓拍和识别结果全链、真人检索未完成；没有实名人脸比对、自动去重或能保存并检索的原始识别人脸图；ByteTrack对官方GT的分配覆盖率不能替代实际人体检测的召回率或跨机位真实人物匹配精度"
     },
     {
       "id": 14,
@@ -199,13 +200,13 @@
       "excel_row": 22,
       "title": "抓拍结果查询",
       "status": "partial",
-      "verified_scope": "视频抽样帧、研究监控底图/人工框和来源时间可追溯；新增源级/场所级/UTC入库时间及最新审核状态筛选、全范围匹配条数、分页、脱敏原始帧，SQLite实际OpenCV正样片与跨县权限回归验证",
+      "verified_scope": "视频抽样帧、研究监控底图/人工框和来源时间可追溯；新增源级/场所级/UTC入库时间及最新审核状态筛选、全范围匹配条数、分页、脱敏原始帧，SQLite实际OpenCV正样片与跨县权限回归验证；真实官方CAVIAR双机位CVML框作为输入，已运行Roboflow ByteTrack v2.6本机时序跟踪的独立Owner验收（检测本身未运行）",
       "evidence_files": [
         "tests/test_cctv_dataset.py",
         "tests/test_real_face_boxes.py",
         "tests/test_video_evidence_search.py"
       ],
-      "remaining_gap": "抓拍人脸图、真人特征/身份仍不完整；查询是帧与几何框，不是图片相似度人脸检索；直播无可重放原片时不能伪造源帧快照"
+      "remaining_gap": "抓拍人脸图、真人特征/身份仍不完整；查询是帧与几何框，不是图片相似度人脸检索；直播无可重放原片时不能伪造源帧快照；ByteTrack对官方GT的分配覆盖率不能替代实际人体检测的召回率或跨机位真实人物匹配精度"
     },
     {
       "id": 17,
@@ -291,5 +292,12 @@
       "remaining_gap": "账号删除为停用、保留历史审计"
     }
   ],
-  "last_review_note": "研究人工关联与会话已落地但仍是operator_assertion，未验证跨摄像机身份自动比对。#14图像人脸检索、#17真实地理轨迹继续missing；#3及七类规则仍synthetic_only。"
+  "last_review_note": "研究人工关联与会话已落地但仍是operator_assertion，未验证跨摄像机身份自动比对。#14图像人脸检索、#17真实地理轨迹继续missing；#3及七类规则仍synthetic_only。",
+  "latest_tracking_proof": {
+    "ci_run": "https://github.com/yituanxing/test3/actions/runs/38418598531",
+    "status": "real_official_CAVIAR_GT_to_ByteTrack_tracking_only",
+    "official_video_frames_per_camera": 383,
+    "detector_evaluated": false,
+    "cross_camera_identity_evaluated": false
+  }
 }
