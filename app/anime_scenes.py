@@ -11,6 +11,9 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
+import os
+import uuid
+from urllib.parse import unquote
 import re
 
 import cv2
@@ -18,11 +21,13 @@ import numpy as np
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from app import access
+from app import access, admin
 
 router = APIRouter()
 _db = None
 _revision = None
+_upload_dir = None
+MAX_UPLOAD_BYTES = 128 * 1024 * 1024
 
 
 class SceneIn(BaseModel):
@@ -69,9 +74,9 @@ def initialize(c):
     """)
 
 
-def register(app, db, file_revision):
-    global _db, _revision
-    _db, _revision = db, file_revision
+def register(app, db, file_revision, upload_dir):
+    global _db, _revision, _upload_dir
+    _db, _revision, _upload_dir = db, file_revision, Path(upload_dir)
     app.include_router(router)
 
 
@@ -147,6 +152,73 @@ def _suggest_video(path, *, threshold, min_duration_ms, sample_stride, max_secon
                 'note':'仅检测像素变化候选剪辑点，不能识别真实或虚构地理位置，也不证明角色移动；快速运动可能误触发。'}
     finally:
         capture.release()
+
+
+@router.post('/api/anime/scenes/uploads',status_code=201)
+async def upload_local_clip(request:Request,place_id:int=Query(gt=0)):
+    """Raw request-body upload: no multipart dependency and no arbitrary paths.
+
+    Explicitly local demo scope: max 128 MiB, a bounded single-file upload,
+    unique server filenames, permission checked BEFORE bytes are accepted.
+    Video decoding is verified before DB registration; neither footage nor
+    derived frames are part of the CI deliverable source archive.
+    """
+    _require_editor(request)
+    with _db() as c:
+        access.check_place(c,request,place_id)
+        admin._active_place(c,place_id)
+    client_name=unquote(request.headers.get('x-upload-name','clip.mp4'))
+    ext=Path(client_name).suffix.lower()
+    if ext not in {'.mp4','.mov','.mkv','.avi'}:
+        raise HTTPException(422,'仅支持 mp4、mov、mkv、avi 动画视频')
+    length=request.headers.get('content-length')
+    if length:
+        try:
+            declared=int(length)
+        except ValueError as exc:
+            raise HTTPException(400,'文件长度不是整数') from exc
+        if declared>MAX_UPLOAD_BYTES:
+            raise HTTPException(413,'本地Demo单个动画视频上限128MiB')
+    _upload_dir.mkdir(parents=True,exist_ok=True)
+    final=_upload_dir/(uuid.uuid4().hex+ext)
+    staged=final.with_suffix(final.suffix+'.part')
+    count=0
+    try:
+        with staged.open('xb') as target:
+            async for chunk in request.stream():
+                count+=len(chunk)
+                if count>MAX_UPLOAD_BYTES:
+                    raise HTTPException(413,'本地Demo单个动画视频上限128MiB')
+                target.write(chunk)
+        if count<=0:
+            raise HTTPException(422,'空文件不能作为视频源')
+        capture=cv2.VideoCapture(str(staged))
+        try:
+            opened=capture.isOpened()
+            decoded,frame=capture.read() if opened else (False,None)
+        finally:
+            capture.release()
+        if not decoded:
+            raise HTTPException(422,'已上传的内容不是可解码视频')
+        os.replace(staged,final)
+        with _db() as c:
+            access.check_place(c,request,place_id)
+            admin._active_place(c,place_id)
+            display=(Path(client_name).stem.strip() or '动画样本')[:70]
+            row=c.execute("""INSERT INTO sources(place_id,name,kind,uri)
+               VALUES(?,?,?,?)""",(place_id,'上传动画 · '+display,'file',str(final)))
+            admin.audit(c,'anime_video_uploaded',f"source:{row.lastrowid}",None,
+                        {'place_id':place_id,'size_bytes':count,
+                         'kind':'file','mode':'local_demo_clip'})
+            return {'id':row.lastrowid,'place_id':place_id,'kind':'file',
+                    'name':'上传动画 · '+display,'size_bytes':count,
+                    'source_revision':_revision(str(final)),
+                    'note':'本地上传成功。场景和角色仍需人工审阅，上传本身不证明自动识别。'}
+    except Exception:
+        staged.unlink(missing_ok=True)
+        # Atomic video registration failure must not strand the uploaded file.
+        final.unlink(missing_ok=True)
+        raise
 
 
 @router.get('/api/anime/scenes/sources/{source_id}/suggest')
