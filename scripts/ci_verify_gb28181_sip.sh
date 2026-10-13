@@ -81,6 +81,14 @@ content=transport.read_text()
 old='const sipMaxPacketSize = 1500'
 if content.count(old)!=1:raise SystemExit('Simulator UDP packet bound upstream version changed')
 transport.write_text(content.replace(old,'const sipMaxPacketSize = 65535'))
+# The Go sender fragments large H264 access units into PES packets.
+# 0xFFFF is NOT a valid PES payload length when its 13-byte optional header
+# must also fit in the MPEG-PS 16-bit packet-length field.
+packet=root/'internal/streams/packet/common.go'
+packet_content=packet.read_text()
+old='PESLoadLength     int = 0xFFFF'
+if packet_content.count(old)!=1:raise SystemExit('Upstream PES size pin changed')
+packet.write_text(packet_content.replace(old,'PESLoadLength     int = 0xFF00'))
 # Use SDP transport matching the actual offer, not the legacy TCP-only reply.
 invite=root/'internal/invite/invite.go'
 content=invite.read_text()
@@ -240,7 +248,7 @@ test -s samples/face_box_truth_v1.json
 ffmpeg -hide_banner -loglevel error -nostdin -y -stream_loop -1 \
   -i samples/astronaut-face-test.mp4 -t 45 -an \
   -vf 'fps=15,scale=512:512:flags=bicubic,format=yuv420p' \
-  -c:v libx264 -preset ultrafast -crf 18 -g 15 \
+  -c:v libx264 -preset medium -crf 24 -maxrate 600k -bufsize 1200k -g 15 \
   -x264-params 'aud=1:repeat-headers=1:scenecut=0' \
   -f h264 "$BASE/sim/test.dat"
 test -s "$BASE/sim/test.dat"
@@ -250,13 +258,23 @@ python - "$BASE/sim/test.dat" <<'PY'
 import sys
 from pathlib import Path
 p=Path(sys.argv[1]); b=p.read_bytes()
-aud=b.count(bytes.fromhex('0000000109'))
+aud_marker=bytes.fromhex('0000000109')
+positions=[]
+start=0
+while True:
+    pos=b.find(aud_marker,start)
+    if pos<0:break
+    positions.append(pos)
+    start=pos+len(aud_marker)
+aus=[end-begin for begin,end in zip(positions,positions[1:]+[len(b)])]
 idr=b.count(bytes.fromhex('00000165'))
 print('GB face fixture H264 preflight:',{'bytes':len(b),
-    'aud_access_units':aud,'idr_nals':idr,
-    'starts_with_aud':b.startswith(bytes.fromhex('0000000109'))})
-assert b.startswith(bytes.fromhex('0000000109')), 'GB PS sender needs first Annex-B AUD'
-assert aud>=30 and idr>=1, 'GB face fixture must contain access units and IDR NALs'
+    'aud_access_units':len(positions),'idr_nals':idr,
+    'max_access_unit_bytes':max(aus,default=0),
+    'large_access_units_gt65k':sum(a>65522 for a in aus),
+    'starts_with_aud':b.startswith(aud_marker)})
+assert b.startswith(aud_marker), 'GB PS sender needs first Annex-B AUD'
+assert len(positions)>=30 and idr>=1, 'GB face fixture must contain access units and IDR NALs'
 PY
 docker run -d --name "$SIM_CONTAINER" \
   --network "${PROJECT}_media-net" \
