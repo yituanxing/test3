@@ -52,7 +52,7 @@ python -m scripts.cartoon_video_ui
 ## 真值与验收边界
 
 - **不是“完美识别”承诺**：开放词汇检测器可能漏掉画风复杂的角色；
-  阈值 `0.50` 暂时只是人工检查用的探索值，不是统计校准的身份置信度。
+  阈值 `0.42` 是第一次视频观察后选择的探索值，不是统计校准的身份置信度。
 - 参考身份是 Buck。别的动漫出现 `not_confirmed` 属于预期：
   只有 Buck 一个参考图，不意味着自动识别所有角色姓名。
 - GitHub CI 单独验证公开视频自动检测+识别，不使用人工检测坐标。
@@ -62,3 +62,11 @@ python -m scripts.cartoon_video_ui
   [CC BY 3.0](https://peach.blender.org/about/)。
   测试片段 Wikimedia Commons [Big buck bunny montage.ogv](https://commons.wikimedia.org/wiki/File:Big_buck_bunny_montage.ogv)，
   15 秒实际动画，非多张静态图片拼装。
+
+## 首轮真视频实测：不是人工裁剪
+
+实际 CI #38341068383 使用 Grounding DINO 在真实动画短片中自动生成了 9 个候选框，抽取 4 个不同时刻的视频帧。Wikimedia 视频源被 HTTP 429 限制，程序切换到 W3Schools 的真实 Big Buck Bunny 短片。
+
+第一轮 DINOv2 兔子余弦分数最高约 0.498，最初未校准的 0.50 阈值使识别 NO_MATCH，CI 因此失败；这是诚实的失败，不是视频读取失败。进一步实验调整到 0.42 探索阈值，并用 NMS 对重叠的自动检测框去重；须至少两处独立的视频时间戳识别出 Buck 才算 PASS。阈值是事后根据首轮片段观察选取的，**不代表泛化精度**。
+
+首轮证据：https://github.com/yituanxing/test3/actions/runs/38341068383/artifacts/11786891489
