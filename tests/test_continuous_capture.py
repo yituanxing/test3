@@ -210,3 +210,50 @@ def test_live_capture_reuses_actual_decoder_across_sqlite_batches(context, monke
         assert positions == [1, 11, 21, 31]
     finally:
         session.close()
+
+    # A reconnect in the same logical source must not reuse indexes 1,11,...
+    recovered = main.LiveCaptureSession(src, batch_frames=20, sample_every=10)
+    try:
+        third = recovered.next_batch()
+        assert third["new_samples"] == 2
+        assert len(calls) == 2, "only real reconnect opens a second decoder"
+        with main.db() as c:
+            positions = [r[0] for r in c.execute(
+                "SELECT frame_index FROM samples WHERE source_id=? ORDER BY id",
+                (src,)).fetchall()]
+        assert positions == [1, 11, 21, 31, 41, 51]
+    finally:
+        recovered.close()
+
+
+def test_stop_start_during_old_worker_exit_rearms_capture(context, monkeypatch):
+    """Starting while old worker is exiting must not orphan desired_enabled=1."""
+    client, main, jobs, src, _ = context
+    at_exit = threading.Event()
+    allow_exit = threading.Event()
+    calls = []
+    original_release = jobs._release
+
+    def hold_last_release(source_id, token):
+        at_exit.set()
+        assert allow_exit.wait(3)
+        return original_release(source_id, token)
+
+    def process(source_id):
+        calls.append(source_id)
+        return {"new_samples": 1}
+
+    monkeypatch.setattr(jobs, "_process", process)
+    monkeypatch.setattr(jobs, "_release", hold_last_release)
+    try:
+        assert client.post(f"/api/capture/jobs/{src}/start").status_code == 200
+        assert eventually(lambda: len(calls) >= 1)
+        assert client.post(f"/api/capture/jobs/{src}/stop").status_code == 200
+        assert at_exit.wait(3), "first worker should enter finalizer"
+        # The old worker is *still alive*; previously this start was lost.
+        assert client.post(f"/api/capture/jobs/{src}/start").status_code == 200
+        allow_exit.set()
+        assert eventually(lambda: len(calls) >= 2), "new worker must be rearmed"
+    finally:
+        allow_exit.set()
+        client.post(f"/api/capture/jobs/{src}/stop")
