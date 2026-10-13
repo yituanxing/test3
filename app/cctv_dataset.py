@@ -83,6 +83,31 @@ def initialize(c):
     );
     CREATE INDEX IF NOT EXISTS cctv_boxes_track
       ON public_cctv_track_boxes(source_id,camera_local_track_id,frame_number);
+    -- Inference output is a SEPARATE namespace from published CAVIAR GT.
+    -- One run's local track number never means a globally unique person.
+    CREATE TABLE IF NOT EXISTS model_track_runs (
+      run_key TEXT PRIMARY KEY,
+      source_id INTEGER NOT NULL REFERENCES sources(id),
+      video_sha256 TEXT NOT NULL,
+      model_name TEXT NOT NULL,
+      tracker_name TEXT NOT NULL,
+      params_json TEXT NOT NULL,
+      frames_decoded INTEGER NOT NULL,
+      frames_inferred INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS model_runs_source ON model_track_runs(source_id);
+    CREATE TABLE IF NOT EXISTS model_track_boxes (
+      run_key TEXT NOT NULL REFERENCES model_track_runs(run_key),
+      frame_number INTEGER NOT NULL,
+      local_track_id TEXT NOT NULL,
+      x INTEGER NOT NULL,y INTEGER NOT NULL,
+      width INTEGER NOT NULL,height INTEGER NOT NULL,
+      confidence REAL NOT NULL,
+      PRIMARY KEY(run_key,frame_number,local_track_id)
+    );
+    CREATE INDEX IF NOT EXISTS model_track_local
+      ON model_track_boxes(run_key,local_track_id,frame_number);
     """)
 
 
