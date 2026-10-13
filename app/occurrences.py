@@ -32,7 +32,7 @@ def _key(provider,source_key,track_key):
     return sha256((provider+'\x00'+source_key+'\x00'+track_key).encode('utf-8')).hexdigest()[:24]
 
 
-def _scoped_rows(c,allowed,*,limit=500,offset=0):
+def _scoped_rows(c,allowed,*,limit=500,offset=0,live_start=None,live_end=None):
     """Single deterministic SQL query. Scope restriction happens BEFORE LIMIT.
 
     Avoid the old global LIMIT 1500 that silently discarded a county's
@@ -42,6 +42,10 @@ def _scoped_rows(c,allowed,*,limit=500,offset=0):
         return []
     keys=sorted(allowed)
     marks=','.join('?' for _ in keys)
+    if (live_start is None)!=(live_end is None):
+        raise ValueError('UTC start and end must be supplied together')
+    live_where=' AND e.started_at>=? AND e.started_at<?' if live_start is not None else ''
+    time_args=(live_start.isoformat(),live_end.isoformat()) if live_start is not None else ()
     query=f"""WITH scoped AS (
         SELECT 'caviar_ground_truth' AS provider,
           i.source_id AS source_id, i.camera_view AS camera_key,
@@ -60,12 +64,12 @@ def _scoped_rows(c,allowed,*,limit=500,offset=0):
         SELECT 'frigate',NULL,e.camera,NULL,e.place_id,e.event_id,
                e.started_at,e.ended_at,NULL,e.score,e.binding_epoch_id
         FROM frigate_object_events e
-        WHERE e.place_id IN ({marks})
+        WHERE e.place_id IN ({marks}){live_where}
     )
     SELECT * FROM scoped
     ORDER BY provider,COALESCE(source_id,0),camera_key,track_id
     LIMIT ? OFFSET ?"""
-    return [dict(x) for x in c.execute(query,(*keys,*keys,limit,offset))]
+    return [dict(x) for x in c.execute(query,(*keys,*keys,*time_args,limit,offset))]
 
 
 def _project(row,allowed):
@@ -113,14 +117,15 @@ def occurrences(c,allowed,*,limit=MAX_PAGE,offset=0):
     return [_project(x,allowed) for x in fetched[:limit]],len(fetched)>limit
 
 
-def iter_occurrences(c,allowed,*,batch=500):
+def iter_occurrences(c,allowed,*,batch=500,live_start=None,live_end=None):
     """Full authorized enumeration for QA lookups and honest summary counts.
 
     This is deliberately independent of the UI's first 200 results.
     """
     offset=0
     while True:
-        page=_scoped_rows(c,allowed,limit=batch,offset=offset)
+        page=_scoped_rows(c,allowed,limit=batch,offset=offset,
+                          live_start=live_start,live_end=live_end)
         for row in page:
             yield _project(row,allowed)
         if len(page)<batch:
