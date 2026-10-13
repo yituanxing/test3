@@ -58,7 +58,8 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <div class="panel"><h2>⑤ 实际视频解码与人员检测分开验收</h2>
 <p>第一条链路：从官方素材读取视频帧。第二条链路：CAVIAR 官方人体框帮助验证目标出现。第三条链路：我们自己的模型检测与跟踪必须单独评估。</p>
 <div class="row"><button id="process" class="secondary">运行已有匿名人脸检测</button>
-<button id="benchmarkTracker" class="secondary">用现成 ByteTrack 验证本机轨迹</button></div>
+<label>成熟跟踪算法<select id="trackerAlgorithm"><option value="bytetrack">ByteTrack</option><option value="ocsort">OC-SORT</option></select></label>
+<button id="benchmarkTracker" class="secondary">验证现成算法的本机跟踪</button></div>
 <p class="small">ByteTrack 使用 Roboflow 已有开源实现，输入是官方 CAVIAR 人工人体框，不是我们的检测预测。只验证本机自动跟踪稳定性，不能识别跨镜头同一真人；需安装可选跟踪依赖。</p>
 <pre id="trackerBaseline" class="small" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
 <p class="small">目前项目已有 OpenCV 的人脸候选检测；监控分辨率仅384×288，可能检测到0张脸。这不等于没有人员！后续的人体检测必须单独实测。</p>
@@ -242,8 +243,8 @@ async function evaluateExistingTracker(){
  const button=$('benchmarkTracker');button.disabled=true;
  $('trackerBaseline').textContent='正在调用外部 ByteTrack，核验官方逐帧人体框的局部轨迹…';
  try{
-  const r=await api('/api/cctv/sources/'+source+'/tracking-baseline?max_frames=400');
-  $('trackerBaseline').textContent='现成算法：Roboflow ByteTrack\n'+
+  const r=await api('/api/cctv/sources/'+source+'/tracking-baseline?max_frames=400&algorithm='+encodeURIComponent($('trackerAlgorithm').value));
+  $('trackerBaseline').textContent='现成算法：Roboflow '+r.algorithm+'\n'+
     '摄像机：'+r.camera_view+'；官方人体框：'+r.ground_truth_boxes+
     '；人工局部轨迹：'+r.ground_truth_local_track_count+
     '；确认框：'+r.assigned_boxes+'；待确认：'+r.unconfirmed_boxes+
