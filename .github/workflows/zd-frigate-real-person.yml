@@ -4,6 +4,12 @@ name: ZD Frigate Real Person CI
   push:
     branches: [main]
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "static/**"
+      - ".github/workflows/zd-frigate-real-person.yml"
 
 permissions:
   contents: read
@@ -13,10 +19,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backend-pull-request:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install backend dependencies
+        run: python -m pip install -r requirements.txt -r requirements-business.txt
+      - name: Python compilation and isolated regression suite
+        run: |
+          python -m compileall -q app tests
+          python -m pytest -q
+
   real-media:
     # GB28181 protocol-only changes should not repeat the unrelated
     # 4-minute UI/Frigate acceptance suite; routine commits still do.
-    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[gb-sip]')
+    if: github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[gb-sip]'))
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
