@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 from hashlib import sha256
 from fastapi import APIRouter, HTTPException, Query, Request
-from app import access, admin
+from app import access, admin, monitoring
 
 router=APIRouter()
 _db=None
@@ -159,7 +159,7 @@ def occurrence_list(request:Request,limit:int=Query(100,ge=1,le=MAX_PAGE),
 
 
 @router.get('/api/site/occurrences/summary')
-def occurrence_summary(request:Request):
+def occurrence_summary(request:Request,days:int|None=Query(default=None,ge=1,le=31)):
     """Aggregate per-source *track segments*, not faces or independent humans.
 
     CAVIAR frame numbers can NEVER enter Frigate's UTC-date trend window.
@@ -167,8 +167,15 @@ def occurrence_summary(request:Request):
     with _db() as c:
         allowed=_allowed(c,request)
         by={}
-        for r in c.execute("""SELECT camera,place_id,COUNT(*) AS local_tracks
-            FROM frigate_object_events GROUP BY camera,place_id ORDER BY camera"""):
+        start,end=monitoring.utc_day_window(days) if days is not None else (None,None)
+        live_query="""SELECT camera,place_id,COUNT(*) AS local_tracks
+            FROM frigate_object_events"""
+        params=()
+        if start is not None:
+            live_query+=" WHERE started_at>=? AND started_at<?"
+            params=(start.isoformat(),end.isoformat())
+        live_query+=" GROUP BY camera,place_id ORDER BY camera"
+        for r in c.execute(live_query,params):
             if r['place_id'] not in allowed:
                 continue
             key=('frigate',r['camera'],r['place_id'])
@@ -204,9 +211,14 @@ def occurrence_summary(request:Request):
             n['cameras']+=1
             n['annotated_frames']+=(r['annotated_frames'] or 0)
         return {'mode':'anonymous_local_tracks_per_camera',
+                'window':({'start_utc':start.isoformat(),
+                          'end_exclusive_utc':end.isoformat(),'days':days}
+                           if start is not None else None),
+                'frigate_time_scope':'UTC_calendar_days' if start is not None else 'all_time',
+                'research_time_scope':'archival_clip_frames_all_time_not_calendar_days',
                 'by_camera':rows,'by_provider':counts,'visible_cameras':len(rows),
                 'scope':{'venues':[{'id':p['id'],'name':p['name']}
                                       for p in sorted(allowed.values(),key=lambda p:p['id'])]},
                 'counts_unique_people':False,'counts_site_visits':False,
                 'merged_across_cameras':False,'mixes_historical_with_realtime':False,
-                'note':'摄像机局部轨迹数不等于全场独立人数；历史公开人体框不计入实时人数及人员底库。'}
+                'note':'Frigate局部目标事件可以按UTC自然日与监测对象计数核对；CAVIAR只有原片帧号，始终单独统计。局部事件不是独立人数或可信到访。'}
