@@ -6,6 +6,7 @@ The synthetic business simulator is never mixed into these results.
 from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from app.activity_windows import count_face_activity_windows, DEFAULT_GAP_SECONDS
 
 
 def _to_utc(value: str) -> datetime:
@@ -28,10 +29,12 @@ def overview(conn, *, days: int = 7, now: datetime | None = None,
     if allowed_region_ids is not None:
         places = [p for p in places if p['region_id'] in allowed_region_ids]
     labels = [(start+timedelta(days=i)).date().isoformat() for i in range(days)]
-    timeline = {day:{'person_objects':0,'sampled_frames':0,'face_detections':0} for day in labels}
+    timeline = {day:{'person_objects':0,'sampled_frames':0,'face_detections':0,
+                      'face_activity_windows':0} for day in labels}
     by_place = {p['id']:{'place_id':p['id'],'place_name':p['name'],
                          'person_objects':0,'active_objects':0,'sampled_frames':0,
-                         'face_detections':0,'cameras':[]} for p in places}
+                         'face_detections':0,'face_activity_windows':0,
+                         'cameras':[]} for p in places}
     bindings = conn.execute('''SELECT b.camera,b.place_id FROM frigate_camera_bindings b
                                ORDER BY b.camera''')
     for r in bindings:
@@ -49,11 +52,11 @@ def overview(conn, *, days: int = 7, now: datetime | None = None,
         by_place[r['place_id']]['person_objects'] += 1
         if r['ended_at'] is None:
             by_place[r['place_id']]['active_objects'] += 1
-    sample_rows = conn.execute('''SELECT place_id,ingested_at,detected_faces,
+    sample_rows = conn.execute('''SELECT place_id,source_id,ingested_at,detected_faces,
              COALESCE((SELECT corrected_faces FROM reviews r WHERE r.sample_id=s.id
              ORDER BY r.id DESC LIMIT 1),detected_faces) AS effective_faces
              FROM samples s WHERE s.origin='video' AND ingested_at >= ? AND ingested_at < ?''',
-             (start.isoformat(),end.isoformat()))
+             (start.isoformat(),end.isoformat())).fetchall()
     for r in sample_rows:
         dt = _to_utc(r['ingested_at']); label=dt.date().isoformat()
         if label not in timeline or r['place_id'] not in by_place:
@@ -62,12 +65,30 @@ def overview(conn, *, days: int = 7, now: datetime | None = None,
         timeline[label]['face_detections'] += r['effective_faces']
         by_place[r['place_id']]['sampled_frames'] += 1
         by_place[r['place_id']]['face_detections'] += r['effective_faces']
+    # A positive sequence on a single source, separated by <=20s of ingest
+    # time, is one anonymous *activity window*. This is NOT a person visit
+    # and does not imply one tracked or uniquely counted human.
+    activity = count_face_activity_windows(sample_rows, gap_seconds=DEFAULT_GAP_SECONDS)
+    for place_id, value in activity['by_place'].items():
+        if place_id in by_place:
+            by_place[place_id]['face_activity_windows'] = value
+    for day, value in activity['by_day'].items():
+        if day in timeline:
+            timeline[day]['face_activity_windows'] = value
+    visible_windows = sum(p['face_activity_windows'] for p in by_place.values())
     counts = {'person_objects':sum(r['person_objects'] for r in by_place.values()),
               'sampled_frames':sum(r['sampled_frames'] for r in by_place.values()),
               'face_detections':sum(r['face_detections'] for r in by_place.values())}
     return {
         'window':{'start_utc':start.isoformat(),'end_exclusive_utc':end.isoformat(),'days':days},
         'counts':counts,
+        'face_activity':{
+            'windows':visible_windows,
+            'gap_seconds':activity['gap_seconds'],
+            'basis':activity['basis'],
+            'counts_unique_people':False,
+            'note':'同一视频源按UTC日及采集入库时间归并连续有脸抽样帧；并非人数、到访次数或身份去重。不同人可能落入同一窗口，同一人也可能跨窗口。',
+        },
         'timeline':[{'day':k,**v} for k,v in timeline.items()],
         'places':list(by_place.values()),
         'scope':{'region_id':region_id,'includes_descendants':True},
@@ -75,6 +96,7 @@ def overview(conn, *, days: int = 7, now: datetime | None = None,
             'person_objects':'Frigate person事件ID（可能包含同一人多次，不是身份去重人数）',
             'sampled_frames':'OpenCV真实视频抽取后保存的帧观测（不含演示数据）',
             'face_detections':'抽帧的人脸检测框数量之和（可经人工复核，不是人数）',
+            'face_activity_windows':'按视频源、UTC日和入库时间间隔归并的连续有脸采集窗口；非独立人数，不能当作准确去重',
             'synthetic_business_isolated':True,
         },
     }
