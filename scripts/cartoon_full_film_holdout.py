@@ -1,9 +1,8 @@
-"""FROZEN model/threshold audit over the entire UNSEEN ORIGINAL open movie.
+"""FROZEN matching test on predeclared 3:00-3:25 segment of the full film.
 
-First ever test of 10-minute Big Buck Bunny. No hand crop, no training,
-no threshold adjustment, no temporal propagation across far-apart scenes.
-Evaluate randomly distributed (deterministic) original timestamps.
-Model predictions cannot be treated as accuracy without frame-level truth.
+Do not train, retune thresholds or hand-crop the characters. Original movie
+source changed only to repair the previously broken transport URL. A 25-second
+held-out scene cannot establish full-feature accuracy without per-frame labels.
 """
 from __future__ import annotations
 import hashlib
@@ -16,10 +15,11 @@ from PIL import Image, ImageDraw
 from scripts.cartoon_video_recognize import run, choose_video_frames, ROOT
 from scripts.cartoon_holdout_eval import LOCKED_PARAMETERS
 
-# The former 320x180 URL returned actual HTTP 404 (CI #38346863286).
-# Google's public 10-minute Big Buck Bunny sample allows HTTP byte ranges:
-# FFmpeg seeks to an unseen later scene instead of downloading 160MB.
-FULL_MOVIE = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+# Google GTV mirror was retired (HTTP 403 / FFmpeg status 8).
+# Public Mux HLS is a Big Buck Bunny VOD playlist, maintained for playback tests
+# (https://github.com/video-commander/public-test-streams).
+# HLS uses small transport segments so later scenes do not require 160MB MP4.
+FULL_MOVIE = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
 OUT = ROOT / "reports" / "cartoon-full-film-holdout"
 
 
@@ -34,7 +34,7 @@ def get_original() -> Path:
     if target.is_file() and target.stat().st_size > 150_000:
         return target
     command = [
-        "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+        "ffmpeg", "-hide_banner", "-loglevel", "warning", "-nostdin", "-y",
         "-ss", "00:03:00", "-i", FULL_MOVIE, "-t", "00:00:25",
         "-an", "-vf", "scale=640:-2",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
@@ -45,10 +45,18 @@ def get_original() -> Path:
                        capture_output=True, text=True)
     except (OSError, subprocess.SubprocessError) as exc:
         target.unlink(missing_ok=True)
-        raise RuntimeError("Remote original-movie seek failed: " +
-                           str(exc)[-260:]) from exc
+        raise RuntimeError("Original movie HLS seek failed: " +
+                           ((exc.stderr or "")[-600:] if isinstance(
+                               exc, subprocess.CalledProcessError) else str(exc)[-300:])) from exc
     if not target.is_file() or target.stat().st_size < 150_000:
         raise RuntimeError("Original film extracted an empty scene")
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=nokey=1:noprint_wrappers=1", str(target)],
+        capture_output=True, text=True, check=True, timeout=30)
+    duration = float(probe.stdout.strip())
+    if not 20 <= duration <= 27:
+        raise RuntimeError(f"Holdout excerpt had wrong duration {duration:.1f}s")
     return target
 
 
