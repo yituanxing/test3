@@ -150,6 +150,17 @@ def run():
                         expect(page.locator("#kRunState")).to_contain_text("未发布草稿")
                         checks.append("real_browser_rolling_window_removes_absent_fictional_person")
                         page.screenshot(path=str(OUT/"ui-roster-expiry-diff.png"),full_page=True)
+                        # Excel #4/#5/#19: one analytics contract drives
+                        # comparisons, rankings and scoped cross-home flows.
+                        page.goto(base + "/insights")
+                        expect(page.locator("#periodComparison")).to_contain_text(
+                            "当期到访", timeout=12000)
+                        expect(page.locator("#comparisonWindow")).to_contain_text(
+                            "UTC", timeout=12000)
+                        expect(page.locator("#placeBreakdown tr").first).to_be_visible()
+                        expect(page.locator("#flowSummary")).to_contain_text("流入")
+                        checks.append("shared_analytics_period_rank_flow_browser")
+                        page.screenshot(path=str(OUT / "ui-shared-analytics.png"), full_page=True)
                         # Real video and actual browser interaction: never rely
                         # on a stubbed API or synthetic detector boxes.
                         page.goto(base+"/monitor")
