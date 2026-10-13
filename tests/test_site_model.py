@@ -303,6 +303,11 @@ def test_large_other_jurisdiction_cannot_starve_county_pagination(env):
     assert values['returned']==20 and values['truncated'] is False
     assert all(x['venue_id']==pa for x in values['occurrences'])
     assert values['next_offset'] is None
+    # Existing old URL must now delegate to the SAME canonical scoped model.
+    legacy=client.get('/api/site/anonymous-events?limit=100',headers=county).json()
+    assert legacy['total_returned']==20 and legacy['limited'] is False
+    assert {x['occurrence_key'] for x in legacy['events']}=={
+        x['occurrence_key'] for x in values['occurrences']}
     remote_events=client.get('/api/site/occurrences?limit=100',headers=other).json()
     assert remote_events['returned']==100 and remote_events['truncated']
     assert all(x['venue_id']==remote for x in remote_events['occurrences'])
