@@ -250,10 +250,11 @@ def test_stop_start_during_old_worker_exit_rearms_capture(context, monkeypatch):
         assert eventually(lambda: len(calls) >= 1)
         assert client.post(f"/api/capture/jobs/{src}/stop").status_code == 200
         assert at_exit.wait(3), "first worker should enter finalizer"
+        calls_before_rearm = len(calls)
         # The old worker is *still alive*; previously this start was lost.
         assert client.post(f"/api/capture/jobs/{src}/start").status_code == 200
         allow_exit.set()
-        assert eventually(lambda: len(calls) >= 2), "new worker must be rearmed"
+        assert eventually(lambda: len(calls) > calls_before_rearm), "new worker must be rearmed"
     finally:
         allow_exit.set()
         client.post(f"/api/capture/jobs/{src}/stop")
