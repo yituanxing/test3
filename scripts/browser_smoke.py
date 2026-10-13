@@ -142,8 +142,9 @@ def run():
                         # RTSP source. The RTSP address intentionally has NO
                         # broadcaster: verify start/stop workflow and truthful
                         # failure state, not nonexistent video/identity results.
-                        expect(page.locator("#captureSource option")).to_contain_text(
-                            "browser-offline-RTSP-contract", timeout=12000)
+                        expect(page.locator("#captureSource option").filter(
+                            has_text="browser-offline-RTSP-contract")).to_have_count(
+                                1, timeout=12000)
                         page.locator("#captureSource").select_option(str(rtsp_source_id))
                         page.locator("#captureStart").click()
                         expect(page.locator("#captureJobs")).to_contain_text(
