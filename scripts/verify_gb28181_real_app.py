@@ -2,8 +2,10 @@
 
 Invoked inside ci_verify_gb28181_sip.sh while the pinned WVP, real GB
 simulator and ZLMediaKit are still running. NO WVP mock or captured JPEG is
-used for the application acceptance path. Synthetic H264 test pattern only:
-this does NOT certify person/face recall or hardware camera interoperability.
+used for the application acceptance path. The NASA public-domain astronaut
+video repeats ONE annotated human still through actual RTP/PS. This is a
+face-localization smoke, NOT distinct-person count, real-world recall or
+hardware interoperability.
 """
 import json
 import os
@@ -33,7 +35,9 @@ def main():
         "media_plane": "actual GB28181 simulator H264 PS/RTP via ZLMediaKit RTSP",
         "test3_adapter": "actual FastAPI API routing through TestClient",
         "model": "anonymous frame-level face geometry; no identity recognition",
-        "person_detection_truth": "NOT_TESTED - synthetic test pattern",
+        "face_detection_truth": "one manually annotated NASA astronaut still, repeated",
+        "representative_accuracy_benchmark": False,
+        "distinct_people_count": "NOT_ESTIMATED",
         "recorded_playback": "NOT_TESTED",
         "verified_at_utc": datetime.now(timezone.utc).isoformat(),
     }
@@ -102,6 +106,9 @@ def main():
                 assert processed["frames_decoded"] >= 10, "OpenCV did not decode live GB video"
                 assert processed["frames_analyzed"] >= 2
                 assert processed["new_samples"] >= 2, "no durable anonymous frames"
+                assert processed["face_detections"] >= 2, (
+                    "human face was not detected after real GB RTP/PS decoding"
+                )
                 result.update({
                     "opencv_frames_decoded": processed["frames_decoded"],
                     "cpu_frames_analyzed": processed["frames_analyzed"],
@@ -118,6 +125,44 @@ def main():
                 assert all(o["place_id"] == place and o["source_id"] == source_id
                            and o["source_revision"] is None
                            for o in observed["observations"])
+                # Source independent of the detector: a manually marked public
+                # NASA astronaut still. Verify a real box overlaps the known
+                # face after GB28181 transport, not just a nonzero counter.
+                from scripts.verify_face_box_truth import intersection_over_union
+                annotation = json.loads((ROOT / "samples/face_box_truth_v1.json").read_text())
+                positive = next(c for c in annotation["cases"]
+                    if c["path"] == "samples/astronaut-face-test.mp4")
+                reference = positive["reference_face_boxes_xywh"][0]
+                refsize = annotation["coordinate_reference"]
+                matched = 0
+                highest_iou = 0.0
+                all_boxes = 0
+                for event in observed["observations"]:
+                    boxes = event["boxes"]
+                    all_boxes += len(boxes)
+                    for box in boxes:
+                        scaled = [
+                            round(reference[0] * box["frame_width"] / refsize["width"]),
+                            round(reference[1] * box["frame_height"] / refsize["height"]),
+                            round(reference[2] * box["frame_width"] / refsize["width"]),
+                            round(reference[3] * box["frame_height"] / refsize["height"]),
+                        ]
+                        overlap = intersection_over_union(scaled, [
+                            box["x"], box["y"], box["w"], box["h"]
+                        ])
+                        highest_iou = max(highest_iou, overlap)
+                        if overlap >= 0.35:
+                            matched += 1
+                            break
+                result.update({
+                    "actual_face_boxes_in_sqlite": all_boxes,
+                    "matched_annotated_face_frames": matched,
+                    "maximum_face_iou": round(highest_iou, 4),
+                    "reused_single_still_not_unique_people": True,
+                })
+                assert matched >= 2, (
+                    "no reliable overlap with manually annotated astronaut face"
+                )
                 result["durable_place_linked_video_observations"] = True
 
             finally:
