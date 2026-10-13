@@ -309,7 +309,7 @@ def run():
                         expect(page.locator("#evidencePageInfo")).to_contain_text(
                             "匹配",timeout=12000)
                         expect(page.locator("#faceEvidence")).to_contain_text(
-                            "宇航员",timeout=12000)
+                            "browser-real-face-review",timeout=12000)
                         page.locator("#faceEvidence button").last.click()
                         expect(page.locator("#redactedEvidence")).to_be_visible(
                             timeout=12000)
