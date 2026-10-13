@@ -21,7 +21,7 @@ import numpy as np
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from app import access, admin
+from app import access, admin, anime_ontology
 
 router = APIRouter()
 _db = None
@@ -333,6 +333,7 @@ def graph(source_id:int,request:Request):
               (source_id,revision,segment['start_ms'],segment['end_ms']))]
             segment['mode']='manually_named_video_interval'
             cuts.append(segment)
+        canonical=anime_ontology.enrich_graph(c,segments)
         transition_counts=defaultdict(int)
         for a,b in zip(segments,segments[1:]):
             if a['label']!=b['label']:
@@ -353,6 +354,9 @@ def graph(source_id:int,request:Request):
             if place is not None:
                 by_character[review['character_code']].append({
                     'scene_label':place['label'],'segment_id':place['id'],
+                    'story_venue_id':place.get('canonical_venue_id'),
+                    'story_venue_name':place.get('canonical_venue_name'),
+                    'canonical_scene_group_id':place.get('canonical_scene_group_id'),
                     'sample_id':review['sample_id'],'at_ms':review['video_offset_ms'],
                     'evidence':'human_tag_of_actual_decoded_frame'})
         trajectories={key:rows for key,rows in sorted(by_character.items())}
@@ -364,4 +368,5 @@ def graph(source_id:int,request:Request):
                 'nodes':[{'label':label,'segments':count,'coords':'not_available'}
                          for label,count in sorted(labels.items())],
                 'segments':cuts,'edges':transitions,'characters':trajectories,
+                **canonical,'scene_vs_source':'源视频所属场所仅用于文件权限，不能作为整集动画所有镜头的叙事场所',
                 'note':'这是视频镜头剪辑顺序图，而不是现实GPS地图；C###路径只来自逐帧人工证据，不是自动角色跟踪。'}
