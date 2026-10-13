@@ -1278,7 +1278,16 @@ class LiveCaptureSession:
         self.sample_every = sample_every
         self._capture = None
         self._detector = None
-        self._frame_base = 0
+        # RTSP has no immutable content digest. The ordinal indexes ingested
+        # observations for this source, and must not repeat after reconnect or
+        # process restart. Reserve the remainder of the last sampling stride.
+        with db() as c:
+            last = c.execute(
+                "SELECT COALESCE(MAX(frame_index),0) FROM samples "
+                "WHERE source_id=? AND origin='video'", (source_id,)).fetchone()[0]
+        self._frame_base = (
+            ((last - 1) // sample_every + 1) * sample_every if last else 0
+        )
 
     def next_batch(self):
         if self._capture is None:
