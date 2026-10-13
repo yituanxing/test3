@@ -21,7 +21,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview, face_activity_details
-from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology, cctv_dataset, site_model, occurrences
+from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology, cctv_dataset, site_model, occurrences, occurrence_reviews
 import httpx
 from pydantic import BaseModel, Field
 
@@ -239,6 +239,7 @@ def setup_db():
         anime_ontology.initialize(c)
         cctv_dataset.initialize(c)
         site_model.initialize(c)
+        occurrence_reviews.initialize(c)
 
 
 setup_db()
@@ -264,6 +265,7 @@ anime_ontology.register(app,db,_file_revision)
 cctv_dataset.register(app,db,DATA_DIR / 'public_cctv')
 site_model.register(app,db)
 occurrences.register(app,db)
+occurrence_reviews.register(app,db)
 gb28181.register(app,db)
 
 
