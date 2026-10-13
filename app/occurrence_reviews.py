@@ -93,9 +93,18 @@ def _signature(c,row):
         extra={'upstream':dict(ev) if ev else None}
     else:
         raise ValueError('Unsupported provider in local occurrence signature')
+    # Do not hash the READ-MODEL projection. Its field aliases, optional
+    # time filters and presentation labels are not the original evidence and
+    # may change without a detector/annotation change. Hash durable scope
+    # identifiers + the ORIGINAL upstream source content instead.
     payload={
-      'contract':'anonymous_camera_local_quality_v1',
-      'evidence':row,
+      'contract':'anonymous_camera_local_quality_v2',
+      'local_evidence':{
+          'provider':row['provider'],'source_id':row['source_id'],
+          'camera':row['camera_key'],'track_id':row['track_id'],
+          'venue_id':row['venue_id'],
+          'binding_epoch_id':row.get('binding_epoch_id'),
+      },
       'upstream':extra,
     }
     return sha256(json.dumps(payload,ensure_ascii=False,sort_keys=True,
