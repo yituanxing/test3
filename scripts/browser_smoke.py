@@ -178,6 +178,30 @@ def run():
                         assert len(rule_config['watch_place_ids'])==1,rule_config
                         checks.append("common_rule_n_person_and_multi_target_browser")
                         page.screenshot(path=str(OUT/"ui-shared-rules.png"),full_page=True)
+                        # Excel #22: true browser CRUD with one shared rule
+                        # instance engine; verify DB persistence across reload.
+                        page.locator("#instType").select_option("appearance")
+                        page.locator("#instName").fill("动画场景合成出现规则")
+                        page.locator("#instPlaces").select_option(label="测试场所 B")
+                        page.locator("#instPeople").fill("P099")
+                        page.locator("#instSave").click()
+                        expect(page.locator("#instanceRows")).to_contain_text(
+                            "动画场景合成出现规则", timeout=12000)
+                        page.reload()
+                        expect(page.locator("#instanceRows")).to_contain_text(
+                            "动画场景合成出现规则", timeout=12000)
+                        first_row=page.locator("#instanceRows tr").filter(
+                            has_text="动画场景合成出现规则")
+                        first_row.get_by_role("button",name="暂停").click()
+                        expect(page.locator("#instanceRows")).to_contain_text("暂停")
+                        # Paused instance must suppress the default appearance
+                        # singleton, NOT silently restore legacy events.
+                        resp=page.evaluate("""async()=> (await
+                            (await fetch('/api/business/analysis')).json())""")
+                        assert not [a for a in resp['alerts']
+                                    if a['type']=='appearance'],resp['rule_counts']
+                        page.screenshot(path=str(OUT/"ui-rule-instances.png"),full_page=True)
+                        checks.append("shared_rule_instance_browser_create_pause_persist")
                         # Real video and actual browser interaction: never rely
                         # on a stubbed API or synthetic detector boxes.
                         page.goto(base+"/monitor")
