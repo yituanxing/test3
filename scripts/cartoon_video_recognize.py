@@ -184,17 +184,44 @@ def run(video: Path, out: Path, *,
             if reference is None:
                 (out / "source").mkdir(exist_ok=True)
                 reference = download_image(CASES[0], out / "source", http)
-        image = Image.open(reference).convert("RGB")
+        # Multiple independent Buck *photo* references reduce sensitivity
+        # to pose. ALL reference bounding boxes are predicted by Grounding
+        # DINO on UNMODIFIED full images; no static/manual crop coordinates.
+        reference_entries = [("buck_reference", reference)]
+        if reference.name == CASES[0]["file"]:
+            secondary = next(e for e in CASES if e["name"] == "buck_with_bow")
+            cached = ROOT / "reports" / "cartoon-character-proof" / "source" / secondary["file"]
+            if cached.is_file():
+                secondary_file = cached
+            else:
+                (out / "source").mkdir(exist_ok=True)
+                with requests.Session() as http:
+                    secondary_file = download_image(secondary, out / "source", http)
+            reference_entries.append(("buck_bow", secondary_file))
+
         detector = PretrainedBoxDetector()
-        bboxes = detector.boxes(image, PROMPT, threshold=box_threshold)
-        if not bboxes:
-            raise RuntimeError("Grounding DINO did not detect Buck in reference photo")
-        reference_box = bboxes[0]
-        reference_crop = image.crop(reference_box["box_xyxy"])
-        reference_crop.save(out / "reference_auto_crop.jpg", quality=90)
+        reference_crops = []
+        reference_meta = []
+        for name, filename in reference_entries:
+            image = Image.open(filename).convert("RGB")
+            candidates = detector.boxes(image, "a large white cartoon rabbit.",
+                                        threshold=box_threshold)
+            if not candidates:
+                if name == "buck_reference":
+                    raise RuntimeError("Detector did not find Buck in reference picture")
+                continue
+            detected_box = candidates[0]
+            reference_crop = image.crop(detected_box["box_xyxy"])
+            reference_crop.save(out / ("reference_auto_crop.jpg" if name == "buck_reference"
+                                       else f"reference_auto_crop_{name}.jpg"), quality=90)
+            reference_crops.append(reference_crop)
+            reference_meta.append({"name": name, "box": detected_box})
+        if not reference_crops:
+            raise RuntimeError("No usable Buck reference photos")
         embeddings = load_model()
-        reference_feature = embed([reference_crop], embeddings)[0]
-        report["reference_detection"] = reference_box
+        reference_features = embed(reference_crops, embeddings)
+        report["reference_detections"] = reference_meta
+        report["reference_count"] = len(reference_meta)
         candidate_items = []
         decoded = 0
         summary_video = None
@@ -213,7 +240,9 @@ def run(video: Path, out: Path, *,
             for index, detection in enumerate(proposals[:4]):
                 crop = pil.crop(detection["box_xyxy"])
                 feature = embed([crop], embeddings)[0]
-                similarity = float(feature @ reference_feature)
+                similarities = reference_features @ feature
+                best_reference = int(np.argmax(similarities))
+                similarity = float(similarities[best_reference])
                 verdict = (
                     "buck_candidate" if similarity >= match_threshold
                     else "not_confirmed"
@@ -223,6 +252,11 @@ def run(video: Path, out: Path, *,
                 entry["proposals"].append({
                     **detection,
                     "cosine_similarity": round(similarity, 6),
+                    "reference_similarities": {
+                        item["name"]: round(float(score), 6)
+                        for item, score in zip(reference_meta, similarities)
+                    },
+                    "best_reference": reference_meta[best_reference]["name"],
                     "verdict": verdict,
                     "crop": f"crops/{name}",
                 })
@@ -252,7 +286,13 @@ def run(video: Path, out: Path, *,
             "detected_boxes": sum(x["detections"] for x in report["frames"]),
             "buck_candidate_boxes": len(candidate_items),
             "distinct_timestamps_with_buck": len(set(x[0] for x in candidate_items)),
-            "note": "Cosine score is not a calibrated identity confidence.",
+            "sampled_timestamps_without_buck": [
+                frame["second"] for frame in report["frames"]
+                if not any(p["verdict"] == "buck_candidate"
+                           for p in frame["proposals"])
+            ],
+            "note": ("Best-of-references cosine score is NOT a calibrated "
+                     "identity confidence; threshold chosen after earlier film run."),
         })
         # Require the rabbit in more than one ORIGINAL VIDEO timestamp.
         # A single lucky box is not a convincing video demonstration.
