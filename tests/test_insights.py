@@ -211,3 +211,45 @@ def test_analytics_comparison_zero_baseline_not_fabricated_percentage(client):
     narrowed=client.get(f'/api/insights/overview?days=7&place_id={p}').json()['synthetic']
     assert len(narrowed['ranking'])==1
     assert sum(f['synthetic_visits'] for f in narrowed['movement']['flows']) <= narrowed['cards']['synthetic_visits']
+
+
+def test_cross_region_alert_does_not_leak_hidden_place_ids_or_observation_ids():
+    """A partial venue overlap must never return a full cross-site alert.
+
+    Prior _filtered used set.intersection, leaking the OTHER county's place
+    ID, people, and sensitive observation IDs to a user scoped to venue 10.
+    """
+    from app.insights import _filtered, overview, people_search, person_detail
+    stamp='2026-10-13T12:00:00+00:00'
+    analysis={
+        'simulation_time_utc':stamp,
+        'visits':[{'person':'P001','place_id':10,'started_at':stamp,
+                   'ended_at':stamp,'observation_ids':[123],'raw_observations':1}],
+        'alerts':[
+            {'type':'cross_site','place_ids':[10,999],
+             'people':['P001','P999'],'observation_ids':[123,999999],
+             'key':'forbidden-region-evidence'},
+            {'type':'appeared','place_ids':[10],
+             'people':['P001'],'observation_ids':[123],
+             'key':'visible-evidence'}],
+        'rule_counts':[],'registry_status':{'state':'not_published'},
+        'affiliation':[{'person':'P001','place_id':999}],
+        'config':{'encounter_window_minutes':10},
+    }
+    view=[{'id':10,'name':'仅可见的学校'}]
+    scoped=_filtered(analysis,days=1,place_ids={10})
+    assert len(scoped['alerts'])==1
+    assert scoped['alerts'][0]['key']=='visible-evidence'
+    dashboard=overview(analysis,view,days=1)
+    assert dashboard['cards']['rule_hits']==1
+    assert len(dashboard['recent_alerts'])==1
+    assert '999999' not in str(dashboard)
+    assert 'forbidden-region-evidence' not in str(dashboard)
+    roster=people_search(analysis,view,days=1)['people']
+    assert len(roster)==1 and roster[0]['affiliation_place_id'] is None
+    person=person_detail(analysis,view,'P001',days=1)
+    assert person['affiliation_place_id'] is None
+    assert person['affiliation_place_name'] is None
+    assert len(person['alerts'])==1
+    assert person['alerts'][0]['key']=='visible-evidence'
+    assert 'P999' not in str(person)
