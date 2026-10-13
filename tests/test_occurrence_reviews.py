@@ -82,7 +82,7 @@ def test_quality_is_append_only_and_stales_when_actual_box_changes(env):
     assert client.get(base).status_code==401
     assert client.get(base,headers=user['remote']).status_code==404
     assert client.post(base,headers=user['remote'],json={
-        'verdict':'false_positive','reason':'异地越权尝试'}).status_code==403
+        'verdict':'false_positive','reason':'异地越权尝试'}).status_code==404
     assert client.post(base,headers=user['community'],json={
         'verdict':'false_positive','reason':'社区不能审核'}).status_code==403
     assert client.post(base,headers=user['county'],json={
@@ -164,8 +164,8 @@ def test_provider_scope_and_frigate_upstream_revision_invalidation(env):
     assert forbidden['counts']['not_reviewed']==1
     assert client.post('/api/site/occurrences/'+gt['occurrence_key']+'/quality',
                        headers=user['remote'],json={
-                           'verdict':'valid_local_target','reason':'另一辖区用户不能写此记录'}).status_code==403
+                           'verdict':'valid_local_target','reason':'另一辖区用户不能写此记录'}).status_code==404
     assert client.get('/api/site/occurrences/'+'f'*24+'/quality',
                       headers=user['state']).status_code==404
     assert client.get('/api/site/occurrences/'+'bad'+'/quality',
-                      headers=user['state']).status_code==403  # deny at middleware
+                      headers=user['state']).status_code==422  # state admin sees input validation
