@@ -222,12 +222,22 @@ jobs:
           python -m scripts.cartoon_consensus_match --input reports/cartoon-4m30-unseen-holdout/predictions/result.json
       - name: First-use frozen two-reference consensus on untouched 5m30–5m55 Buck movie
         run: python -m scripts.cartoon_consensus_holdout
+      - name: Re-score previously untouched 5m30 clip using POST-inference human annotations
+        run: python -m scripts.cartoon_consensus_score
+      - name: Publish first untouched 5m30 A/B and separately annotated metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-harmonic-consensus-5m30-audited
+          path: reports/cartoon-5m30-consensus-holdout/audited_5m30_ab.json
+          if-no-files-found: warn
       - name: Publish untouched 5m30 real-video A/B BEFORE examining visual truth
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cartoon-harmonic-consensus-untouched-5m30
           path: |
+            reports/cartoon-5m30-consensus-holdout/audited_5m30_ab.json
             reports/cartoon-5m30-consensus-holdout/summary.json
             reports/cartoon-5m30-consensus-holdout/consensus_result.json
             reports/cartoon-5m30-consensus-holdout/raw/result.json
