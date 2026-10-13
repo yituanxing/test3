@@ -157,7 +157,8 @@ def run(video: Path, out: Path, *,
         interval: float = 1.5, max_frames: int = 10,
         box_threshold: float = .28,
         match_threshold: float = .42,
-        reference: Path | None = None):
+        reference: Path | None = None,
+        reference_crops: list[Path] | None = None):
     """Return measured video inference. Never accept annotated/cropped input."""
     out.mkdir(parents=True, exist_ok=True)
     (out / "frames").mkdir(exist_ok=True)
@@ -182,46 +183,67 @@ def run(video: Path, out: Path, *,
         "frames": [],
     }
     try:
-        with requests.Session() as http:
-            if reference is None:
-                (out / "source").mkdir(exist_ok=True)
-                reference = download_image(CASES[0], out / "source", http)
-        # Multiple independent Buck *photo* references reduce sensitivity
-        # to pose. ALL reference bounding boxes are predicted by Grounding
-        # DINO on UNMODIFIED full images; no static/manual crop coordinates.
-        reference_entries = [("buck_reference", reference)]
-        if reference.name == CASES[0]["file"]:
-            secondary = next(e for e in CASES if e["name"] == "buck_with_bow")
-            cached = ROOT / "reports" / "cartoon-character-proof" / "source" / secondary["file"]
-            if cached.is_file():
-                secondary_file = cached
-            else:
+        # Frozen gallery from a prior successful REAL auto-detector run:
+        # cropped by Grounding DINO, not by any human. The same gallery is
+        # reused on unknown test films to avoid Wikimedia HTTP 429 and prevent
+        # trial-to-trial reference feature changes. CLI/UI defaults still
+        # create and detect references when no frozen gallery is supplied.
+        detector = PretrainedBoxDetector()
+        reference_crops_loaded = []
+        reference_meta = []
+        if reference_crops:
+            for i, filename in enumerate(reference_crops):
+                if not filename.is_file():
+                    raise FileNotFoundError(f"Frozen auto-reference missing: {filename}")
+                crop = Image.open(filename).convert("RGB")
+                if min(crop.size) < 60:
+                    raise ValueError("Frozen auto-reference crop too small")
+                name = "buck_reference" if i == 0 else "buck_bow"
+                reference_crops_loaded.append(crop)
+                reference_meta.append({
+                    "name": name,
+                    "source": str(filename),
+                    "origin": "previously model-generated Grounding DINO crop",
+                })
+            report["reference_gallery_mode"] = "frozen_prior_detector_crops"
+        else:
+            with requests.Session() as http:
+                if reference is None:
+                    (out / "source").mkdir(exist_ok=True)
+                    reference = download_image(CASES[0], out / "source", http)
+            source_entries = [("buck_reference", reference)]
+            if reference.name == CASES[0]["file"]:
+                bow = next(e for e in CASES if e["name"] == "buck_with_bow")
                 (out / "source").mkdir(exist_ok=True)
                 with requests.Session() as http:
-                    secondary_file = download_image(secondary, out / "source", http)
-            reference_entries.append(("buck_bow", secondary_file))
-
-        detector = PretrainedBoxDetector()
-        reference_crops = []
-        reference_meta = []
-        for name, filename in reference_entries:
-            image = Image.open(filename).convert("RGB")
-            candidates = detector.boxes(image, "a large white cartoon rabbit.",
-                                        threshold=box_threshold)
-            if not candidates:
-                if name == "buck_reference":
-                    raise RuntimeError("Detector did not find Buck in reference picture")
-                continue
-            detected_box = candidates[0]
-            reference_crop = image.crop(detected_box["box_xyxy"])
-            reference_crop.save(out / ("reference_auto_crop.jpg" if name == "buck_reference"
-                                       else f"reference_auto_crop_{name}.jpg"), quality=90)
-            reference_crops.append(reference_crop)
-            reference_meta.append({"name": name, "box": detected_box})
-        if not reference_crops:
+                    bow_file = download_image(bow, out / "source", http)
+                source_entries.append(("buck_bow", bow_file))
+            for name, filename in source_entries:
+                image = Image.open(filename).convert("RGB")
+                candidates = detector.boxes(
+                    image, "a large white cartoon rabbit.",
+                    threshold=box_threshold)
+                if not candidates:
+                    if name == "buck_reference":
+                        raise RuntimeError("Detector did not find Buck in reference picture")
+                    continue
+                detected_box = candidates[0]
+                reference_crops_loaded.append(image.crop(detected_box["box_xyxy"]))
+                reference_meta.append({
+                    "name": name,
+                    "source": str(filename),
+                    "box": detected_box,
+                    "origin": "Grounding DINO auto-box from unmodified photo",
+                })
+            report["reference_gallery_mode"] = "fresh_pretrained_detector_crops"
+        if not reference_crops_loaded:
             raise RuntimeError("No usable Buck reference photos")
+        for i, crop in enumerate(reference_crops_loaded):
+            filename = ("reference_auto_crop.jpg" if i == 0 else
+                        f"reference_auto_crop_{reference_meta[i]['name']}.jpg")
+            crop.save(out / filename, quality=90)
         embeddings = load_model()
-        reference_features = embed(reference_crops, embeddings)
+        reference_features = embed(reference_crops_loaded, embeddings)
         report["reference_detections"] = reference_meta
         report["reference_count"] = len(reference_meta)
         candidate_items = []
@@ -342,6 +364,8 @@ def main(argv=None):
                            help="download CC BY film montage 15s from Commons")
     parser.add_argument("--reference", type=Path, default=None,
                         help="optional un-cropped character reference image")
+    parser.add_argument("--frozen-reference-crops", type=Path, default=None,
+                        help="folder of two PREVIOUSLY detector-generated Buck crops")
     parser.add_argument("--out", type=Path, default=OUT_DEFAULT)
     parser.add_argument("--interval", type=float, default=1.5)
     parser.add_argument("--max-frames", type=int, default=10)
@@ -353,7 +377,11 @@ def main(argv=None):
     video = fetch_demo_video(args.out / "big_buck_bunny_montage.ogv") if args.demo_video else args.video
     result = run(video, args.out, interval=args.interval,
                  max_frames=args.max_frames, box_threshold=args.box_threshold,
-                 match_threshold=args.match_threshold, reference=args.reference)
+                 match_threshold=args.match_threshold, reference=args.reference,
+                 reference_crops=([
+                     args.frozen_reference_crops / "reference_auto_crop.jpg",
+                     args.frozen_reference_crops / "reference_auto_crop_buck_bow.jpg"
+                 ] if args.frozen_reference_crops else None))
     print(json.dumps({
         "status": result["status"],
         "frames_decoded": result["frames_decoded"],
