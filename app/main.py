@@ -21,7 +21,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview, face_activity_details
-from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology, cctv_dataset
+from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology, cctv_dataset, site_model
 import httpx
 from pydantic import BaseModel, Field
 
@@ -238,6 +238,7 @@ def setup_db():
         anime_scenes.initialize(c)
         anime_ontology.initialize(c)
         cctv_dataset.initialize(c)
+        site_model.initialize(c)
 
 
 setup_db()
@@ -261,6 +262,7 @@ rule_instances.register(app,db)
 anime_scenes.register(app,db,_file_revision,DATA_DIR / 'anime_uploads')
 anime_ontology.register(app,db,_file_revision)
 cctv_dataset.register(app,db,DATA_DIR / 'public_cctv')
+site_model.register(app,db)
 gb28181.register(app,db)
 
 
@@ -424,6 +426,7 @@ def add_source(data: SourceIn,request:Request):
         cursor = c.execute('INSERT INTO sources(place_id,name,kind,uri) VALUES (?,?,?,?)',
                            (data.place_id, data.name, data.kind, data.uri))
         result={'id': cursor.lastrowid, **data.model_dump()}
+        site_model.record_initial(c,cursor.lastrowid,data.place_id)
         admin.audit(c,'source_create',f"source:{result['id']}",None,result)
         return result
 
