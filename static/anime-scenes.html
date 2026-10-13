@@ -1,0 +1,153 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZD · 动画故事板与场景图</title>
+<style>
+:root{--bg:#f4f6fb;--navy:#172e50;--ink:#273a52;--blue:#305ed4;--line:#dfe5ef}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,"Microsoft Yahei",sans-serif}
+header{background:var(--navy);color:#fff;padding:20px max(4%,calc((100% - 1200px)/2))}
+header h1{margin:3px 0 8px;font-size:24px}header p{color:#b7c9e5;margin:0 0 14px}
+nav{display:flex;gap:15px;flex-wrap:wrap}a{color:#3b68d7}nav a{color:#e1eafa;text-decoration:none}
+main{max-width:1250px;margin:25px auto;padding:0 16px 55px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:15px;box-shadow:0 5px 14px #1430490a}
+.notice{background:#fff7e2;border-color:#f4d99f;color:#865d1b}
+h2{font-size:19px;margin:0 0 9px}h3{font-size:15px;margin:0 0 9px}
+.row{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:11px 0}
+label{font-size:12px;font-weight:700;display:flex;flex-direction:column;gap:4px}
+input,select{padding:9px;border:1px solid #c5d1e2;border-radius:8px;background:#fff;font:inherit;min-width:90px}
+input[type=number]{width:128px}
+button{background:var(--blue);border:0;color:#fff;padding:9px 13px;border-radius:8px;font:inherit;font-weight:700;cursor:pointer}
+button.ghost{color:var(--blue);background:#eef2ff}button.danger{background:#c65347}
+button:disabled{opacity:.45;cursor:wait}.info{font-size:12px;color:#66778a}.warn{color:#a64e30}
+.table{max-width:100%;overflow:auto}table{border-collapse:collapse;width:100%;min-width:710px}th,td{border-bottom:1px solid #e6ebf1;padding:10px;text-align:left;vertical-align:middle}
+th{background:#f6f9fc}td input{width:100%;min-width:130px}td button{white-space:nowrap}
+#graph{min-height:220px;background:radial-gradient(circle,#fff,#f1f5ff);border:1px solid #dce7fa;border-radius:12px;padding:12px}
+#graph svg{width:100%;height:270px}#status{min-height:22px}
+.cols{display:grid;grid-template-columns:1.3fr 1fr;gap:15px}@media(max-width:820px){.cols{grid-template-columns:1fr}}
+.pill{display:inline-block;background:#e8f1ff;color:#2958a2;padding:2px 9px;border-radius:30px;font-size:12px}
+code{background:#f1f4fa;padding:1px 5px;border-radius:5px}
+</style></head><body><header><small>ZD / ANIMATION STORYBOARD</small><h1>动画场景 · 时间轴 · 示意图</h1>
+<p>从实际上传的视频剪辑点提取候选镜头 → 人工命名场景 → 人工标注角色实际视频帧 → 场景时序图</p>
+<nav><a href="/portal">首页</a><a href="/monitor">视频采集</a><a href="/insights">综合态势</a><a href="/business">规则管理</a><a href="/admin">管理</a><a href="#" id="logout">退出</a></nav>
+</header><main>
+<section class="panel notice"><strong>这里不是地理信息系统（GIS）。</strong>
+动漫的学校、房间、街道等都是剧情场景，视频只能给出镜头画面和播放时间；镜头切换不代表角色走动，也没有真实经纬度。
+候选镜头是像素差算法的自动建议，名称需要人工核实。只有人工绑定了实际视频帧证据，才展示虚构角色 C### 的故事板时间线；
+<strong>不把 OpenCV 人脸框自动当成动漫角色身份</strong>。</section>
+<section class="panel"><h2>① 选择真实视频并提出镜头候选</h2>
+<div class="row"><label>本地视频源<select id="source"></select></label>
+<label>像素差阈值<input id="threshold" type="number" value="32" min="5" max="200"></label>
+<label>扫描最初秒数<input id="seconds" type="number" value="45" min="1" max="180"></label>
+<button id="suggest">扫描视频剪辑点</button><button class="ghost" id="reload">刷新已命名场景</button>
+<span id="status" role="status" class="info">请选择本地视频</span></div>
+<p class="info">为保证 Demo 快速响应，默认只扫描前45秒、每4帧取一个样本；只对服务器可访问的本地视频文件开放，RTSP 实时流暂不运行耗时扫描。</p>
+<div class="table"><table><thead><tr><th>候选</th><th>视频起点</th><th>视频终点</th><th>像素变化分数</th><th>人工场景命名</th><th>操作</th></tr></thead>
+<tbody id="candidates"><tr><td colspan="6">点击扫描获取候选</td></tr></tbody></table></div></section>
+<div class="cols"><section class="panel"><h2>② 已人工确认的镜头时间线</h2>
+<div class="table"><table><thead><tr><th>镜头</th><th>时间区间</th><th>实际抽帧样本</th><th>操作</th></tr></thead>
+<tbody id="segments"><tr><td colspan="4">暂无</td></tr></tbody></table></div>
+<p class="info">同一视频版本的镜头不能重叠；视频文件内容改变后，历史注释会标记为过期，不会被误当作新素材证据。</p></section>
+<section class="panel"><h2>③ 场景关系图（非地理位置）</h2>
+<div id="graph"><p class="info">命名场景后出现节点，连线表示剪辑时间顺序，不表示物理道路或行进。</p></div>
+<p id="graphDetails" class="info"></p></section></div>
+<section class="panel"><h2>④ 动画角色人工证据与故事板路径</h2><p class="info">使用虚构编号 C001、C002 等。只允许引用该视频当前版本里真实解码、时间落入指定镜头的样本 ID。</p>
+<div class="row"><label>人工确认镜头<select id="targetScene"></select></label>
+<label>虚构角色编号<input id="character" maxlength="4" placeholder="C001" value="C001"></label>
+<label>实际视频样本 ID<select id="sampleId"></select></label>
+<label>复核依据<input id="reviewNote" style="min-width:250px" value="人工对照该帧确认虚构角色" maxlength="300"></label>
+<button id="tag">保存人工角色证据</button></div>
+<div class="table"><table><thead><tr><th>虚构角色</th><th>视频剧情场景顺序</th><th>逐帧证据</th></tr></thead>
+<tbody id="characters"><tr><td colspan="3">暂无人工标注角色</td></tr></tbody></table></div>
+</section>
+</main>
+<script>
+const token=sessionStorage.getItem('zd_access_token');
+if(!token)location.replace('/login');
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch]));
+const ms=x=>{let n=Math.max(0,Number(x));return String(Math.floor(n/60000)).padStart(2,'0')+':'+String(Math.floor(n%60000/1000)).padStart(2,'0')+'.'+String(n%1000).padStart(3,'0')};
+let state=null;
+async function api(path,method='GET',body){
+ const r=await fetch(path,{method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+ body:body===undefined?undefined:JSON.stringify(body)});
+ if(r.status===401){sessionStorage.removeItem('zd_access_token');location.replace('/login');throw Error('登录已失效')}
+ const x=await r.json();if(!r.ok)throw Error(typeof x.detail==='string'?x.detail:JSON.stringify(x));
+ return x;
+}
+function say(message,error=false){$('status').textContent=message;$('status').className=error?'warn':'info'}
+const sid=()=>Number($('source').value);
+function drawing(nodes,edges){
+ const box=$('graph');if(!nodes.length){box.innerHTML='<p class="info">当前视频还没有人工命名的场景节点</p>';return}
+ const w=620,h=255,cx=w/2,cy=h/2,r=Math.min(168,62+nodes.length*12);
+ const pos=new Map(nodes.map((node,i)=>[node.label,{x:cx+r*Math.cos(i*2*Math.PI/nodes.length-Math.PI/2),
+ y:cy+Math.min(100,r*.60)*Math.sin(i*2*Math.PI/nodes.length-Math.PI/2)}]));
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+ function line(a,b,count){let p=pos.get(a),q=pos.get(b);if(!p||!q)return;
+ const el=document.createElementNS(svg.namespaceURI,'line');for(const[k,v]of Object.entries({x1:p.x,y1:p.y,x2:q.x,y2:q.y,
+ stroke:'#7ba0db','stroke-width':Math.min(5,count+1),'stroke-dasharray':'5 4'}))el.setAttribute(k,v);svg.append(el)}
+ edges.forEach(e=>line(e.from_scene,e.to_scene,e.cuts));
+ for(const node of nodes){const p=pos.get(node.label);const c=document.createElementNS(svg.namespaceURI,'circle');
+ for(const[k,v]of Object.entries({cx:p.x,cy:p.y,r:30,fill:'#eaf1ff',stroke:'#3d71cc','stroke-width':2}))c.setAttribute(k,v);
+ const t=document.createElementNS(svg.namespaceURI,'text');t.setAttribute('x',p.x);t.setAttribute('y',p.y+45);
+ t.setAttribute('text-anchor','middle');t.setAttribute('font-size','12');t.textContent=node.label;svg.append(c,t)}
+ box.replaceChildren(svg);
+ $('graphDetails').textContent='共 '+nodes.length+' 个人工场景名称，'+edges.length+' 条剪辑先后关系；节点位置是示意排版，不是剧中真实坐标。';
+}
+function fillSamples(){if(!state)return;const seg=state.segments.find(x=>x.id===Number($('targetScene').value));
+ const items=seg?.evidence_samples||[];$('sampleId').innerHTML=items.map(x=>
+ `<option value="${x.id}">#${x.id} · ${ms(x.video_offset_ms)} · 帧 ${x.frame_index}</option>`).join('');
+}
+async function reload(){
+ if(!sid())return;
+ const d=await api('/api/anime/scenes/sources/'+sid()+'/graph');state=d;
+ $('segments').innerHTML=d.segments.map(s=>`<tr><td>${esc(s.label)}<br><span class="pill">人工命名</span></td>
+ <td>${ms(s.start_ms)} → ${ms(s.end_ms)}</td><td>${s.decoded_sample_count}</td>
+ <td><button class="ghost" data-scene="${s.id}">选择</button></td></tr>`).join('')||
+ '<tr><td colspan="4">暂无已标注镜头</td></tr>';
+ $('segments').querySelectorAll('[data-scene]').forEach(b=>b.onclick=()=>{
+ $('targetScene').value=b.dataset.scene;fillSamples()});
+ const selected=$('targetScene').value;
+ $('targetScene').innerHTML=d.segments.map(x=>`<option value="${x.id}">${esc(x.label)} · ${ms(x.start_ms)}</option>`).join('');
+ if(d.segments.some(x=>String(x.id)===selected))$('targetScene').value=selected;
+ fillSamples();drawing(d.nodes,d.edges);
+ $('characters').innerHTML=Object.entries(d.characters).map(([code,route])=>
+ `<tr><td>${esc(code)}<br><span class="pill">逐帧人工证据</span></td>
+ <td>${route.map(x=>esc(x.scene_label)+' @'+ms(x.at_ms)).join(' → ')}</td>
+ <td>${route.map(x=>'样本#'+x.sample_id).join('、')}</td></tr>`).join('')||
+ '<tr><td colspan="3">还没有任何人工绑定到真实视频帧的虚构角色</td></tr>';
+ if(d.has_stale_segments)say('警告：视频内容版本与旧标注不一致；旧记录已隔离 ('+d.stale_segment_count+' 条)',true);
+ else say('已加载 '+d.segments.length+' 个命名镜头、'+Object.keys(d.characters).length+' 个有真实帧证据的虚构角色');
+}
+async function suggest(){
+ const b=$('suggest');b.disabled=true;say('正在解码本地视频并扫描镜头切换…');
+ try{const d=await api('/api/anime/scenes/sources/'+sid()+'/suggest?threshold='+encodeURIComponent($('threshold').value)+
+ '&max_seconds='+encodeURIComponent($('seconds').value));
+ $('candidates').innerHTML=d.segments.map((x,i)=>
+ `<tr><td>#${i+1}</td><td>${ms(x.start_ms)}</td><td>${ms(x.end_ms)}</td>
+ <td>${x.boundary_score??'起点'}</td><td><input id="candidate_${i}" maxlength="80" value="镜头 ${i+1}"></td>
+ <td><button data-adopt="${i}">人工确认</button></td></tr>`).join('')||'<tr><td colspan="6">未找到可解码候选</td></tr>';
+ $('candidates').querySelectorAll('[data-adopt]').forEach(b=>b.onclick=async()=>{
+   const i=Number(b.dataset.adopt),candidate=d.segments[i];
+   try{await api('/api/anime/scenes/sources/'+sid()+'/segments','POST',
+     {start_ms:candidate.start_ms,end_ms:candidate.end_ms,
+      label:$('candidate_'+i).value.trim(),note:'基于像素差候选镜头，人工确认时间与场景'});
+     await reload()}catch(e){say(e.message,true)}
+ });
+ say('已解码 '+d.decoded_frames+' 帧；得到 '+d.segments.length+' 个候选镜头；需要逐段命名确认（非自动地点识别）。');
+ }catch(e){say('扫描失败：'+e.message,true)}finally{b.disabled=false}
+}
+async function tag(){
+ try{const x=await api('/api/anime/scenes/segments/'+Number($('targetScene').value)+'/characters','POST',
+  {character_code:$('character').value.trim().toUpperCase(),sample_id:Number($('sampleId').value),
+   note:$('reviewNote').value.trim()});await reload();say('已保存人工角色证据 #'+x.id+'，来源是真实解码帧')}
+ catch(e){say('保存失败：'+e.message,true)}
+}
+async function start(){try{const sources=await api('/api/sources');const files=sources.filter(x=>x.kind==='file');
+ $('source').innerHTML=files.map(x=>`<option value="${x.id}">${esc(x.name)} (#${x.id})</option>`).join('');
+ if(!files.length){say('需要先在视频管理中登记一个本地动画文件',true);return}
+ await reload()}catch(e){say('加载失败：'+e.message,true)}}
+$('suggest').onclick=suggest;$('reload').onclick=()=>reload().catch(e=>say(e.message,true));
+$('source').onchange=()=>{state=null;$('candidates').innerHTML='<tr><td colspan="6">切换来源后请重新扫描</td></tr>';reload().catch(e=>say(e.message,true))};
+$('targetScene').onchange=fillSamples;$('tag').onclick=tag;
+$('logout').onclick=async e=>{e.preventDefault();await api('/api/auth/logout','POST').catch(()=>{});sessionStorage.removeItem('zd_access_token');location.replace('/login')};
+start();
+</script></body></html>
