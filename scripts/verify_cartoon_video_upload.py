@@ -31,8 +31,10 @@ def main() -> None:
                    share=False, prevent_thread_lock=True, quiet=True,
                    show_error=True)
         client = Client("http://127.0.0.1:7873", verbose=False)
+        # Gradio 5's VideoData payload has a nested 'video' FileData field;
+        # a bare file object passes FileData validation but fails VideoData.
         response = client.predict(
-            handle_file(str(actual_video.resolve())),
+            {"video": handle_file(str(actual_video.resolve()))},
             api_name="/recognize_cartoon_video")
         if not isinstance(response, (tuple, list)) or len(response) != 3:
             raise AssertionError("Gradio UI did not return video, gallery, report")
