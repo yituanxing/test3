@@ -55,11 +55,7 @@ jobs:
           name: p0-capture-browser-acceptance
           path: |
             reports/ui-smoke-result.json
-            reports/ui-capture-start-stop.png
-            reports/ui-roster-v2-diff.png
-            reports/ui-anonymous-face-review.png
-            reports/ui-admin-operations.png
-            reports/ui-shared-analytics.png
+            reports/ui-*.png
             reports/ui-server.log
           if-no-files-found: warn
       - name: Build auditable local demo ZIP
