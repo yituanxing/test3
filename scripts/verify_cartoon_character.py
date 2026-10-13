@@ -37,8 +37,8 @@ CASES = [
      "role": "candidate", "truth": "Buck", "crop": [0.32, 0.0, 1.0, 1.0]},
     {"name": "buck_with_bow", "file": "Big.Buck.Bunny.-.Bunny.with.Bow.png",
      "role": "candidate", "truth": "Buck", "crop": [0.0, 0.0, 1.0, 1.0]},
-    {"name": "ricky_negative", "file": "Big.Buck.Bunny.-.Ricky.png",
-     "role": "candidate", "truth": "other", "crop": [0.0, 0.0, 1.0, 1.0]},
+    {"name": "small_animal_negative", "file": "Big.Buck.Bunny.-.Frank.Bunny.png",
+     "role": "candidate", "truth": "other", "crop": [0.0, 0.25, 0.33, 0.66]},
 ]
 
 
