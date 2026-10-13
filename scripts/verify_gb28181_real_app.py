@@ -165,6 +165,29 @@ def main():
                 )
                 result["durable_place_linked_video_observations"] = True
 
+                # A stream with multiple face-positive sampled frames must
+                # yield ONE operational activity window on this short ingest.
+                # A window groups observations, NOT unique persons/identities.
+                rollup = expect(client.get(
+                    "/api/monitoring/overview?days=7", headers=headers),
+                    "real GB monitoring activity summary")
+                detail = expect(client.get(
+                    "/api/monitoring/face-activity?days=7&limit=50",
+                    headers=headers), "real GB face activity detail")
+                assert rollup["counts"]["sampled_frames"] == processed["new_samples"]
+                assert rollup["face_activity"]["counts_unique_people"] is False
+                assert rollup["face_activity"]["windows"] == 1, (
+                    "positive GB camera frames must form one short source window"
+                )
+                assert detail["total_windows"] == 1
+                window = detail["windows"][0]
+                assert window["source_id"] == source_id and window["place_id"] == place
+                assert window["effective_face_detections"] == processed["face_detections"]
+                assert 1 <= window["positive_sampled_frames"] <= processed["new_samples"]
+                result["face_activity_windows"] = 1
+                result["face_activity_window_is_unique_person_count"] = False
+                result["face_activity_source_scope_verified"] = True
+
             finally:
                 if session_id is not None:
                     stopped = expect(client.post(
