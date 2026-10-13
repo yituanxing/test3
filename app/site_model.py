@@ -67,12 +67,90 @@ def initialize(c):
       ON source_site_bindings(source_id,valid_from,id);
     CREATE UNIQUE INDEX IF NOT EXISTS source_site_one_current_binding
       ON source_site_bindings(source_id) WHERE valid_until IS NULL;
+    CREATE TABLE IF NOT EXISTS frigate_site_binding_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      camera TEXT NOT NULL REFERENCES frigate_camera_bindings(camera),
+      place_id INTEGER NOT NULL REFERENCES places(id),
+      valid_from TEXT NOT NULL,
+      valid_until TEXT,
+      provenance TEXT NOT NULL CHECK(provenance IN ('explicit','legacy_backfill')),
+      created_at TEXT NOT NULL,
+      CHECK(valid_until IS NULL OR valid_until > valid_from)
+    );
+    CREATE INDEX IF NOT EXISTS frigate_binding_epoch_lookup
+       ON frigate_site_binding_history(camera,valid_from,id);
+    CREATE UNIQUE INDEX IF NOT EXISTS frigate_binding_one_current
+       ON frigate_site_binding_history(camera) WHERE valid_until IS NULL;
     """)
     # Old source rows existed before this model. Baseline only *now*, not 1970:
     # for earlier events ownership is UNKNOWN, so no retroactive fake location.
     for row in c.execute("""SELECT s.id,s.place_id FROM sources s WHERE NOT EXISTS
            (SELECT 1 FROM source_site_bindings b WHERE b.source_id=s.id)""").fetchall():
         record_initial(c,row['id'],row['place_id'],provenance='legacy_backfill')
+    for row in c.execute("""SELECT b.camera,b.place_id FROM frigate_camera_bindings b
+         WHERE NOT EXISTS (SELECT 1 FROM frigate_site_binding_history h
+                           WHERE h.camera=b.camera)""").fetchall():
+        record_frigate_initial(c,row['camera'],row['place_id'],
+                               provenance='legacy_backfill')
+
+
+def _as_utc_microseconds(value):
+    dt=datetime.fromisoformat(value.replace('Z','+00:00'))
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise ValueError('摄像机事件必须有明确时区')
+    return dt.astimezone(timezone.utc).isoformat(timespec='microseconds')
+
+
+def record_frigate_initial(c,camera,place_id,*,provenance='explicit',at=None):
+    """No backdating. Migrated bindings have UNKNOWN earlier physical history."""
+    if c.execute('SELECT 1 FROM frigate_site_binding_history WHERE camera=?',
+                 (camera,)).fetchone():
+        return False
+    stamp=_as_utc_microseconds(at) if at else now_utc()
+    c.execute("""INSERT INTO frigate_site_binding_history
+       (camera,place_id,valid_from,valid_until,provenance,created_at)
+       VALUES(?,?,?,NULL,?,?)""",(camera,place_id,stamp,provenance,stamp))
+    return True
+
+
+def set_frigate_binding(c,camera,place_id,*,at=None):
+    """Record monotone camera relocation without rewriting old epochs.
+
+    Camera metadata and its history must share ONE SQLite transaction.
+    The at parameter is for fixture setup; public API uses server time.
+    """
+    stamp=_as_utc_microseconds(at) if at else now_utc()
+    current=c.execute("""SELECT * FROM frigate_site_binding_history
+            WHERE camera=? AND valid_until IS NULL""",(camera,)).fetchone()
+    original=c.execute('SELECT place_id FROM frigate_camera_bindings WHERE camera=?',
+                       (camera,)).fetchone()
+    if not current and original is not None:
+        record_frigate_initial(c,camera,original['place_id'],
+                               provenance='legacy_backfill',at=stamp)
+        current=c.execute("""SELECT * FROM frigate_site_binding_history
+            WHERE camera=? AND valid_until IS NULL""",(camera,)).fetchone()
+    if current and current['place_id']==place_id:
+        return dict(current)
+    if current:
+        if stamp <= current['valid_from']:
+            raise HTTPException(409,'新机位归属不得早于上一条绑定记录')
+        c.execute("""UPDATE frigate_site_binding_history SET valid_until=?
+                WHERE id=?""",(stamp,current['id']))
+    cur=c.execute("""INSERT INTO frigate_site_binding_history
+            (camera,place_id,valid_from,valid_until,provenance,created_at)
+            VALUES(?,?,?,NULL,'explicit',?)""",(camera,place_id,stamp,stamp))
+    return dict(c.execute('SELECT * FROM frigate_site_binding_history WHERE id=?',
+                          (cur.lastrowid,)).fetchone())
+
+
+def resolve_frigate_binding(c,camera,started_at):
+    """Use event-time location; current assignment cannot backfill history."""
+    instant=_as_utc_microseconds(started_at)
+    row=c.execute("""SELECT * FROM frigate_site_binding_history
+         WHERE camera=? AND valid_from<=?
+           AND (valid_until IS NULL OR valid_until>?)
+         ORDER BY valid_from DESC,id DESC LIMIT 1""",(camera,instant,instant)).fetchone()
+    return dict(row) if row else None
 
 
 def record_initial(c,source_id,place_id,*,provenance='explicit',at=None):
