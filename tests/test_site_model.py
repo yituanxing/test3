@@ -201,3 +201,83 @@ def test_moving_across_counties_hides_former_site_binding_history(env):
         assert c.execute('SELECT place_id FROM sources WHERE id=?',(source,)).fetchone()[0]==remote
         records=c.execute('SELECT place_id FROM source_site_bindings WHERE source_id=? ORDER BY id',(source,)).fetchall()
         assert [r[0] for r in records]==[pa,remote]
+
+
+def test_canonical_occurrence_100_frames_one_local_track_and_two_cameras(env):
+    """Research GT: 100 boxes != 100 people, local IDs are camera-scoped.
+
+    Frigate 'local-1' is also not globally the same as CAVIAR 'local-1'.
+    Never create synthetic P labels, roster, or cross-site alerts from this.
+    """
+    main,client,(pa,pb,remote),(root,county,other)=env
+    with main.db() as c:
+        for camera in ('entrance_left','entrance_right'):
+            c.execute('INSERT INTO frigate_camera_bindings(camera,place_id) VALUES(?,?)',
+                      (camera,pa))
+            c.execute("""INSERT INTO frigate_object_events
+                (camera,event_id,place_id,label,started_at,score,has_snapshot,updated_at)
+                VALUES (?, 'local-1', ?,'person', ?,0.92,1,?)""",
+                (camera,pa,main.utcnow(),main.utcnow()))
+        for view in ('front','corridor'):
+            src=c.execute('INSERT INTO sources(place_id,name,kind,uri) VALUES(?,?,?,?)',
+                (pa,'GT '+view,'file','/tmp/'+view+'.mpg')).lastrowid
+            c.execute("""INSERT INTO public_cctv_imports
+                (source_id,dataset,scenario,camera_view,video_sha256,video_bytes,
+                 video_url,annotation_url,frames_available,xml_frame_count,
+                 license_note,imported_at)
+                VALUES(?,'CAVIAR','real-example',?,'unique-clip-'||?,2200000,
+                       'https://official.example/video','https://official.example/gt',
+                       300,300,'CC BY-SA',?)""",
+                (src,view,src,main.utcnow()))
+            c.executemany("""INSERT INTO public_cctv_track_boxes
+                (source_id,frame_number,camera_local_track_id,x,y,width,height,provenance)
+                VALUES (?,?,'local-1',10,10,30,55,'CAVIAR_ANNOTATION')""",
+                [(src,frame) for frame in range(1,101)])
+        assert c.execute('SELECT COUNT(*) FROM public_cctv_track_boxes').fetchone()[0]==200
+        assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
+
+    url='/api/site/occurrences'
+    assert client.get(url).status_code==401
+    assert client.get(url,headers=county).status_code==200
+    response=client.get(url,headers=county).json()
+    rows=response['occurrences']
+    assert len(rows)==4,response
+    assert response['identity_verification']=='not_performed'
+    assert response['site_visit_generation']=='not_performed'
+    assert len({r['occurrence_key'] for r in rows})==4
+    assert {r['track_id'] for r in rows}=={'local-1'}
+    assert all(r['venue_id']==pa for r in rows)
+    assert all(r['subject_id'] is None and r['counts_as_unique_person'] is False
+               and r['counts_as_visit'] is False for r in rows)
+    gt=[r for r in rows if r['provider']=='caviar_ground_truth']
+    live=[r for r in rows if r['provider']=='frigate']
+    assert len(gt)==2 and len(live)==2
+    assert {x['time_basis'] for x in gt}=={'archival_video_frame_number'}
+    assert {x['time_basis'] for x in live}=={'UTC_event_clock'}
+    assert {x['annotation_frames'] for x in gt}=={100}
+    assert {(x['first_seen'],x['last_seen']) for x in gt}=={(1,100)}
+    assert len({r['occurrence_key'] for r in gt})==2
+    # Stable idempotent identity of *local events*, including re-reading.
+    again=client.get(url,headers=county).json()
+    assert again['occurrences']==rows
+    single=client.get(url+'?limit=1',headers=county).json()
+    assert len(single['occurrences'])==1 and single['truncated']
+    assert client.get(url+'?limit=0',headers=county).status_code==422
+
+    summary=client.get(url+'/summary',headers=county)
+    assert summary.status_code==200,summary.text
+    data=summary.json()
+    assert not data['merged_across_cameras']
+    assert not data['mixes_historical_with_realtime']
+    assert not data['counts_unique_people']
+    assert not data['counts_site_visits']
+    assert len(data['by_camera'])==4
+    assert data['by_provider']['caviar_ground_truth']=={
+        'camera_local_occurrences':2,'cameras':2,'annotated_frames':200}
+    assert data['by_provider']['frigate']=={
+        'camera_local_occurrences':2,'cameras':2,'annotated_frames':0}
+    assert {row['venue_id'] for row in data['by_camera']}=={pa}
+    assert client.get(url,headers=other).json()['occurrences']==[]
+    assert client.get(url+'/summary',headers=other).json()['by_provider']=={}
+    assert client.get('/api/business/analysis',headers=root).json()['person_count']==0
+    assert client.get('/api/monitoring/overview',headers=root).json()['counts']['person_objects']==2
