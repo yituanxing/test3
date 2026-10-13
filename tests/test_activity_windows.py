@@ -61,7 +61,7 @@ def test_monitoring_face_positive_windows_are_separate_from_people_and_frames(ap
                 "INSERT INTO sources(place_id,name,kind,uri) VALUES(?,?,?,?)",
                 (place, "activity unit", "file", "/unused/fixture.mp4")
             ).lastrowid)
-        now = datetime.now(timezone.utc).replace(microsecond=0)
+        now = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
         points = [
             (ids[0], places[0], now - timedelta(seconds=90), 1),
             (ids[0], places[0], now - timedelta(seconds=4), 1),
@@ -82,8 +82,6 @@ def test_monitoring_face_positive_windows_are_separate_from_people_and_frames(ap
     assert data["counts"]["face_detections"] == 6
     assert data["face_activity"]["counts_unique_people"] is False
     assert data["face_activity"]["gap_seconds"] == 20
-    # A midnight boundary can split the 90-second-before sample into prior
-    # day; the count remains three independent activity windows overall.
     assert data["face_activity"]["windows"] == 3
     assert sum(p["face_activity_windows"] for p in data["places"]) == 3
     assert sum(d["face_activity_windows"] for d in data["timeline"]) == 3
