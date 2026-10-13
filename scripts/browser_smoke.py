@@ -410,6 +410,50 @@ def run():
                         checks.append("real_browser_qa_raw_vs_reviewed_window_consistency")
                         checks.append("real_browser_append_only_anonymous_quality_and_stale_evidence")
                         page.screenshot(path=str(OUT/"ui-anonymous-quality-review.png"),full_page=True)
+                        # This is a deliberately controlled RESEARCH STUDY
+                        # fixture: two known local events, two cameras in the
+                        # SAME venue, no inferred real-world person identity.
+                        from datetime import datetime, timezone, timedelta
+                        from app import site_model
+                        with main.db() as check:
+                            now=datetime.now(timezone.utc)+timedelta(seconds=2)
+                            for name in ("browser_research_cam_a","browser_research_cam_b"):
+                                check.execute("""INSERT OR IGNORE INTO frigate_camera_bindings
+                                  (camera,place_id) VALUES(?,1)""",(name,))
+                                site_model.record_frigate_initial(check,name,1)
+                                epoch=check.execute("""SELECT id FROM frigate_site_binding_history
+                                  WHERE camera=? AND valid_until IS NULL""",(name,)).fetchone()[0]
+                                check.execute("""INSERT INTO frigate_object_events
+                                  (camera,event_id,place_id,label,started_at,score,has_snapshot,
+                                   updated_at,binding_epoch_id)
+                                  VALUES (?,'same-local-demo',1,'person',?,0.84,0,?,?)""",
+                                  (name,now.isoformat(),main.utcnow(),epoch))
+                        page.reload()
+                        expect(page.locator("#researchPanel")).to_be_visible(timeout=12000)
+                        for name in ("browser_research_cam_a","browser_research_cam_b"):
+                            option=page.locator("#qaOccurrence option").filter(has_text=name).first
+                            key=option.get_attribute("value")
+                            assert key
+                            page.locator("#qaOccurrence").select_option(key)
+                            page.locator("#qaVerdict").select_option("valid_local_target")
+                            page.locator("#qaReason").fill("实际浏览器控制研究录像目标质检验收")
+                            page.locator("#qaSave").click()
+                            expect(page.locator("#qaStatus")).to_contain_text(
+                                "valid_local_target",timeout=12000)
+                            page.locator("#researchReason").fill(
+                                "人工研究标签D001经控制样本核对，不代表真人自动识别")
+                            page.locator("#researchAttach").click()
+                            expect(page.locator("#researchStatus")).to_contain_text(
+                                "当前有效",timeout=12000)
+                        expect(page.locator("#researchRows")).to_contain_text(
+                            "D001",timeout=12000)
+                        expect(page.locator("#researchRows tr").first.locator("td").nth(3)
+                               ).to_have_text("2",timeout=12000)
+                        with main.db() as check:
+                            assert check.execute("SELECT COUNT(*) FROM research_occurrence_links"
+                                  ).fetchone()[0]==2
+                        checks.append("browser_manual_pseudonymous_link_two_cameras_one_candidate_visit")
+                        page.screenshot(path=str(OUT/"ui-manual-research-linkage.png"),full_page=True)
                         # Verify end users can REVIEW item 221, not only call
                         # its direct backend URL. This is a deliberate fake
                         # upstream event fixture, not a real detected person.
