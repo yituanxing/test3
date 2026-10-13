@@ -80,9 +80,28 @@ def overview(conn, *, days: int = 7, now: datetime | None = None,
     counts = {'person_objects':sum(r['person_objects'] for r in by_place.values()),
               'sampled_frames':sum(r['sampled_frames'] for r in by_place.values()),
               'face_detections':sum(r['face_detections'] for r in by_place.values())}
+    # Optional licensed reference footage is NEVER counted as a real-time
+    # monitoring observation: its annotation clock is archival video-relative,
+    # not today, and two camera-local tracks can correspond to one person.
+    official = conn.execute("""SELECT i.source_id,s.place_id,
+                (SELECT COUNT(*) FROM public_cctv_track_boxes b
+                 WHERE b.source_id=i.source_id) AS boxes,
+                (SELECT COUNT(DISTINCT b.camera_local_track_id)
+                 FROM public_cctv_track_boxes b WHERE b.source_id=i.source_id) AS tracks
+            FROM public_cctv_imports i JOIN sources s ON s.id=i.source_id""")
+    dataset_rows=[dict(row) for row in official if row['place_id'] in by_place]
+    dataset_evidence={
+        'fixed_camera_sources':len(dataset_rows),
+        'camera_local_tracks':sum(row['tracks'] for row in dataset_rows),
+        'manual_person_boxes':sum(row['boxes'] for row in dataset_rows),
+        'basis':'CC BY-SA CAVIAR official ground truth, source/camera local; archival clip-relative evidence, not live people',
+        'counts_unique_people':False,'counts_for_date_window':False,
+        'distinct_from_current_synthetic_business':True,
+    }
     return {
         'window':{'start_utc':start.isoformat(),'end_exclusive_utc':end.isoformat(),'days':days},
         'counts':counts,
+        'licensed_research_video':dataset_evidence,
         'face_activity':{
             'windows':visible_windows,
             'gap_seconds':activity['gap_seconds'],
