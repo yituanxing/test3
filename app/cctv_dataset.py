@@ -18,6 +18,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 import cv2
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -346,8 +347,9 @@ def camera_activity(source_id:int,request:Request,
 
 @router.get('/api/cctv/sources/{source_id}/tracking-baseline')
 def tracking_baseline(source_id:int,request:Request,
-                      max_frames:int=Query(400,ge=1,le=600)):
-    """Real EXISTING ByteTrack on published per-camera GT, not cross-cam ReID.
+                      max_frames:int=Query(400,ge=1,le=600),
+                      algorithm:Literal["bytetrack","ocsort"]="bytetrack"):
+    """Real existing tracking algorithms on published camera GT, not ReID.
 
     Optional tracker dependency absent => explicit 503. Never silently fake
     tracking IDs or contaminate real Frigate counts or simulated P### roster.
@@ -355,7 +357,7 @@ def tracking_baseline(source_id:int,request:Request,
     from app.tracker_adapters import run_caviar_tracking
     with _db() as c:
         access.check_source(c,request,source_id)
-        return run_caviar_tracking(c,source_id,max_frames=max_frames)
+        return run_caviar_tracking(c,source_id,max_frames=max_frames,algorithm=algorithm)
 
 
 @router.get('/api/cctv/sources/{source_id}/frame')
