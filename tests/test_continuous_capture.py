@@ -288,3 +288,42 @@ def test_open_capture_does_not_misattribute_frames_after_source_rebind(context, 
         assert [x[0] for x in rows] == [first_place, first_place]
     finally:
         held.close()
+
+def test_capture_demo_start_ui_uses_authorized_real_rtsp_sources_not_files(context, monkeypatch):
+    """Excel #1 local demo: expose persistent capture without GB hardware.
+
+    The browser can choose only authorized active RTSP sources. HTTP still
+    enforces scope; UI does not create phantom person/face observations.
+    Actual frame decoding is covered by the existing LiveCaptureSession test.
+    """
+    client, main, jobs, rtsp_id, file_id = context
+    monkeypatch.setattr(jobs, "_spawn", lambda source_id: None)
+    page = client.get("/monitor")
+    assert page.status_code == 200
+    content = page.text
+    assert 'id="captureStartControls"' in content
+    assert 'id="captureSource"' in content
+    assert 'id="captureStart"' in content
+    assert "async function captureStartSelected()" in content
+    assert "api('/api/sources')" in content
+    assert "x.kind==='rtsp'&&x.enabled&&x.place_active" in content
+
+    available = client.get("/api/sources")
+    assert available.status_code == 200
+    sources = available.json()
+    assert any(s["id"] == rtsp_id and s["kind"] == "rtsp"
+               and s["enabled"] and s["place_active"] for s in sources)
+    assert any(s["id"] == file_id and s["kind"] == "file" for s in sources)
+    started = client.post(f"/api/capture/jobs/{rtsp_id}/start")
+    assert started.status_code == 200, started.text
+    assert started.json()["desired_enabled"] is True
+    assert client.post(f"/api/capture/jobs/{file_id}/start").status_code == 422
+
+    live = client.get("/api/capture/jobs").json()["jobs"]
+    assert len(live) == 1 and live[0]["source_id"] == rtsp_id
+    assert "owner_token" not in live[0]
+    assert client.post(f"/api/capture/jobs/{rtsp_id}/stop").json()["desired_enabled"] is False
+    with main.db() as c:
+        assert c.execute("SELECT COUNT(*) FROM samples WHERE source_id=?",
+                         (rtsp_id,)).fetchone()[0] == 0
+        assert c.execute("SELECT COUNT(*) FROM synthetic_observations").fetchone()[0] == 0
