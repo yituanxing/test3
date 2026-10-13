@@ -10,6 +10,7 @@ import hashlib
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Literal
+from contextlib import asynccontextmanager
 
 import cv2
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -236,7 +237,19 @@ def setup_db():
 
 
 setup_db()
-app = FastAPI(title='ZD Business Pipeline Demo', version='1.1.0')
+
+
+@asynccontextmanager
+async def app_lifespan(application):
+    """Start durable collection only when an ASGI server enters lifespan."""
+    continuous_capture.start_pending()
+    try:
+        yield
+    finally:
+        continuous_capture.shutdown()
+
+
+app = FastAPI(title='ZD Business Pipeline Demo', version='1.1.0', lifespan=app_lifespan)
 admin.register(app,db)
 base_registry.register(app,db)
 access.register(app,db)
@@ -419,10 +432,8 @@ def probe_source(source_id: int):
         raise HTTPException(400, str(e)) from e
 
 
-@app.post('/api/sources/{source_id}/process')
-def process_source(source_id: int, max_frames: int = Query(90, ge=1, le=600),
-                   sample_every: int = Query(10, ge=1, le=60),
-                   worker_mode: bool = False):
+def _process_source_impl(source_id: int, max_frames: int = 90,
+                         sample_every: int = 10, *, worker_mode: bool = False):
     with db() as c:
         if not worker_mode and c.execute(
                 'SELECT 1 FROM capture_jobs WHERE source_id=? AND desired_enabled=1',
@@ -514,6 +525,13 @@ def process_source(source_id: int, max_frames: int = Query(90, ge=1, le=600),
             'quality_assessment': 'uncalibrated_heuristic',
             'note': '文件按内容哈希+帧号+检测器幂等导入；流数据不保证重放去重。检测数为本次推理的框数，新保存框数仅计新记录。'}
 
+
+
+@app.post('/api/sources/{source_id}/process')
+def process_source(source_id: int, max_frames: int = Query(90, ge=1, le=600),
+                   sample_every: int = Query(10, ge=1, le=60)):
+    """Public route cannot set internal worker mode to bypass singleton safety."""
+    return _process_source_impl(source_id, max_frames, sample_every)
 
 
 @app.get('/api/video/observations/{sample_id}/preview')
@@ -1243,5 +1261,5 @@ def get_insights_relationships(request:Request, days: int = Query(30,ge=1,le=365
 
 
 # Register after process_source is defined; worker reuses its tested inference path.
-continuous_capture.register(app, db, lambda source_id: process_source(
+continuous_capture.register(app, db, lambda source_id: _process_source_impl(
     source_id, max_frames=90, sample_every=10, worker_mode=True))
