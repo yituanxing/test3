@@ -145,7 +145,7 @@ def permitted(actor: dict, method: str, path: str) -> bool:
         or re.fullmatch(r'/api/site/occurrences/[0-9a-f]{24}/quality',path)
         or re.fullmatch(r'/api/site/sources/\d+/bindings',path)
         or re.fullmatch(r'/api/site/frigate/[a-zA-Z0-9_-]{1,100}/bindings',path)
-        or re.fullmatch(r'/api/cctv/sources/\d+/(activity|frame|tracking-baseline|pair-tracking-baseline)',path)
+        or re.fullmatch(r'/api/cctv/sources/\d+/(activity|frame|tracking-baseline|pair-tracking-baseline|person-detector-baseline)',path)
     )
     if read and scope_reads:
         return True
