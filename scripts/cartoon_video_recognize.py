@@ -46,23 +46,25 @@ OUT_DEFAULT = ROOT / "reports/cartoon-video-proof"
 
 def fetch_demo_video(out: Path) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
-    source_note = out.with_suffix(".source.txt")
     if out.is_file() and out.stat().st_size > 100_000:
         return out
     errors = []
     for url in PUBLIC_CLIP_URLS:
+        target = out.with_suffix(".mp4") if url.endswith(".mp4") else out
         try:
+            if target.is_file() and target.stat().st_size > 100_000:
+                return target
             response = requests.get(
                 url, timeout=45,
                 headers={"User-Agent": "ZD-Cartoon-Video-Proof/1.0"})
             response.raise_for_status()
             if not 100_000 < len(response.content) < 30_000_000:
                 raise RuntimeError("unexpected video size")
-            out.write_bytes(response.content)
-            source_note.write_text(url, encoding="utf-8")
-            return out
+            target.write_bytes(response.content)
+            target.with_suffix(".source.txt").write_text(url, encoding="utf-8")
+            return target
         except (requests.RequestException, OSError, RuntimeError) as exc:
-            out.unlink(missing_ok=True)
+            target.unlink(missing_ok=True)
             errors.append(type(exc).__name__)
     raise RuntimeError("All three licensed video mirrors unavailable: " +
                        ",".join(errors))
