@@ -95,7 +95,12 @@ def run():
                         expect(page.locator("#sources")).to_contain_text(
                             "尚无研究监控视频", timeout=12000)
                         assert page.locator("#sources tr").count()==1
+                        expect(page.locator("#occurrenceRows")).to_contain_text(
+                            "不会生成模拟数",timeout=12000)
+                        expect(page.locator("#occurrenceNote")).to_contain_text(
+                            "不合并跨机位轨迹",timeout=12000)
                         checks.append("real_fixed_camera_catalog_truthful_no_video_state")
+                        checks.append("common_anonymous_local_occurrences_zero_state_browser")
                         page.screenshot(path=str(OUT/"ui-cctv-primary.png"),full_page=True)
                         # Excel #20/#23: the admin screen MUST actually attach
                         # Bearer auth, list real inventory, register an RTSP
