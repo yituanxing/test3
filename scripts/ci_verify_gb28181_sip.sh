@@ -87,7 +87,7 @@ transport.write_text(content.replace(old,'const sipMaxPacketSize = 65535'))
 packet=root/'internal/streams/packet/common.go'
 packet_content=packet.read_text()
 import re
-packet_content,n=re.subn(r'PESLoadLength\\s+int = 0xFFFF',
+packet_content,n=re.subn(r'PESLoadLength\s+int = 0xFFFF',
     'PESLoadLength     int = 0xFF00',packet_content)
 if n!=1:raise SystemExit('Upstream PES size pin changed')
 packet.write_text(packet_content)
