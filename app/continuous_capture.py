@@ -37,6 +37,7 @@ def initialize(c):
     c.executescript("""
     CREATE TABLE IF NOT EXISTS capture_jobs (
         source_id INTEGER PRIMARY KEY REFERENCES sources(id),
+        binding_id INTEGER REFERENCES gb28181_channel_bindings(id),
         desired_enabled INTEGER NOT NULL DEFAULT 0 CHECK(desired_enabled IN (0,1)),
         state TEXT NOT NULL DEFAULT 'stopped',
         owner_token TEXT,
@@ -49,6 +50,11 @@ def initialize(c):
         updated_at TEXT NOT NULL
     );
     """)
+    # Only one desired worker per real GB device/channel binding, even when
+    # WVP creates a NEW RTSP source for another live session.
+    c.execute("""CREATE UNIQUE INDEX IF NOT EXISTS one_active_gb_capture
+        ON capture_jobs(binding_id)
+        WHERE desired_enabled=1 AND binding_id IS NOT NULL""")
 
 
 def register(app, get_db, process):
@@ -219,15 +225,24 @@ def start(source_id: int, request: Request):
         admin._active_place(c, src["place_id"])
         if src["kind"] not in ("rtsp", "camera"):
             raise HTTPException(422, "持续采集仅支持 RTSP/摄像头，文件请单次分析")
-        c.execute("""
-          INSERT INTO capture_jobs(source_id,desired_enabled,state,updated_at)
-          VALUES(?,1,'pending',?)
+        linked = c.execute("""SELECT binding_id FROM gb28181_stream_sessions
+            WHERE source_id=? AND mode='live' AND state='active'""",
+            (source_id,)).fetchone()
+        if c.execute("""SELECT 1 FROM gb28181_stream_sessions
+            WHERE source_id=? AND state='stopped'""", (source_id,)).fetchone():
+            raise HTTPException(409, "国标会话已停流，请先重新实时点播")
+        try:
+            c.execute("""
+          INSERT INTO capture_jobs(source_id,binding_id,desired_enabled,state,updated_at)
+          VALUES(?,?,1,'pending',?)
           ON CONFLICT(source_id) DO UPDATE SET
-            desired_enabled=1,
+            desired_enabled=1, binding_id=excluded.binding_id,
             state=CASE WHEN capture_jobs.owner_token IS NULL
                        THEN 'pending' ELSE capture_jobs.state END,
             updated_at=excluded.updated_at
-        """, (source_id, _stamp()))
+            """, (source_id, linked['binding_id'] if linked else None, _stamp()))
+        except __import__('sqlite3').IntegrityError as exc:
+            raise HTTPException(409, "同一国标通道已有持续采集任务；请先停止旧任务") from exc
         row = _row(c, source_id)
     _spawn(source_id)
     return _public(row)
