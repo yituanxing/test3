@@ -138,6 +138,8 @@ def permitted(actor: dict, method: str, path: str) -> bool:
         or re.fullmatch(r'/api/video/observations/\d+/preview',path)
         or re.fullmatch(r'/api/insights/people/P[0-9]{3}',path)
         or re.fullmatch(r'/api/anime/scenes/sources/\d+/(suggest|graph)',path)
+        or path in {'/api/cctv/datasets','/api/cctv/sources'}
+        or re.fullmatch(r'/api/cctv/sources/\d+/activity',path)
     )
     if read and scope_reads:
         return True
