@@ -212,7 +212,12 @@ def test_all_count_types_share_utc_days_and_review_never_mutates_raw(env):
     events=client.get('/api/site/occurrences?limit=100',headers=user['county']).json()['occurrences']
     assert {x['track_id'] for x in events if x['provider']=='frigate'}=={
         'local-1','recent-extra','old-track'}
-    first=next(x for x in events if x['track_id']=='local-1')
+    # Camera-local IDs repeat ACROSS providers; select provider explicitly.
+    # Otherwise the first matching track is CAVIAR (alphabetical provider
+    # ordering), and a second review silently supersedes it instead of
+    # reviewing the intended Frigate event.
+    first=next(x for x in events if x['provider']=='frigate'
+               and x['track_id']=='local-1')
     gt=next(x for x in events if x['provider']=='caviar_ground_truth')
     post='/api/site/occurrences/'+first['occurrence_key']+'/quality'
     verdict=client.post(post,headers=user['county'],json={
