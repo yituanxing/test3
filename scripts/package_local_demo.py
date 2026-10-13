@@ -21,7 +21,7 @@ FILES = (
     "ANONYMOUS_OCCURRENCES_V1.md",
     "ANONYMOUS_QUALITY_GATE_V1.md",
     "INSIGHTS_V1.0.md", "UI_ACCEPTANCE_V1.4.md",
-    "requirements.txt", "requirements-business.txt",
+    "requirements.txt", "requirements-business.txt", "requirements-tracking.txt",
 )
 EXTENSIONS = {".py", ".html", ".sh", ".yml", ".yaml", ".md", ".txt", ".json", ".mp4"}
 BANNED = {".git", ".venv", "data", "__pycache__", ".ci-data", "reports", "dist", "node_modules"}
