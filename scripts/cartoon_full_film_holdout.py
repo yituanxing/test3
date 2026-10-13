@@ -101,7 +101,11 @@ def main():
             movie, output,
             interval=2.5, max_frames=10,
             box_threshold=parameters["box_threshold"],
-            match_threshold=parameters["match_threshold"])
+            match_threshold=parameters["match_threshold"],
+            reference_crops=[
+                ROOT / "reports/cartoon-reference-fixtures/reference_auto_crop.jpg",
+                ROOT / "reports/cartoon-reference-fixtures/reference_auto_crop_buck_bow.jpg",
+            ])
         report.update({
             "sampled_frames": result["frames_decoded"],
             "box_proposals": result["detected_boxes"],
