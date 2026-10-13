@@ -152,6 +152,17 @@ jobs:
         run: |
           python -m scripts.cartoon_video_recognize --demo-video --interval 1.25 --max-frames 10
           test "$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 reports/cartoon-video-proof/annotated_samples.mp4)" = h264
+      - name: Group detector-generated cartoon boxes with existing ByteTrack
+        run: python -m scripts.cartoon_video_track_existing
+      - name: Preserve independently reviewed track consistency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-temporal-tracker-evidence
+          path: |
+            reports/cartoon-video-proof/tracked_result.json
+            reports/cartoon-video-proof/tracked_frames/*.jpg
+          if-no-files-found: warn
       - name: Install existing video-upload UI library
         run: python -m pip install 'gradio>=5.49,<6'
       - name: Upload complete film through real localhost Gradio API and verify H.264 video preview
