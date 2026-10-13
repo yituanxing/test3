@@ -4,9 +4,14 @@ name: ZD Frigate Real Person CI
   push:
     branches: [main]
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/verify_cartoon_character.py"
+      - ".github/workflows/zd-frigate-real-person.yml"
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: zd-frigate-real-person-${{ github.ref }}
@@ -16,7 +21,7 @@ jobs:
   real-media:
     # GB28181 protocol-only changes should not repeat the unrelated
     # 4-minute UI/Frigate acceptance suite; routine commits still do.
-    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[gb-sip]')
+    if: github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[gb-sip]'))
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -96,7 +101,7 @@ jobs:
   # video/UI commits; one deliberate verification run is activated by placing
   # [gb-sip] in a commit message or by manual workflow_dispatch.
   gb-sip-protocol:
-    if: contains(github.event.head_commit.message, '[gb-sip]') || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request' && (contains(github.event.head_commit.message, '[gb-sip]') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -116,3 +121,180 @@ jobs:
             reports/verify-gb28181-real-app.json
             reports/gb28181-decoded-ci.jpg
           if-no-files-found: error
+
+  # Isolated one-off cartoon-character recognition proof. No GB/Frigate jobs,
+  # no human face matcher, no newly added workflow files.
+  cartoon-character-proof:
+    if: github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, '[cartoon]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Verified fixture from successful earlier detector run: refs are
+      # model-produced, NOT hand drawn/cropped. Reuse exact image bytes for
+      # independent holdout instead of hitting rate-limited Wikimedia.
+      - name: Restore frozen auto-cropped Buck references from verified CI
+        uses: actions/download-artifact@v4
+        with:
+          name: cartoon-uncropped-video-detection
+          run-id: 38343247734
+          repository: yituanxing/test3
+          github-token: ${{ github.token }}
+          path: reports/cartoon-reference-fixtures
+      - name: Verify frozen references exist
+        run: |
+          test -s reports/cartoon-reference-fixtures/reference_auto_crop.jpg
+          test -s reports/cartoon-reference-fixtures/reference_auto_crop_buck_bow.jpg
+      - name: Install CPU-only pretrained model runtime
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu \
+            'torch==2.5.1+cpu' 'torchvision==0.20.1+cpu'
+          python -m pip install pillow requests numpy
+      - name: Install existing pretrained open-vocabulary video detector
+        run: python -m pip install -r requirements-cartoon-video.txt
+      - name: Check frozen label ambiguity rule and multi-pose consensus without network
+        run: python -m unittest -v tests.test_cartoon_label_guard tests.test_cartoon_consensus
+      - name: Ensure actual browser-compatible H.264 encoder is available
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          ffmpeg -hide_banner -encoders | grep -q 'libx264'
+      - name: Feed genuine Big Buck Bunny video and auto-detect rabbit boxes
+        run: |
+          python -m scripts.cartoon_video_recognize --demo-video --interval 1.25 --max-frames 10 --frozen-reference-crops reports/cartoon-reference-fixtures
+          test "$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 reports/cartoon-video-proof/annotated_samples.mp4)" = h264
+      - name: Run once-only frozen parameter holdout vs fresh cartoon movie and negative Sintel
+        run: python -m scripts.cartoon_holdout_eval
+      - name: Preserve independent holdout scores, non-overlap screening and negative control
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-locked-holdout-evaluation
+          path: |
+            reports/cartoon-holdout-v1/holdout_result.json
+            reports/cartoon-holdout-v1/*_contact.jpg
+            reports/cartoon-holdout-v1/unseen_buck/result.json
+            reports/cartoon-holdout-v1/negative_sintel/result.json
+          if-no-files-found: warn
+      - name: Evaluate frozen matching on untested 3-minute-mark scene of full Big Buck Bunny film
+        run: python -m scripts.cartoon_full_film_holdout
+      - name: Publish full-film holdout audit before any post-evaluation tuning
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-frozen-full-film-holdout
+          path: |
+            reports/cartoon-full-film-holdout/frozen_result.json
+            reports/cartoon-full-film-holdout/whole_film_contact.jpg
+            reports/cartoon-full-film-holdout/evaluation/result.json
+            reports/cartoon-full-film-holdout/evaluation/frames/*.jpg
+          if-no-files-found: warn
+      - name: Record A/B decisions on DEVELOPMENT error-reproduction scene
+        run: |
+          python -m scripts.cartoon_holdout_score
+          python -m scripts.cartoon_label_guard \
+            --input reports/cartoon-full-film-holdout/evaluation/result.json \
+            --output reports/cartoon-full-film-holdout/guarded_development.json
+      - name: Run genuinely unseen 4m30–4m55 original-film A/B with same frozen models
+        run: python -m scripts.cartoon_second_holdout
+      - name: Preserve untouched A/B holdout evidence, raw scores and ambiguous marks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-untuned-second-holdout-ab
+          path: |
+            reports/cartoon-4m30-unseen-holdout/summary.json
+            reports/cartoon-4m30-unseen-holdout/guarded_result.json
+            reports/cartoon-4m30-unseen-holdout/predictions/result.json
+            reports/cartoon-4m30-unseen-holdout/holdout_4m30_visual_comparison.jpg
+            reports/cartoon-4m30-unseen-holdout/predictions/frames/*.jpg
+            reports/cartoon-full-film-holdout/audited_metrics.json
+            reports/cartoon-full-film-holdout/guarded_development.json
+          if-no-files-found: warn
+      - name: Compare new two-reference harmony on DEVELOPMENT 3m00 and 4m30 film scenes
+        run: |
+          python -m scripts.cartoon_consensus_match --input reports/cartoon-full-film-holdout/evaluation/result.json
+          python -m scripts.cartoon_consensus_match --input reports/cartoon-4m30-unseen-holdout/predictions/result.json
+      - name: First-use frozen two-reference consensus on untouched 5m30–5m55 Buck movie
+        run: python -m scripts.cartoon_consensus_holdout
+      - name: Re-score previously untouched 5m30 clip using POST-inference human annotations
+        run: python -m scripts.cartoon_consensus_score
+      - name: Publish first untouched 5m30 A/B and separately annotated metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-harmonic-consensus-5m30-audited
+          path: reports/cartoon-5m30-consensus-holdout/audited_5m30_ab.json
+          if-no-files-found: warn
+      - name: Publish untouched 5m30 real-video A/B BEFORE examining visual truth
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-harmonic-consensus-untouched-5m30
+          path: |
+            reports/cartoon-5m30-consensus-holdout/audited_5m30_ab.json
+            reports/cartoon-5m30-consensus-holdout/summary.json
+            reports/cartoon-5m30-consensus-holdout/consensus_result.json
+            reports/cartoon-5m30-consensus-holdout/raw/result.json
+            reports/cartoon-5m30-consensus-holdout/raw/frames/*.jpg
+            reports/cartoon-5m30-consensus-holdout/untuned_consensus_comparison.jpg
+            reports/cartoon-full-film-holdout/evaluation/consensus_result.json
+            reports/cartoon-4m30-unseen-holdout/predictions/consensus_result.json
+          if-no-files-found: warn
+      - name: Test frozen two-pose consensus on untouched Buck movie at 2m00 and 7m00
+        run: python -m scripts.cartoon_multiwindow_holdout
+      - name: Preserve first-time raw A/B visual evidence before manual truth labels
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-frozen-multiwindow-2m-7m-untouched
+          path: |
+            reports/cartoon-multiwindow-holdout/summary.json
+            reports/cartoon-multiwindow-holdout/original_2m00/consensus.json
+            reports/cartoon-multiwindow-holdout/original_2m00/predictions/result.json
+            reports/cartoon-multiwindow-holdout/original_2m00/first_untuned_ab.jpg
+            reports/cartoon-multiwindow-holdout/original_2m00/predictions/frames/*.jpg
+            reports/cartoon-multiwindow-holdout/original_7m00/consensus.json
+            reports/cartoon-multiwindow-holdout/original_7m00/predictions/result.json
+            reports/cartoon-multiwindow-holdout/original_7m00/first_untuned_ab.jpg
+            reports/cartoon-multiwindow-holdout/original_7m00/predictions/frames/*.jpg
+          if-no-files-found: warn
+      - name: Group detector-generated cartoon boxes with existing ByteTrack
+        run: python -m scripts.cartoon_video_track_existing
+      - name: Preserve independently reviewed track consistency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-temporal-tracker-evidence
+          path: |
+            reports/cartoon-video-proof/tracked_result.json
+            reports/cartoon-video-proof/tracked_frames/*.jpg
+          if-no-files-found: warn
+      - name: Install existing video-upload UI library
+        run: python -m pip install 'gradio>=5.49,<6'
+      - name: Upload complete film through real localhost Gradio API and verify H.264 video preview
+        run: python -m scripts.verify_cartoon_video_upload
+      - name: Save actual upload acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-upload-ui-acceptance
+          path: reports/cartoon-video-upload/result.json
+          if-no-files-found: warn
+      - name: Save actual video detection and matching artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-uncropped-video-detection
+          path: |
+            reports/cartoon-video-proof/result.json
+            reports/cartoon-video-proof/reference_auto_crop*.jpg
+            reports/cartoon-video-proof/annotated_samples.mp4
+            reports/cartoon-video-proof/frames/*.jpg
+            reports/cartoon-video-proof/crops/*.jpg
+          if-no-files-found: warn

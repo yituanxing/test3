@@ -1,0 +1,62 @@
+{
+  "schema_version": "cartoon_holdout_4m30_visual_truth_v1",
+  "source_hls": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+  "excerpt_start_sec": 270,
+  "excerpt_end_sec": 295,
+  "media_sha256": "c1bf65ff839d2e7830c58504fdee9fd8ba18703bb39308b74929687cf9dd8ef6",
+  "annotations_created_after_inference": true,
+  "blinding": "No. Frame truth was visually reviewed after seeing A/B output, for reproducible diagnosis only.",
+  "positive_definition": "Buck recognizable in any part of the full scene; source crop is from original frame, not pretrimmed.",
+  "labels": [
+    {
+      "second": 0.5,
+      "buck": "uncertain",
+      "why": "Only legs/body closeup. Identity cannot be established from this frame alone."
+    },
+    {
+      "second": 3,
+      "buck": "present",
+      "why": "Buck clearly holds a piece of wood with face/body fully visible."
+    },
+    {
+      "second": 5.5,
+      "buck": "present",
+      "why": "Buck clearly visible in profile next to a large tree."
+    },
+    {
+      "second": 8,
+      "buck": "present",
+      "why": "Buck close-up, frontal."
+    },
+    {
+      "second": 10.5,
+      "buck": "absent",
+      "why": "Three small animals sit on a tree stump, no Buck."
+    },
+    {
+      "second": 13,
+      "buck": "present",
+      "why": "Buck close-up holding a vine."
+    },
+    {
+      "second": 15.5,
+      "buck": "present",
+      "why": "Buck standing next to tree, full body visible."
+    },
+    {
+      "second": 18,
+      "buck": "present",
+      "why": "Buck at distance to right of frame; recognized visual figure despite smaller apparent size."
+    },
+    {
+      "second": 20.5,
+      "buck": "absent",
+      "why": "Grass/tree trunk close-up, no identifiable Buck."
+    },
+    {
+      "second": 23,
+      "buck": "present",
+      "why": "Buck holds a vine, clearly visible at center-right."
+    }
+  ]
+}
