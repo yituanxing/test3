@@ -58,6 +58,20 @@ jobs:
             reports/ui-*.png
             reports/ui-server.log
           if-no-files-found: warn
+      # Explicit, short opt-in: verify actual Edinburgh CAVIAR files, not mocks.
+      # Does not repeat the heavyweight GB28181/Frigate Docker integration.
+      - name: Validate real public CAVIAR two-camera media and CVML
+        if: contains(github.event.pull_request.labels.*.name, 'cctv-real')
+        run: python -m scripts.verify_caviar_public_footage
+      - name: Preserve real public CCTV evidence (no raw licensed videos)
+        if: always() && contains(github.event.pull_request.labels.*.name, 'cctv-real')
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-caviar-actual-video-proof
+          path: |
+            reports/verify-caviar-fixed-cctv.json
+            reports/caviar-*-gt.jpg
+          if-no-files-found: warn
       - name: Build auditable local demo ZIP
         run: python -m scripts.package_local_demo
       - name: Upload demo deliverable for Excel review
