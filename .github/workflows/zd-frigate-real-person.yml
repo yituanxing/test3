@@ -16,6 +16,7 @@ name: ZD Frigate Real Person CI
       - "scripts/package_local_demo.py"
       - "scripts/verify_caviar_public_footage.py"
       - "requirements-tracking.txt"
+      - "requirements-person-detection.txt"
       - ".github/workflows/zd-frigate-real-person.yml"
 
 permissions:
@@ -62,9 +63,9 @@ jobs:
           if-no-files-found: warn
       # Explicit, short opt-in: verify actual Edinburgh CAVIAR files, not mocks.
       # Does not repeat the heavyweight GB28181/Frigate Docker integration.
-      - name: Install existing Roboflow ByteTrack only for real CCTV owner acceptance
+      - name: Install existing Roboflow tracking + pretrained person detector for real CCTV owner
         if: contains(github.event.pull_request.labels.*.name, 'cctv-real')
-        run: python -m pip install -r requirements-tracking.txt
+        run: python -m pip install -r requirements-person-detection.txt
       - name: Validate real public CAVIAR two-camera media and existing ByteTrack
         if: contains(github.event.pull_request.labels.*.name, 'cctv-real')
         run: |
