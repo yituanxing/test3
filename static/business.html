@@ -48,6 +48,26 @@ window.addEventListener('load',async()=>{
 <label class="field">关注的多个模拟场所（Ctrl/⌘多选；留空使用上方单场所）<select id="watchMultiPlaces" multiple size="4"></select></label>
 <label class="field">指定虚构人员编码（用逗号分隔，留空=全部）<input id="watchPeople" placeholder="如 P001,P002；不接受真实姓名" maxlength="300"></label></div>
 <div id="ruleToggles" class="row" style="margin-top:12px"></div><div class="row" style="margin-top:15px"><button onclick="saveConfig()">保存并重新分析</button><span class="hint">不修改原始事件</span></div></section>
+<section class="panel full" id="instancePanel">
+<div class="row between"><div><h2>规则实例管理 · 公共配置中心</h2>
+<p class="hint">Excel #22：七类规则使用同一个创建/修改/暂停/归档流程。实例接管所属规则类型，保留每次复核及审计历史；只使用 P### 合成数据。</p></div>
+<button class="secondary" id="instNew" onclick="resetRuleInstanceForm()">清空 / 新建</button></div>
+<div class="fields">
+<label class="field">实例名称<input id="instName" maxlength="80" placeholder="如 动画演示·场所A出现事件"></label>
+<label class="field">预警类型<select id="instType" onchange="renderInstanceParamInputs()">
+<option value="cross_place">跨场所出现</option><option value="companion">多人成组出现</option>
+<option value="interaction">双向交叉出现</option><option value="gathering">多归属聚集</option>
+<option value="absence">久未观测</option><option value="appearance">指定场所出现</option>
+<option value="headcount">人数偏差</option></select></label>
+<label class="field">关注场所（可多选，出现规则必选）<select id="instPlaces" multiple size="4"></select></label>
+<label class="field">合成角色编码（可选，逗号分隔）<input id="instPeople" placeholder="如 P001,P002；非真实人员" maxlength="300"></label></div>
+<div id="instParams" class="row" style="margin:12px 0"></div>
+<div class="row"><label><input type="checkbox" id="instEnabled" checked> 启用实例</label>
+<button id="instSave" onclick="saveRuleInstance()">创建规则实例</button>
+<span class="hint" id="instFormState">未选择已有实例</span></div>
+<div class="scroll"><table><thead><tr><th>ID / 规则名</th><th>类别</th><th>关注目标</th><th>状态</th><th>版本</th><th>操作</th></tr></thead>
+<tbody id="instanceRows"><tr><td colspan="6">正在读取</td></tr></tbody></table></div>
+</section>
 <section class="panel full"><div class="row between"><div><h2>规则候选与人工核实</h2><p class="hint">点击「证据」查看所依赖的合成观测ID；核实不会删除命中。</p></div><select id="alertFilter" onchange="renderAlerts()"><option value="all">全部类型</option></select></div><div class="scroll large"><table><thead><tr><th>类别</th><th>规则命中</th><th>涉及场所</th><th>证据数量</th><th>状态</th><th>操作</th></tr></thead><tbody id="alerts"></tbody></table></div></section>
 <section class="panel"><h2>模拟底库：唯一主归属</h2><p class="hint">主归属仅有一个；在其他场所的观察记录不删除。</p><div class="scroll"><table><thead><tr><th>虚构标识</th><th>主归属场所</th><th>到访数</th></tr></thead><tbody id="homes"></tbody></table></div></section>
 <section class="panel"><h2>有效到访事件</h2><p class="hint">把同一合成身份、同一场所、短时间内的抓拍合成一次。</p><div class="scroll"><table><thead><tr><th>身份</th><th>场所</th><th>时间</th><th>原始条数</th></tr></thead><tbody id="visits"></tbody></table></div></section>
@@ -56,14 +76,89 @@ window.addEventListener('load',async()=>{
 </div><footer>本Demo只用于评估数据管道、统计口径、规则引擎与复核交互。正式应用须单独落实合法授权、访问控制、隐私保护、识别性能与视频设备联调。</footer></main><div id="toast"></div>
 <script>
 const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let data=null,obs=[],placeMap={};const RULES=['cross_place','companion','interaction','gathering','absence','appearance','headcount'];
+let data=null,obs=[],placeMap={},ruleInstances=[],editingRuleInstanceId=null;const RULES=['cross_place','companion','interaction','gathering','absence','appearance','headcount'];
 const LABEL={visit_gap_minutes:'同人同场合并间隔（分钟）',encounter_window_minutes:'共同出现时间窗口（分钟）',companion_min_episodes:'同行候选所需窗口次数',companion_min_people:'同行候选同组最少人数（2–20）',gathering_min_people:'多人共同出现最少人数',gathering_min_episodes:'聚集所需窗口次数',interaction_min_rounds:'双向互动最低往返轮数',absence_days:'久未观测天数',absence_mode:'未出现规则口径',absence_check_interval_days:'检查周期（天）',absence_missed_checks:'连续缺席周期阈值',headcount_difference:'人数异常绝对差阈值',activity_start_hour:'活动开始小时（0-22）',activity_end_hour:'活动结束小时（1-23）',activity_timezone_offset_hours:'演示时区UTC偏移（小时）',watch_place_id:'指定关注场所',affiliation_mode:'主归属规则'};
 async function api(url,method='GET',body){let res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});let x=await res.json();if(!res.ok)throw Error(x.detail||JSON.stringify(x));return x}
 function pop(msg,error=false){let t=$('toast');t.textContent=msg;t.className=error?'err':'';t.style.display='block';clearTimeout(window._popTimer);window._popTimer=setTimeout(()=>t.style.display='none',5500)}
 async function work(fn,msg){try{await fn();await reload();pop(msg||'完成，已使用数据库中的有效事件重新计算。')}catch(e){pop('操作失败：'+e.message,true)}}
 const pName=id=>placeMap[id]||('场所 #'+id);
+const INSTANCE_LIMITS={
+ cross_place:{},
+ companion:{companion_min_people:[2,20],companion_min_episodes:[1,20],encounter_window_minutes:[1,120]},
+ interaction:{interaction_min_rounds:[1,20],encounter_window_minutes:[1,120]},
+ gathering:{gathering_min_people:[2,100],gathering_min_episodes:[1,20],encounter_window_minutes:[1,120]},
+ absence:{absence_days:[1,365],absence_check_interval_days:[1,365],absence_missed_checks:[1,365]},
+ appearance:{},
+ headcount:{headcount_difference:[1,1000]}
+};
+function renderInstanceParamInputs(values={}){
+  const type=$('instType').value;
+  $('instParams').innerHTML='<span class="hint">覆盖规则参数（留空则使用全局默认）</span>'+
+    Object.entries(INSTANCE_LIMITS[type]).map(([key,range])=>
+      `<label class="field">${esc(LABEL[key]||key)}<input data-rule-parameter="${key}" type="number" min="${range[0]}" max="${range[1]}" value="${values[key]??''}" placeholder="继承全局"></label>`).join('');
+}
+function resetRuleInstanceForm(){
+  editingRuleInstanceId=null;
+  $('instName').value='';$('instPeople').value='';$('instType').value='companion';
+  [...$('instPlaces').options].forEach(x=>x.selected=false);
+  $('instEnabled').checked=true;
+  renderInstanceParamInputs();$('instSave').textContent='创建规则实例';
+  $('instFormState').textContent='未选择已有实例';
+}
+function editRuleInstance(id){
+  const row=ruleInstances.find(x=>x.id===id);if(!row)return;
+  editingRuleInstanceId=id;$('instName').value=row.name;$('instType').value=row.type;
+  $('instPeople').value=row.target_synthetic_people.join(',');
+  $('instEnabled').checked=row.enabled;
+  [...$('instPlaces').options].forEach(x=>x.selected=row.target_place_ids.includes(Number(x.value)));
+  renderInstanceParamInputs(row.parameters);
+  $('instSave').textContent='保存实例修改';
+  $('instFormState').textContent='正在编辑实例 #'+id+'（保留旧版审计）';
+  $('instancePanel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function instancePayload(){
+  const parameters={};
+  document.querySelectorAll('#instParams [data-rule-parameter]').forEach(el=>{
+    if(el.value.trim()!=='')parameters[el.dataset.ruleParameter]=Number(el.value);
+  });
+  return {type:$('instType').value,name:$('instName').value.trim(),
+    enabled:$('instEnabled').checked,parameters,
+    target_place_ids:[...$('instPlaces').selectedOptions].map(x=>Number(x.value)),
+    target_synthetic_people:$('instPeople').value.toUpperCase().split(/[,，;；\s]+/).filter(Boolean)};
+}
+async function saveRuleInstance(){
+  const payload=instancePayload();
+  const url=editingRuleInstanceId?'/api/business/rule-instances/'+editingRuleInstanceId:'/api/business/rule-instances';
+  await work(()=>api(url,editingRuleInstanceId?'PUT':'POST',payload),'规则实例已保存；按新配置重新计算。');
+  resetRuleInstanceForm();
+}
+async function toggleRuleInstance(id){
+  const row=ruleInstances.find(x=>x.id===id);if(!row)return;
+  const payload={type:row.type,name:row.name,enabled:!row.enabled,
+    parameters:row.parameters,target_place_ids:row.target_place_ids,
+    target_synthetic_people:row.target_synthetic_people};
+  await work(()=>api('/api/business/rule-instances/'+id,'PUT',payload),'实例状态已更新');
+}
+async function archiveRuleInstance(id){
+  if(!confirm('归档规则实例 #'+id+'？历史复核和操作审计会保留。'))return;
+  await work(()=>api('/api/business/rule-instances/'+id,'DELETE'),'规则实例已归档');
+}
+function renderRuleInstances(){
+  $('instanceRows').innerHTML=ruleInstances.map(x=>
+    `<tr><td>#${x.id} · ${esc(x.name)}</td><td>${esc(x.type)}</td>
+    <td>场所 ${esc(x.target_place_ids.map(pName).join('、')||'全部')}<br>虚构编码 ${esc(x.target_synthetic_people.join('、')||'不限')}</td>
+    <td><span class="chip ${x.enabled?'confirmed':'false_positive'}">${x.enabled?'启用':'暂停'}</span></td><td>V${x.version}</td><td>
+    <button class="secondary" onclick="editRuleInstance(${x.id})">修改</button>
+    <button class="secondary" onclick="toggleRuleInstance(${x.id})">${x.enabled?'暂停':'启用'}</button>
+    <button class="danger" onclick="archiveRuleInstance(${x.id})">归档</button></td></tr>`).join('')||
+    '<tr><td colspan="6">当前尚无独立规则实例；旧版七类规则仍正常运行。</td></tr>';
+}
+
 const localTime=x=>{try{return new Date(x).toLocaleString('zh-CN',{hour12:false})}catch{return x}};
-async function reload(){let [d,o,p,a]=await Promise.all([api('/api/business/analysis'),api('/api/business/observations'),api('/api/places'),api('/api/business/audit')]);data=d;obs=o;placeMap=Object.fromEntries(p.map(v=>[v.id,v.name]));$('mRaw').textContent=d.raw_count;$('mEffective').textContent=d.effective_observations;$('mVisit').textContent=d.visit_count;$('mPerson').textContent=d.person_count;$('mAlert').textContent=d.alerts.length;
+async function reload(){let [d,o,p,a,instances]=await Promise.all([api('/api/business/analysis'),api('/api/business/observations'),api('/api/places'),api('/api/business/audit'),api('/api/business/rule-instances')]);data=d;obs=o;ruleInstances=instances.instances;placeMap=Object.fromEntries(p.map(v=>[v.id,v.name]));
+const selected=[...$('instPlaces').selectedOptions].map(x=>Number(x.value));
+$('instPlaces').innerHTML=p.map(x=>`<option value="${x.id}" ${selected.includes(x.id)?'selected':''}>${esc(x.name)}</option>`).join('');
+renderRuleInstances();$('mRaw').textContent=d.raw_count;$('mEffective').textContent=d.effective_observations;$('mVisit').textContent=d.visit_count;$('mPerson').textContent=d.person_count;$('mAlert').textContent=d.alerts.length;
 $('rules').innerHTML=d.rule_counts.map(x=>`<div class="rline"><span>${esc(x.name)}</span><strong>${x.count}</strong></div>`).join('');
 $('configs').innerHTML=Object.entries(LABEL).map(([key,title])=>{let v=d.config[key];let input=key==='absence_mode'?`<select id="cfg_${key}"><option value="days" ${v==='days'?'selected':''}>连续天数</option><option value="missed_checks" ${v==='missed_checks'?'selected':''}>连续缺席检查周期</option></select>`:key==='affiliation_mode'?`<select id="cfg_${key}"><option value="earliest" ${v==='earliest'?'selected':''}>最早出现优先</option><option value="frequency" ${v==='frequency'?'selected':''}>有效出现次数优先</option></select>`:key==='watch_place_id'?`<select id="cfg_${key}"><option value="0">不启用</option>${p.map(r=>`<option value="${r.id}" ${r.id===v?'selected':''}>${esc(r.name)}</option>`).join('')}</select>`:`<input id="cfg_${key}" type="number" min="1" max="1440" value="${v}">`;return `<label class="field">${esc(title)}${input}</label>`}).join('');
 $('watchMultiPlaces').innerHTML=p.map(x=>`<option value="${x.id}" ${(d.config.watch_place_ids||[]).includes(x.id)?'selected':''}>${esc(x.name)}</option>`).join('');
@@ -84,5 +179,5 @@ cfg.watch_person_ids=$('watchPeople').value.split(/[,，;；\s]+/).map(x=>x.trim
 await work(()=>api('/api/business/config','PUT',cfg),'配置已保存，原始观测不变，规则已重算。')}
 async function fixObs(id){let x=obs.find(v=>v.id===id);if(!x)return;let input=prompt(`原始模拟身份 ${x.person_label}。\n输入新的有效身份（P001–P999），或输入 X 排除该次记录：`,x.excluded?'X':x.effective_person||x.person_label);if(input===null)return;input=input.trim().toUpperCase();if(input!=='X'&&!/^P\d{3}$/.test(input)){pop('身份只能是 P001–P999 或 X',true);return}let reason=prompt('输入复核依据（至少两个字符）：','人工检查演示数据');if(reason===null)return;await work(()=>api('/api/business/observations/'+id+'/review','POST',{excluded:input==='X',corrected_person:input==='X'?null:input,reason}), '已保留原始观测并记录更正；到访和规则已重新计算。')}
 async function reviewAlert(key){let alert_=data.alerts.find(v=>v.key===key);if(!alert_)return;let choice=prompt('复核 '+alert_.type_name+'\n请输入 1=规则命中，2=误报，3=待补充：','1');if(choice===null)return;let code={'1':'confirmed','2':'false_positive','3':'needs_review'}[choice.trim()];if(!code){pop('只能输入1、2、3',true);return}let reason=prompt('复核依据（至少两个字符）：','演示规则人工复核');if(reason===null)return;await work(()=>api('/api/business/alerts/'+key+'/review','POST',{decision:code,reason}),'人工核实结果已写入审计历史，规则命中原始证据保留。')}
-reload().catch(e=>pop('读取数据失败：'+e.message,true));
+resetRuleInstanceForm();reload().catch(e=>pop('读取数据失败：'+e.message,true));
 </script></body></html>
