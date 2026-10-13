@@ -60,7 +60,8 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <div class="row"><button id="process" class="secondary">运行已有匿名人脸检测</button>
 <label>成熟跟踪算法<select id="trackerAlgorithm"><option value="bytetrack">ByteTrack</option><option value="ocsort">OC-SORT</option></select></label>
 <button id="benchmarkTracker" class="secondary">验证现成算法的本机跟踪</button>
-<button id="benchmarkPair" class="secondary">双摄像机×ByteTrack/OC-SORT联合验证</button></div>
+<button id="benchmarkPair" class="secondary">双摄像机×ByteTrack/OC-SORT联合验证</button>
+<button id="benchmarkDetector" class="secondary">真实YOLO11n人体检测→ByteTrack</button></div>
 <p class="small">ByteTrack 使用 Roboflow 已有开源实现，输入是官方 CAVIAR 人工人体框，不是我们的检测预测。只验证本机自动跟踪稳定性，不能识别跨镜头同一真人；需安装可选跟踪依赖。</p>
 <pre id="trackerBaseline" class="small" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
 <p class="small">目前项目已有 OpenCV 的人脸候选检测；监控分辨率仅384×288，可能检测到0张脸。这不等于没有人员！后续的人体检测必须单独实测。</p>
@@ -255,6 +256,24 @@ async function evaluateBothTrackers(){
  }catch(e){$('trackerBaseline').textContent='双摄像机验证未完成：'+e.message}
  finally{btn.disabled=false}
 }
+async function evaluateRealPersonDetector(){
+ const source=current();if(!source){$('trackerBaseline').textContent='先导入官方CAVIAR视频';return}
+ const btn=$('benchmarkDetector');btn.disabled=true;
+ $('trackerBaseline').textContent='正从本地已校验的官方MPEG帧调用已有YOLO11n人体检测+ByteTrack；不使用人工GT框作为检测输入。';
+ try{
+  const r=await api('/api/cctv/sources/'+source+
+       '/person-detector-baseline?max_frames=32&sample_every=1');
+  $('trackerBaseline').textContent='真实预训练检测 '+r.model+
+    ' + 现成 '+r.tracker+'\n摄像机：'+r.camera_view+
+    '\n真实解码帧：'+r.frames_decoded+'；模型推理帧：'+r.frames_inferred+
+    '；实际检出人体框：'+r.predicted_person_boxes+
+    '；已分配本机跟踪框：'+r.tracker_assigned_boxes+
+    '；模型产生本机轨迹：'+r.camera_local_tracker_ids+
+    '\n同帧官方人工框（独立参考，绝未喂给YOLO）：'+r.published_gt_boxes_on_inferred_frames+
+    '\n未做跨机位身份识别、真实独立人去重或真实到访，许可：'+r.model_license;
+ }catch(e){$('trackerBaseline').textContent='现成人体检测链路未通过：'+e.message}
+ finally{btn.disabled=false}
+}
 async function evaluateExistingTracker(){
  const source=current();
  if(!source){$('trackerBaseline').textContent='尚未导入研究视频';return}
@@ -325,5 +344,6 @@ $('loadPair').onclick=loadPair;$('viewFrame').onclick=()=>viewFrame().catch(e=>$
 $('process').onclick=detect;
 $('benchmarkTracker').onclick=evaluateExistingTracker;
 $('benchmarkPair').onclick=evaluateBothTrackers;
+$('benchmarkDetector').onclick=evaluateRealPersonDetector;
 $('source').onchange=loadTracks;start();
 </script></body></html>
