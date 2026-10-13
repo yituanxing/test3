@@ -184,6 +184,8 @@ def _run(source_id):
                     failure = "STREAM_NO_FRAMES"
                 elif exc.status_code == 409 and "视频源已停用" in detail:
                     failure = "SOURCE_DISABLED"
+                elif exc.status_code == 409 and "视频源配置已更改" in detail:
+                    failure = "SOURCE_RECONFIGURED"
                 elif exc.status_code == 500 and "检测器初始化失败" in detail:
                     failure = "DETECTOR_INIT_FAILED"
                 else:
