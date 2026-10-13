@@ -254,6 +254,11 @@ def graph(source_id:int,request:Request):
               AND video_offset_ms>=? AND video_offset_ms<?""",
               (source_id,revision,segment['start_ms'],segment['end_ms'])).fetchone()
             segment['decoded_sample_count']=sample['n']
+            segment['evidence_samples']=[dict(x) for x in c.execute("""SELECT id,video_offset_ms,frame_index
+              FROM samples WHERE source_id=? AND origin='video' AND source_revision=?
+              AND video_offset_ms>=? AND video_offset_ms<?
+              ORDER BY video_offset_ms LIMIT 10""",
+              (source_id,revision,segment['start_ms'],segment['end_ms']))]
             segment['mode']='manually_named_video_interval'
             cuts.append(segment)
         transition_counts=defaultdict(int)
