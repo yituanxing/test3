@@ -73,6 +73,11 @@ def test_fixed_cameras_share_one_real_place_no_cross_camera_identity(context,mon
         assert out['track_semantics']=='camera_local_ground_truth_not_global_identity'
         created.append(out['source_id'])
     assert created[0]!=created[1]
+    # Both camera angles must never be misrepresented as different venues.
+    other=client.get('/api/places',headers=root).json()
+    different=next(x['id'] for x in other if x['id']!=place)
+    assert client.post(url,headers=root,json={
+        'place_id':different,'view':'front'}).status_code==409
     # Shared region monitoring shows archive evidence only in its own lane;
     # changing imported GT must never manufacture current-day people/events.
     metrics=client.get('/api/monitoring/overview',headers=root)
