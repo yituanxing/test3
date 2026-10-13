@@ -271,6 +271,10 @@ def delete_segment(segment_id:int,request:Request):
                         (segment_id,)).fetchone()['n']
         if count:
             raise HTTPException(409,'请先处理镜头内的人工角色证据，不直接级联删除')
+        grouping=c.execute('SELECT 1 FROM anime_segment_group_reviews WHERE segment_id=? LIMIT 1',
+                           (segment_id,)).fetchone()
+        if grouping:
+            raise HTTPException(409,'该镜头已有人工剧情场景归并历史，不可直接删除证据')
         c.execute('DELETE FROM anime_scene_segments WHERE id=?',(segment_id,))
         return {'deleted':segment_id}
 
