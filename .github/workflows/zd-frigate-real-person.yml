@@ -165,6 +165,19 @@ jobs:
             reports/cartoon-holdout-v1/unseen_buck/result.json
             reports/cartoon-holdout-v1/negative_sintel/result.json
           if-no-files-found: warn
+      - name: Evaluate frozen matching on complete unseen 10-minute Blender movie
+        run: python -m scripts.cartoon_full_film_holdout
+      - name: Publish full-film holdout audit before any post-evaluation tuning
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-frozen-full-film-holdout
+          path: |
+            reports/cartoon-full-film-holdout/frozen_result.json
+            reports/cartoon-full-film-holdout/whole_film_contact.jpg
+            reports/cartoon-full-film-holdout/evaluation/result.json
+            reports/cartoon-full-film-holdout/evaluation/frames/*.jpg
+          if-no-files-found: warn
       - name: Group detector-generated cartoon boxes with existing ByteTrack
         run: python -m scripts.cartoon_video_track_existing
       - name: Preserve independently reviewed track consistency evidence
