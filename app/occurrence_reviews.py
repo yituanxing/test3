@@ -62,13 +62,12 @@ def _allowed(c,request):
 def _resolve(c,request,occurrence_key):
     if not VALID_KEY.fullmatch(occurrence_key):
         raise HTTPException(422,'不是合法的匿名局部事件编号')
-    # V1 read-only projection is intentionally bounded. A retained review
-    # never proves an upstream local track still exists or is in scope.
+    # Lookup is scoped by SQL *before* paging and traverses the whole
+    # authorized event set; page 201 is as reviewable as page 1.
     allowed=_allowed(c,request)
-    rows,_=occurrences.occurrences(c,allowed,limit=occurrences.MAX_PAGE)
-    row=next((r for r in rows if r['occurrence_key']==occurrence_key),None)
+    row=occurrences.occurrence_by_key(c,allowed,occurrence_key)
     if row is None:
-        raise HTTPException(404,'事件不存在或不在当前辖区/有界证据窗口内')
+        raise HTTPException(404,'事件不存在或不在当前辖区')
     return row
 
 
@@ -163,16 +162,17 @@ def review_quality(occurrence_key:str,data:QualityReviewIn,request:Request):
 def quality_summary(request:Request):
     """Current QA counts only. Does NOT count people, visits or biometric IDs."""
     with _db() as c:
-        rows,_=occurrences.occurrences(c,_allowed(c,request),
-                                       limit=occurrences.MAX_PAGE)
+        rows=occurrences.iter_occurrences(c,_allowed(c,request))
         counts={'not_reviewed':0,'valid_local_target':0,'false_positive':0,
                 'needs_review':0,'stale_review':0}
+        scanned=0
         for row in rows:
             state=_state(c,row)
             counts[state['quality_status']]+=1
+            scanned+=1
         return {'mode':'anonymous_evidence_quality_only',
-                'counts':counts,'camera_local_events_scanned':len(rows),
-                'scan_bounded':len(rows)==occurrences.MAX_PAGE,
+                'counts':counts,'camera_local_events_scanned':scanned,
+                'scan_bounded':False,
                 'counts_real_people':False,'counts_site_visits':False,
                 'reviewed_is_verified_identity':False,
                 'note':'仅审核局部目标是否为合理人形目标，不确认真人身份；修改源证据后旧审核标记为过时。'}
