@@ -20,7 +20,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview, face_activity_details
-from app import admin, base_registry, insights, access, gb28181
+from app import admin, base_registry, insights, access, gb28181, continuous_capture
 import httpx
 from pydantic import BaseModel, Field
 
@@ -232,6 +232,7 @@ def setup_db():
         base_registry.initialize(c)
         access.initialize(c)
         gb28181.initialize(c)
+        continuous_capture.initialize(c)
 
 
 setup_db()
@@ -1234,3 +1235,8 @@ def get_insights_relationships(request:Request, days: int = Query(30,ge=1,le=365
             place_ids={place_id}
         return insights.relationships(_analyze_synthetic(c),place_ids=place_ids,
                                       days=days,person=person)
+
+
+# Register after process_source is defined; worker reuses its tested inference path.
+continuous_capture.register(app, db, lambda source_id: process_source(
+    source_id, max_frames=90, sample_every=10))
