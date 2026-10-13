@@ -242,3 +242,65 @@ def test_dual_camera_existing_tracker_baseline_is_not_global_identity(context,mo
     with main.db() as c:
         assert c.execute('SELECT COUNT(*) FROM research_occurrence_links').fetchone()[0]==0
         assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
+
+
+def test_real_pretrained_detector_endpoint_is_scoped_and_never_fakes_missing_model(context,monkeypatch):
+    from app import person_detection_adapter
+    from fastapi import HTTPException
+    main,mod,client,place,root,county=context
+    clip=(Path(__file__).resolve().parents[1]/'samples'/'astronaut-face-test.mp4').read_bytes()
+    monkeypatch.setattr(mod,'_fetch_allowlisted',
+                        lambda url,max_bytes: xml() if url.endswith('.xml') else clip)
+    imp=client.post('/api/cctv/datasets/import',headers=root,
+                    json={'place_id':place,'view':'corridor'})
+    assert imp.status_code==201,imp.text
+    sid=imp.json()['source_id']
+    route=f'/api/cctv/sources/{sid}/person-detector-baseline'
+    assert client.get(route).status_code==401
+    assert client.get(route,headers=county,params={'max_frames':65}).status_code==422
+    assert client.get(route,headers=county,params={'sample_every':0}).status_code==422
+    assert client.get('/api/cctv/sources/999999/person-detector-baseline',
+                      headers=county).status_code==404
+    def model_unavailable():
+        raise HTTPException(503,'YOLO11n研究模型尚未安装')
+    monkeypatch.setattr(person_detection_adapter,'_model',model_unavailable)
+    missing=client.get(route,headers=county)
+    assert missing.status_code==503,missing.text
+    assert 'YOLO11n' in missing.text
+    # Critical: if a downloaded video is modified, do not silently infer
+    # and then claim a metric that used a different video than GT.
+    with main.db() as c:
+        c.execute("UPDATE public_cctv_imports SET video_sha256=? WHERE source_id=?",
+                  ('0'*64,sid))
+    invalid=client.get(route,headers=county)
+    assert invalid.status_code==409
+    assert 'SHA256' in invalid.text
+    with main.db() as c:
+        assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
+        assert c.execute('SELECT COUNT(*) FROM research_occurrence_links').fetchone()[0]==0
+
+
+def test_actual_pretrained_yolo_person_on_video_when_optional_model_installed(context,monkeypatch):
+    pytest.importorskip('ultralytics')
+    pytest.importorskip('trackers')
+    main,mod,client,place,root,county=context
+    clip=(Path(__file__).resolve().parents[1]/'samples'/'astronaut-face-test.mp4').read_bytes()
+    monkeypatch.setattr(mod,'_fetch_allowlisted',
+                        lambda url,max_bytes: xml() if url.endswith('.xml') else clip)
+    imp=client.post('/api/cctv/datasets/import',headers=root,
+                    json={'place_id':place,'view':'corridor'})
+    assert imp.status_code==201,imp.text
+    sid=imp.json()['source_id']
+    r=client.get(f'/api/cctv/sources/{sid}/person-detector-baseline?max_frames=4',
+                 headers=county)
+    assert r.status_code==200,r.text
+    result=r.json()
+    assert result['frames_decoded']==4 and result['frames_inferred']==4
+    assert result['real_pretrained_person_detector_ran'] is True
+    assert result['existing_automatic_tracker_ran'] is True
+    assert result['detector_received_ground_truth_boxes'] is False
+    assert result['cross_camera_identity_matching_ran'] is False
+    assert result['identity_accuracy_measured'] is False
+    assert result['counted_unique_people'] is False
+    assert sum(x['automatically_detected_person_boxes']
+               for x in result['frame_summaries'])==result['predicted_person_boxes']
