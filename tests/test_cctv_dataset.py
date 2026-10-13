@@ -133,3 +133,68 @@ def test_caviar_loader_denies_arbitrary_network_sources_or_malformed_xml(context
         mod._annotations(b'<dataset><frame number="1"><objectlist><object id="1"><box xc="oops" yc="10" w="2" h="2"/></object></objectlist></frame></dataset>',
                          max_frames=20)
     assert exc.value.status_code==422
+
+
+def test_existing_tracker_baseline_requires_real_optional_dependency_and_enforces_scope(context,monkeypatch):
+    main,mod,client,place,root,county=context
+    from app import tracker_adapters
+    clip=(Path(__file__).resolve().parents[1]/'samples'/'astronaut-face-test.mp4').read_bytes()
+    monkeypatch.setattr(mod,'_fetch_allowlisted',
+                        lambda url,max_bytes: xml() if url.endswith('.xml') else clip)
+    response=client.post('/api/cctv/datasets/import',headers=root,
+                         json={'place_id':place,'view':'corridor'})
+    assert response.status_code==201,response.text
+    source=response.json()['source_id']
+    path=f'/api/cctv/sources/{source}/tracking-baseline'
+    assert client.get(path).status_code==401
+    assert client.get(path,headers=county,params={'max_frames':0}).status_code==422
+    assert client.get('/api/cctv/sources/99999/tracking-baseline',
+                      headers=county).status_code==404
+    from fastapi import HTTPException
+    def no_dependency():
+        raise HTTPException(503,'必须安装现有 ByteTrack 包')
+    monkeypatch.setattr(tracker_adapters,'_dependencies',no_dependency)
+    missing=client.get(path,headers=county)
+    assert missing.status_code==503
+    assert 'ByteTrack' in missing.text
+    # A failure must not invent track IDs or write sample/identity records.
+    with main.db() as c:
+        assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
+        assert c.execute('SELECT COUNT(*) FROM research_occurrence_links').fetchone()[0]==0
+
+
+def test_actual_roboflow_bytetrack_tracks_camera_local_ground_truth_when_installed(context,monkeypatch):
+    pytest.importorskip('trackers')
+    pytest.importorskip('supervision')
+    main,mod,client,place,root,county=context
+    clip=(Path(__file__).resolve().parents[1]/'samples'/'astronaut-face-test.mp4').read_bytes()
+    monkeypatch.setattr(mod,'_fetch_allowlisted',
+                        lambda url,max_bytes: xml() if url.endswith('.xml') else clip)
+    ids=[]
+    for view in ('corridor','front'):
+        resp=client.post('/api/cctv/datasets/import',headers=root,
+                         json={'place_id':place,'view':view})
+        assert resp.status_code==201,resp.text
+        ids.append(resp.json()['source_id'])
+    outputs=[]
+    for source in ids:
+        r=client.get(f'/api/cctv/sources/{source}/tracking-baseline?max_frames=8',
+                     headers=county)
+        assert r.status_code==200,r.text
+        data=r.json()
+        assert data['tracker']=='roboflow_trackers_bytetrack'
+        assert data['ground_truth_boxes']==4
+        assert data['ground_truth_local_track_count']==2
+        assert data['automatic_tracking_ran'] is True
+        assert data['automatic_person_detection_ran'] is False
+        assert data['cross_camera_matching_ran'] is False
+        assert data['counts_unique_people'] is False
+        assert data['feeds_real_roster_or_alerts'] is False
+        assert data['assignment_coverage'] is not None
+        assert data['assigned_boxes']+data['unconfirmed_boxes']==4
+        outputs.append(data)
+    assert outputs[0]['source_id']!=outputs[1]['source_id']
+    assert {x['camera_view'] for x in outputs}=={'front','corridor'}
+    with main.db() as c:
+        assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
+        assert c.execute('SELECT COUNT(*) FROM research_occurrence_links').fetchone()[0]==0
