@@ -262,15 +262,17 @@ async function evaluateRealPersonDetector(){
  $('trackerBaseline').textContent='正从本地已校验的官方MPEG帧调用已有YOLO11n人体检测+ByteTrack；不使用人工GT框作为检测输入。';
  try{
   const r=await api('/api/cctv/sources/'+source+
-       '/person-detector-baseline?max_frames=32&sample_every=1');
+       '/person-detector-run?max_frames=32&sample_every=1','POST');
   $('trackerBaseline').textContent='真实预训练检测 '+r.model+
     ' + 现成 '+r.tracker+'\n摄像机：'+r.camera_view+
     '\n真实解码帧：'+r.frames_decoded+'；模型推理帧：'+r.frames_inferred+
     '；实际检出人体框：'+r.predicted_person_boxes+
     '；已分配本机跟踪框：'+r.tracker_assigned_boxes+
     '；模型产生本机轨迹：'+r.camera_local_tracker_ids+
+    '；已存证据框：'+r.stored_local_boxes+'；记录版本：'+r.run_key+
     '\n同帧官方人工框（独立参考，绝未喂给YOLO）：'+r.published_gt_boxes_on_inferred_frames+
-    '\n未做跨机位身份识别、真实独立人去重或真实到访，许可：'+r.model_license;
+    '\n原始模型目标已进入统一匿名事件、来源与人工QA；没有跨机身份识别或真实到访。许可：'+r.model_license;
+  await refreshOccurrences();await refreshQuality();
  }catch(e){$('trackerBaseline').textContent='现成人体检测链路未通过：'+e.message}
  finally{btn.disabled=false}
 }
