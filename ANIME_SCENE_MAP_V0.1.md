@@ -22,7 +22,7 @@
 
 ## 已经实现的 Demo 最短路径
 
-1. 在“管理”登记后端可访问的本地动画视频（`sources.kind='file'`，URI 是**服务器本地路径**）。
+1. 现在可直接在 `/anime-scenes` 页面使用**本机浏览器文件上传**：选择本地动画 MP4/MOV/MKV/AVI，选定授权场所，单次 ≤128MiB；实际二进制流保存到本地 `ZD_DATA_DIR/anime_uploads/`，OpenCV 验证可解码后才登记为 `sources.kind='file'`。也可在“管理”登记服务端已有文件路径。页面不会自动推断角色和地点。
 2. 打开 `/anime-scenes`，选择视频；点击“扫描视频剪辑点”。
 3. `GET /api/anime/scenes/sources/{source_id}/suggest` 使用已有 OpenCV 真实
    解码视频，按帧取样并计算压缩后的像素差。结果仅为**剪辑边界候选**
@@ -42,7 +42,7 @@
 
 ## 代码结构
 
-- `app/anime_scenes.py`：独立的、服务端辖区受控的 CRUD、剪辑候选、图谱汇总。
+- `app/anime_scenes.py`：独立的、服务端辖区受控的 CRUD、≤128MiB 有界原始视频字节上传（无需另装 multipart）、剪辑候选、图谱汇总。
   SQLite 新增 `anime_scene_segments` 和 `anime_character_reviews`。
 - `static/anime-scenes.html`：实际视频剪辑候选、人工命名场景、SVG 场景示意、
   证据回溯角色时间线；从综合态势、监控、业务规则、管理导航可进入。
