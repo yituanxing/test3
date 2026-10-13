@@ -33,25 +33,39 @@ from scripts.verify_cartoon_character import (
 
 DETECTOR_ID = "IDEA-Research/grounding-dino-tiny"
 # The film clip is actual moving video, NOT assembled photo slides.
-PUBLIC_CLIP_URL = (
-    "https://upload.wikimedia.org/wikipedia/commons/1/1b/"
-    "Big_buck_bunny_montage.ogv"
-)
+PUBLIC_CLIP_URLS = [
+    # 15s genuine activity montage, original Wikimedia CC BY clip.
+    "https://upload.wikimedia.org/wikipedia/commons/1/1b/Big_buck_bunny_montage.ogv",
+    # Independent licensed originals when public Wikimedia CDN throttles CI.
+    "https://www.w3schools.com/html/mov_bbb.mp4",
+    "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4",
+]
 PROMPT = "a big white rabbit. a cartoon bunny. a small squirrel."
 OUT_DEFAULT = ROOT / "reports/cartoon-video-proof"
 
 
 def fetch_demo_video(out: Path) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
-    if out.is_file() and out.stat().st_size > 500_000:
+    source_note = out.with_suffix(".source.txt")
+    if out.is_file() and out.stat().st_size > 100_000:
         return out
-    response = requests.get(PUBLIC_CLIP_URL, timeout=70,
-                            headers={"User-Agent": "ZD-Cartoon-Video-Proof/1.0"})
-    response.raise_for_status()
-    if not 500_000 < len(response.content) < 30_000_000:
-        raise RuntimeError("Demo source unexpected size")
-    out.write_bytes(response.content)
-    return out
+    errors = []
+    for url in PUBLIC_CLIP_URLS:
+        try:
+            response = requests.get(
+                url, timeout=45,
+                headers={"User-Agent": "ZD-Cartoon-Video-Proof/1.0"})
+            response.raise_for_status()
+            if not 100_000 < len(response.content) < 30_000_000:
+                raise RuntimeError("unexpected video size")
+            out.write_bytes(response.content)
+            source_note.write_text(url, encoding="utf-8")
+            return out
+        except (requests.RequestException, OSError, RuntimeError) as exc:
+            out.unlink(missing_ok=True)
+            errors.append(type(exc).__name__)
+    raise RuntimeError("All three licensed video mirrors unavailable: " +
+                       ",".join(errors))
 
 
 def choose_video_frames(video: Path, *, stride_seconds: float, max_frames: int):
@@ -129,7 +143,9 @@ def run(video: Path, out: Path, *,
     report = {
         "status": "FAIL",
         "video": str(video),
-        "video_source": PUBLIC_CLIP_URL if video.name == "big_buck_bunny_montage.ogv" else "user_supplied",
+        "video_source": (video.with_suffix(".source.txt").read_text(encoding="utf-8")
+                         if video.with_suffix(".source.txt").is_file()
+                         else "user_supplied"),
         "licensed_media": LICENSE,
         "detector": DETECTOR_ID,
         "embedding_model": "Meta DINOv2 ViT-S/14, frozen",
