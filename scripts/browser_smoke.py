@@ -86,6 +86,17 @@ def run():
                         page.locator('a[data-tab="overview"]').click()
                         expect(page.locator("h2.lead")).to_contain_text("辖区重点场所运行概览")
                         checks.append("home_navigation")
+                        # Primary human CCTV route: real-source catalog and
+                        # truthful empty state. A real remote pair is verified
+                        # separately in the cctv-real labelled CI step.
+                        page.goto(base+"/cctv")
+                        expect(page.get_by_role("heading",name="真实监控视频 · 固定摄像机验收")).to_be_visible()
+                        expect(page.locator("#place")).to_contain_text("测试场所 A")
+                        expect(page.locator("#sources")).to_contain_text(
+                            "尚无研究监控视频", timeout=12000)
+                        assert page.locator("#sources tr").count()==1
+                        checks.append("real_fixed_camera_catalog_truthful_no_video_state")
+                        page.screenshot(path=str(OUT/"ui-cctv-primary.png"),full_page=True)
                         # Excel #20/#23: the admin screen MUST actually attach
                         # Bearer auth, list real inventory, register an RTSP
                         # source and create a scope-bound login through its UI.
