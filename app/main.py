@@ -21,7 +21,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview, face_activity_details
-from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes
+from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology
 import httpx
 from pydantic import BaseModel, Field
 
@@ -236,6 +236,7 @@ def setup_db():
         gb28181.initialize(c)
         continuous_capture.initialize(c)
         anime_scenes.initialize(c)
+        anime_ontology.initialize(c)
 
 
 setup_db()
@@ -257,6 +258,7 @@ base_registry.register(app,db)
 access.register(app,db)
 rule_instances.register(app,db)
 anime_scenes.register(app,db,_file_revision,DATA_DIR / 'anime_uploads')
+anime_ontology.register(app,db,_file_revision)
 gb28181.register(app,db)
 
 
