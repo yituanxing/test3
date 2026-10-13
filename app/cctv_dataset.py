@@ -279,6 +279,8 @@ def import_video(data:ImportIn,request:Request):
                       (data.place_id,
                        f"CAVIAR {data.scenario} / {data.view} 固定摄像机",
                        'file',str(dest)))
+        from app import site_model
+        site_model.record_initial(c,src.lastrowid,data.place_id)
         c.execute('''INSERT INTO public_cctv_imports(source_id,dataset,scenario,camera_view,
                   video_sha256,video_bytes,video_url,annotation_url,
                   frames_available,xml_frame_count,license_note,imported_at)
