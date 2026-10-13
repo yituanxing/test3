@@ -32,7 +32,10 @@ code{background:#f1f4fa;padding:1px 5px;border-radius:5px}
 动漫的学校、房间、街道等都是剧情场景，视频只能给出镜头画面和播放时间；镜头切换不代表角色走动，也没有真实经纬度。
 候选镜头是像素差算法的自动建议，名称需要人工核实。只有人工绑定了实际视频帧证据，才展示虚构角色 C### 的故事板时间线；
 <strong>不把 OpenCV 人脸框自动当成动漫角色身份</strong>。</section>
-<section class="panel"><h2>① 选择真实视频并提出镜头候选</h2>
+<section class="panel"><h2>① 上传/选择实际动画视频并提出镜头候选</h2>
+<div class="row"><label>选择本机动画片段<input type="file" id="uploadFile" accept=".mp4,.mov,.mkv,.avi,video/*"></label>
+<label>绑定场所<select id="uploadPlace"></select></label>
+<button id="upload">上传并登记视频</button><span class="info">浏览器直接上传本地视频，单文件最多128MiB，仅州级管理员。不会自动识别动画角色。</span></div>
 <div class="row"><label>本地视频源<select id="source"></select></label>
 <label>像素差阈值<input id="threshold" type="number" value="32" min="5" max="200"></label>
 <label>扫描最初秒数<input id="seconds" type="number" value="45" min="1" max="180"></label>
@@ -141,10 +144,35 @@ async function tag(){
    note:$('reviewNote').value.trim()});await reload();say('已保存人工角色证据 #'+x.id+'，来源是真实解码帧')}
  catch(e){say('保存失败：'+e.message,true)}
 }
-async function start(){try{const sources=await api('/api/sources');const files=sources.filter(x=>x.kind==='file');
- $('source').innerHTML=files.map(x=>`<option value="${x.id}">${esc(x.name)} (#${x.id})</option>`).join('');
- if(!files.length){say('需要先在视频管理中登记一个本地动画文件',true);return}
+async function reloadSources(wanted){
+ const sources=await api('/api/sources');const files=sources.filter(x=>x.kind==='file');
+ const selected=wanted??sid();$('source').innerHTML=files.map(x=>`<option value="${x.id}">${esc(x.name)} (#${x.id})</option>`).join('');
+ if(files.some(x=>x.id===Number(selected)))$('source').value=String(selected);
+ return files.length;
+}
+async function upload(){
+ const file=$('uploadFile').files[0],place=Number($('uploadPlace').value);
+ if(!file||!place){say('先选动画文件和对应场所',true);return}
+ if(file.size>128*1024*1024){say('超过本地Demo 128MiB上限',true);return}
+ $('upload').disabled=true;say('正在上传真实视频并检查解码…');
+ try{
+   const r=await fetch('/api/anime/scenes/uploads?place_id='+place,
+     {method:'POST',headers:{'Authorization':'Bearer '+token,
+                             'X-Upload-Name':encodeURIComponent(file.name),
+                             'Content-Type':'application/octet-stream'},body:file});
+   const d=await r.json();
+   if(!r.ok)throw Error(d.detail||'上传失败');
+   await reloadSources(d.id);await reload();
+   say('视频上传成功：'+d.name+'（'+d.size_bytes+'字节），可以开始真实镜头扫描。');
+ }catch(e){say('上传失败：'+e.message,true)}finally{$('upload').disabled=false}
+}
+async function start(){try{
+ const [places,n]=await Promise.all([api('/api/places'),reloadSources()]);
+ $('uploadPlace').innerHTML=places.filter(x=>x.active).map(x=>
+ `<option value="${x.id}">${esc(x.name)}</option>`).join('');
+ if(!n){say('请先通过上方按钮上传本地动画文件',true);return}
  await reload()}catch(e){say('加载失败：'+e.message,true)}}
+$('upload').onclick=upload;
 $('suggest').onclick=suggest;$('reload').onclick=()=>reload().catch(e=>say(e.message,true));
 $('source').onchange=()=>{state=null;$('candidates').innerHTML='<tr><td colspan="6">切换来源后请重新扫描</td></tr>';reload().catch(e=>say(e.message,true))};
 $('targetScene').onchange=fillSamples;$('tag').onclick=tag;
