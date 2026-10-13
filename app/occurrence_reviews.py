@@ -85,6 +85,17 @@ def _signature(c,row):
             WHERE source_id=? AND camera_local_track_id=?
             ORDER BY frame_number""",(row['source_id'],row['track_id']))]
         extra={'video_sha256':source['video_sha256'] if source else None,'boxes':frames}
+    elif row['provider']=='yolo_bytetrack':
+        run=c.execute("""SELECT video_sha256,model_name,tracker_name,params_json,
+             frames_decoded,frames_inferred FROM model_track_runs WHERE run_key=?""",
+             (row['run_key'],)).fetchone()
+        boxes=[tuple(b) for b in c.execute("""SELECT frame_number,x,y,width,height,
+               confidence FROM model_track_boxes
+               WHERE run_key=? AND local_track_id=?
+               ORDER BY frame_number""",(row['run_key'],row['track_id']))]
+        extra={'run_key':row['run_key'],
+               'model_run_provenance':dict(run) if run else None,
+               'automatic_track_boxes':boxes}
     elif row['provider']=='frigate':
         ev=c.execute("""SELECT started_at,ended_at,score,has_snapshot,updated_at,
                      place_id,label
@@ -104,6 +115,7 @@ def _signature(c,row):
           'camera':row['camera_key'],'track_id':row['track_id'],
           'venue_id':row['venue_id'],
           'binding_epoch_id':row.get('binding_epoch_id'),
+          'run_key':row.get('run_key'),
       },
       'upstream':extra,
     }
