@@ -53,7 +53,8 @@ def _scoped_rows(c,allowed,*,limit=500,offset=0,live_start=None,live_end=None):
           b.camera_local_track_id AS track_id,
           MIN(b.frame_number) AS first_seen,MAX(b.frame_number) AS last_seen,
           COUNT(*) AS annotation_frames,NULL AS score,
-          NULL AS binding_epoch_id
+          NULL AS binding_epoch_id,
+          NULL AS run_key
         FROM public_cctv_track_boxes b
         JOIN public_cctv_imports i ON i.source_id=b.source_id
         JOIN sources s ON s.id=b.source_id
@@ -61,8 +62,22 @@ def _scoped_rows(c,allowed,*,limit=500,offset=0,live_start=None,live_end=None):
         GROUP BY i.source_id,i.camera_view,i.video_sha256,s.place_id,
                  b.camera_local_track_id
         UNION ALL
+        SELECT 'yolo_bytetrack' AS provider,run.source_id,imp.camera_view,
+               run.video_sha256 AS file_sha,s.place_id AS venue_id,
+               b.local_track_id AS track_id,
+               MIN(b.frame_number) AS first_seen,
+               MAX(b.frame_number) AS last_seen,
+               COUNT(*) AS annotation_frames,MAX(b.confidence) AS score,
+               NULL AS binding_epoch_id,run.run_key AS run_key
+        FROM model_track_boxes b JOIN model_track_runs run ON run.run_key=b.run_key
+        JOIN public_cctv_imports imp ON imp.source_id=run.source_id
+        JOIN sources s ON s.id=run.source_id
+        WHERE s.place_id IN ({marks})
+        GROUP BY run.run_key,run.source_id,imp.camera_view,run.video_sha256,
+                 s.place_id,b.local_track_id
+        UNION ALL
         SELECT 'frigate',NULL,e.camera,NULL,e.place_id,e.event_id,
-               e.started_at,e.ended_at,NULL,e.score,e.binding_epoch_id
+               e.started_at,e.ended_at,NULL,e.score,e.binding_epoch_id,NULL
         FROM frigate_object_events e
         WHERE e.place_id IN ({marks}){live_where}
     )
@@ -87,6 +102,25 @@ def _project(row,allowed):
             'time_basis':'UTC_event_clock','unit':'utc_timestamp',
             'annotation_frames':None,'confidence':row['score'],
             'evidence_link':None,'subject_id':None,'identity_confirmed':False,
+            'counts_as_unique_person':False,'counts_as_visit':False,
+        }
+    if row['provider']=='yolo_bytetrack':
+        return {
+            'occurrence_key':_key('yolo_bytetrack',
+                                  f"{source_id}:{row['run_key']}",
+                                  str(row['track_id'])),
+            'provider':'yolo_bytetrack',
+            'evidence_kind':'pretrained_yolo11n_person_detection_existing_bytetrack',
+            'camera_key':row['camera_key'],'source_id':source_id,
+            'run_key':row['run_key'],'binding_epoch_id':None,
+            'track_id':str(row['track_id']),'venue_id':row['venue_id'],
+            'venue_name':allowed[row['venue_id']]['name'],
+            'first_seen':row['first_seen'],'last_seen':row['last_seen'],
+            'time_basis':'archival_video_frame_number','unit':'frame_index_1_based',
+            'annotation_frames':row['annotation_frames'],
+            'confidence':row['score'],
+            'evidence_link':f"/api/cctv/sources/{source_id}/frame",
+            'subject_id':None,'identity_confirmed':False,
             'counts_as_unique_person':False,'counts_as_visit':False,
         }
     return {
@@ -201,6 +235,23 @@ def occurrence_summary(request:Request,days:int|None=Query(default=None,ge=1,le=
             key=('caviar_ground_truth',str(r['source_id']),r['place_id'])
             by[key]={'provider':'caviar_ground_truth','camera_key':r['camera_view'],
                      'source_id':r['source_id'],'venue_id':r['place_id'],
+                     'venue_name':allowed[r['place_id']]['name'],
+                     'local_occurrences':r['local_tracks'],
+                     'annotated_frames':r['boxes'],
+                     'time_basis':'archival_video_frame_number'}
+        for r in c.execute("""SELECT run.source_id,imp.camera_view,s.place_id,
+                 run.run_key,COUNT(DISTINCT b.local_track_id) AS local_tracks,
+                 COUNT(*) AS boxes
+                 FROM model_track_boxes b
+                 JOIN model_track_runs run ON run.run_key=b.run_key
+                 JOIN public_cctv_imports imp ON imp.source_id=run.source_id
+                 JOIN sources s ON s.id=run.source_id
+                 GROUP BY run.run_key,run.source_id,imp.camera_view,s.place_id"""):
+            if r['place_id'] not in allowed:continue
+            key=('yolo_bytetrack',r['run_key'],r['place_id'])
+            by[key]={'provider':'yolo_bytetrack','camera_key':r['camera_view'],
+                     'source_id':r['source_id'],'venue_id':r['place_id'],
+                     'run_key':r['run_key'],
                      'venue_name':allowed[r['place_id']]['name'],
                      'local_occurrences':r['local_tracks'],
                      'annotated_frames':r['boxes'],
