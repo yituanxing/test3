@@ -129,13 +129,32 @@ class PretrainedBoxDetector:
                 "detection_score": float(score),
                 "label": str(label),
             })
-        return sorted(found, key=lambda d: d["detection_score"], reverse=True)
+        # Grounding DINO produces overlapping language phrase proposals for
+        # one character. Standard IoU-NMS prevents counting a single rabbit
+        # three times; each retained box is still purely detector generated.
+        ranked = sorted(found, key=lambda d: d["detection_score"], reverse=True)
+        retained = []
+        for candidate in ranked:
+            x0, y0, x1, y1 = candidate["box_xyxy"]
+            too_close = False
+            for prior in retained:
+                a0, b0, a1, b1 = prior["box_xyxy"]
+                overlap = max(0, min(x1, a1)-max(x0, a0)) * max(
+                    0, min(y1, b1)-max(y0, b0))
+                union = ((x1-x0)*(y1-y0) +
+                         (a1-a0)*(b1-b0) - overlap)
+                if union and overlap / union >= .55:
+                    too_close = True
+                    break
+            if not too_close:
+                retained.append(candidate)
+        return retained
 
 
 def run(video: Path, out: Path, *,
         interval: float = 1.5, max_frames: int = 10,
         box_threshold: float = .28,
-        match_threshold: float = .50,
+        match_threshold: float = .42,
         reference: Path | None = None):
     """Return measured video inference. Never accept annotated/cropped input."""
     out.mkdir(parents=True, exist_ok=True)
@@ -235,10 +254,10 @@ def run(video: Path, out: Path, *,
             "distinct_timestamps_with_buck": len(set(x[0] for x in candidate_items)),
             "note": "Cosine score is not a calibrated identity confidence.",
         })
-        if candidate_items:
-            report["status"] = "PASS"
-        else:
-            report["status"] = "NO_MATCH"
+        # Require the rabbit in more than one ORIGINAL VIDEO timestamp.
+        # A single lucky box is not a convincing video demonstration.
+        report["status"] = ("PASS" if
+            report["distinct_timestamps_with_buck"] >= 2 else "NO_MATCH")
         return report
     except Exception as exc:
         report["error_type"] = type(exc).__name__
@@ -265,7 +284,7 @@ def main(argv=None):
     parser.add_argument("--interval", type=float, default=1.5)
     parser.add_argument("--max-frames", type=int, default=10)
     parser.add_argument("--box-threshold", type=float, default=.28)
-    parser.add_argument("--match-threshold", type=float, default=.50)
+    parser.add_argument("--match-threshold", type=float, default=.42)
     args = parser.parse_args(argv)
     if not 0 < args.interval <= 120 or not 1 <= args.max_frames <= 100:
         parser.error("Invalid frame interval / max frames")
