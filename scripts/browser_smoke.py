@@ -349,6 +349,39 @@ def run():
                         assert graph['characters']=={},graph
                         checks.append("manual_canonical_anime_venue_and_scene_group_browser")
                         page.screenshot(path=str(OUT/"ui-anime-canonical-groups.png"),full_page=True)
+                        # This is a controlled local EVENT FIXTURE for the
+                        # REVIEW UI, not proof that a detector found a person.
+                        # Earlier real-CAVIAR full-media proof remains separate.
+                        with main.db() as check:
+                            check.execute("INSERT OR IGNORE INTO frigate_camera_bindings(camera,place_id) VALUES(?,?)",
+                                          ("qa_camera_fixture",1))
+                            check.execute("""INSERT INTO frigate_object_events
+                              (camera,event_id,place_id,label,started_at,score,has_snapshot,updated_at)
+                              VALUES ('qa_camera_fixture','test-track-1',1,'person',?,0.81,0,?)""",
+                              (main.utcnow(),main.utcnow()))
+                        page.goto(base+"/cctv")
+                        expect(page.locator("#qaOccurrence")).to_contain_text(
+                            "qa_camera_fixture",timeout=12000)
+                        expect(page.locator("#qaStatus")).to_contain_text(
+                            "not_reviewed",timeout=12000)
+                        page.locator("#qaVerdict").select_option("needs_review")
+                        page.locator("#qaReason").fill("浏览器人工质检测试样本：目标框仍需复查")
+                        page.locator("#qaSave").click()
+                        expect(page.locator("#qaStatus")).to_contain_text(
+                            "needs_review",timeout=12000)
+                        expect(page.locator("#qaHistory")).to_contain_text(
+                            "浏览器人工质检测试样本",timeout=12000)
+                        with main.db() as check:
+                            assert check.execute(
+                                "SELECT COUNT(*) FROM anonymous_occurrence_reviews").fetchone()[0]==1
+                            check.execute("""UPDATE frigate_object_events SET score=0.92,
+                               updated_at=? WHERE camera='qa_camera_fixture'
+                               AND event_id='test-track-1'""",(main.utcnow(),))
+                        page.locator("#qaOccurrence").dispatch_event("change")
+                        expect(page.locator("#qaStatus")).to_contain_text(
+                            "stale_review",timeout=12000)
+                        checks.append("real_browser_append_only_anonymous_quality_and_stale_evidence")
+                        page.screenshot(path=str(OUT/"ui-anonymous-quality-review.png"),full_page=True)
                         page.goto(base+"/portal")
                         page.set_viewport_size({"width": 390, "height": 844})
                         page.screenshot(path=str(OUT / "ui-mobile.png"), full_page=True)
