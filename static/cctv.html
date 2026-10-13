@@ -64,6 +64,18 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <div id="tracks" class="small">选择视频源后加载</div>
 </div>
 </section>
+<section class="panel" id="qualityPanel">
+<h2>⑥ 匿名局部目标 · 证据质量人工复核</h2>
+<p class="small">从现有视频匿名事件中挑选一条局部轨迹，评估目标框是否合理。<b>这是“是否为有效局部检测”的质检，不是确认自然人身份，不合并跨摄像机轨迹，更不会创建真实人员底库或预警。</b> 每次审核只追加新记录，源数据改变时旧审核会自动提示过期。</p>
+<div class="row"><label>匿名事件<select id="qaOccurrence"><option value="">暂无真实轨迹</option></select></label>
+<label>审核结论<select id="qaVerdict"><option value="valid_local_target">合理的局部人体目标</option>
+<option value="false_positive">误检/错误标注</option><option value="needs_review">仍需复核</option></select></label>
+<label>审核理由<input id="qaReason" maxlength="400" style="min-width:280px" value="已核查原始视频帧和摄像机局部轨迹证据"></label>
+<button id="qaSave" class="secondary" onclick="saveOccurrenceQuality()">追加审核记录</button></div>
+<p id="qaStatus" class="small">暂无可审核目标；此处不会制造虚构人员或自动身份。</p>
+<div class="scroller"><table><thead><tr><th>审核记录ID</th><th>结论</th><th>依据</th><th>证据摘要</th></tr></thead>
+<tbody id="qaHistory"><tr><td colspan="4">选择一条实际匿名事件</td></tr></tbody></table></div>
+</section>
 <section class="panel"><h2>Excel 场所功能的真实边界</h2>
 <p>摄像机与场所关联、视频导入、实际帧、匿名框/本机局部轨迹可以采用真实数据。
 原 #3 人员底库、#6跨场所、#7同行、#17轨迹等需要跨摄像机身份关联时，先沿用明确标识的合成业务流程；
@@ -92,7 +104,46 @@ async function refresh(){const d=await api('/api/cctv/sources');imported=d.sourc
  if(imported.some(x=>x.source_id===original))$('source').value=String(original);
  if(imported.length)await loadTracks();
  await refreshOccurrences();
+ await refreshQuality();
 }
+async function refreshQuality(){
+ try{
+   const response=await api('/api/site/occurrences?limit=200');
+   const saved=$('qaOccurrence').value;
+   $('qaOccurrence').innerHTML=response.occurrences.map(x=>
+     '<option value="'+x.occurrence_key+'">'+esc(x.provider)+' / '+esc(x.camera_key)+
+     ' / '+esc(x.track_id)+'（'+esc(x.venue_name)+'）</option>').join('');
+   if(response.occurrences.some(x=>x.occurrence_key===saved))$('qaOccurrence').value=saved;
+   if(response.occurrences.length)await loadOccurrenceQuality();
+   else{$('qaStatus').textContent='没有可供审核的真实匿名局部目标；未生成模拟数据。';
+        $('qaHistory').innerHTML='<tr><td colspan="4">还没有可审核的目标</td></tr>';}
+ }catch(e){$('qaStatus').textContent='读取匿名证据失败：'+e.message}
+}
+async function loadOccurrenceQuality(){
+ const key=$('qaOccurrence').value;if(!key)return;
+ try{
+   const d=await api('/api/site/occurrences/'+key+'/quality');
+   const latest=d.reviews.at(-1);
+   $('qaStatus').textContent='当前局部目标质量状态：'+d.quality_status+
+      (d.review_stale?'（视频证据已有变化，先前审核不再有效）':'')+
+      '。已有 '+d.reviews.length+' 条不可覆盖的审核记录；不会生成真人身份或到访。';
+   $('qaHistory').innerHTML=d.reviews.map(x=>
+      '<tr><td>#'+x.id+'</td><td>'+esc(x.verdict)+
+      '</td><td>'+esc(x.reason)+'</td><td>'+esc(x.evidence_signature.slice(0,14))+
+      '…</td></tr>').join('')||'<tr><td colspan="4">尚未审核，可根据原始画面提交质量结论</td></tr>';
+ }catch(e){$('qaStatus').textContent='读取审核状态失败：'+e.message}
+}
+async function saveOccurrenceQuality(){
+ const key=$('qaOccurrence').value;if(!key){$('qaStatus').textContent='没有实际目标可审核';return}
+ $('qaSave').disabled=true;
+ try{
+   await api('/api/site/occurrences/'+key+'/quality','POST',{
+        verdict:$('qaVerdict').value,reason:$('qaReason').value.trim()});
+   await loadOccurrenceQuality();
+ }catch(e){$('qaStatus').textContent='质量复核未保存：'+e.message}
+ finally{$('qaSave').disabled=false}
+}
+$('qaOccurrence').addEventListener('change',loadOccurrenceQuality);
 async function refreshOccurrences(){
  try{
    const summary=await api('/api/site/occurrences/summary');
