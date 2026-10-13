@@ -299,6 +299,24 @@ def run():
                             assert check.execute(
                                 'SELECT COUNT(*) FROM face_box_reviews').fetchone()[0] == 2
                         checks.append("real_video_face_box_append_only_review_ui")
+                        # Excel #13/#16: actual recorded MP4 -> model face boxes ->
+                        # jurisdiction-scoped, source-filtered evidence ->
+                        # on-demand redacted original frame. This is NOT
+                        # biometric image similarity or independent-person ID.
+                        page.locator("#evidenceSource").select_option(str(face_source_id))
+                        page.locator("#evidenceWithBoxes").check()
+                        page.locator("#evidenceSearchButton").click()
+                        expect(page.locator("#evidencePageInfo")).to_contain_text(
+                            "匹配",timeout=12000)
+                        expect(page.locator("#faceEvidence")).to_contain_text(
+                            "宇航员",timeout=12000)
+                        page.locator("#faceEvidence button").last.click()
+                        expect(page.locator("#redactedEvidence")).to_be_visible(
+                            timeout=12000)
+                        assert page.locator("#redactedEvidence").get_attribute("src").startswith("blob:")
+                        checks.append("real_capture_evidence_query_scoped_and_redacted_preview_browser")
+                        page.screenshot(path=str(OUT/"ui-video-capture-evidence-search.png"),
+                                        full_page=True)
                         # Anime scene map is a STORYBOARD, not GPS. Open a real
                         # decoded file and accept one candidate manually.
                         page.goto(base+"/anime-scenes")
