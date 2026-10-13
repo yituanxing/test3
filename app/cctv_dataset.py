@@ -1,0 +1,321 @@
+"""Public, licensed fixed-CCTV demonstration using the CAVIAR research dataset.
+
+The same *real place* has two stationary cameras. Neither a file nor a
+camera-local annotation ID is a person's real-world identity; the two views
+MUST NOT be counted as two venues or re-identified as one named individual.
+
+Only an allowlisted Edinburgh University public dataset is downloadable.
+MPEG2 + CVML XML may contain real people; do not pack them in the source ZIP.
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+import sqlite3
+import tempfile
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from pathlib import Path
+
+import cv2
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, Field
+from app import access, admin
+
+router = APIRouter()
+_db = None
+_store_dir = None
+MAX_VIDEO_BYTES = 30 * 1024 * 1024
+MAX_XML_BYTES = 5 * 1024 * 1024
+DATASET_ROOT = 'https://groups.inf.ed.ac.uk/vision/DATASETS/CAVIAR/CAVIARDATA2'
+CAVIAR_LICENSE = 'CC BY-SA; credit EC Funded CAVIAR project / IST 2001 37540'
+SCENARIOS = {
+    'enter_exit_crossing_paths_1': {
+        'title': 'EnterExitCrossingPaths1: Lisbon shopping corridor (one venue, two cameras)',
+        'venue_label': '里斯本商场走廊（同一个真实场所）',
+        'views': {
+            'corridor': ('EnterExitCrossingPaths1cor','ceecp1gt.xml'),
+            'front': ('EnterExitCrossingPaths1front','feecp1gt.xml'),
+        },
+    },
+}
+
+
+class ImportIn(BaseModel):
+    place_id: int = Field(gt=0)
+    scenario: str = 'enter_exit_crossing_paths_1'
+    view: str = 'corridor'
+
+
+def _utc():
+    return datetime.now(timezone.utc).isoformat(timespec='seconds')
+
+
+def initialize(c):
+    c.executescript("""
+    CREATE TABLE IF NOT EXISTS public_cctv_imports (
+      source_id INTEGER PRIMARY KEY REFERENCES sources(id),
+      dataset TEXT NOT NULL CHECK(dataset='CAVIAR'),
+      scenario TEXT NOT NULL,
+      camera_view TEXT NOT NULL,
+      video_sha256 TEXT NOT NULL,
+      video_bytes INTEGER NOT NULL,
+      video_url TEXT NOT NULL,
+      annotation_url TEXT NOT NULL,
+      frames_available INTEGER NOT NULL,
+      xml_frame_count INTEGER NOT NULL DEFAULT 0,
+      license_note TEXT NOT NULL,
+      imported_at TEXT NOT NULL,
+      UNIQUE(dataset,scenario,camera_view,source_id)
+    );
+    CREATE TABLE IF NOT EXISTS public_cctv_track_boxes (
+      source_id INTEGER NOT NULL REFERENCES sources(id),
+      frame_number INTEGER NOT NULL,
+      camera_local_track_id TEXT NOT NULL,
+      x INTEGER NOT NULL, y INTEGER NOT NULL,
+      width INTEGER NOT NULL, height INTEGER NOT NULL,
+      provenance TEXT NOT NULL CHECK(provenance='CAVIAR_ANNOTATION'),
+      PRIMARY KEY(source_id,frame_number,camera_local_track_id)
+    );
+    CREATE INDEX IF NOT EXISTS cctv_boxes_track
+      ON public_cctv_track_boxes(source_id,camera_local_track_id,frame_number);
+    """)
+
+
+def register(app, db, store_dir):
+    global _db, _store_dir
+    _db, _store_dir = db, Path(store_dir)
+    app.include_router(router)
+
+
+def _state_admin(request):
+    actor=access.principal(request)
+    if actor is not None and actor['level'] != 1:
+        raise HTTPException(403,'仅州级管理员可导入公开监控研究素材')
+
+
+def _urls(scenario,view):
+    data=SCENARIOS.get(scenario)
+    if not data or view not in data['views']:
+        raise HTTPException(422,'只允许选择公开目录内预置的 CAVIAR 场景及机位')
+    stem,xml=data['views'][view]
+    base=f"{DATASET_ROOT}/{stem}"
+    return f"{base}/{stem}.mpg",f"{base}/{xml}"
+
+
+def _fetch_allowlisted(url, max_bytes):
+    # Fixed HTTPS Edinburgh host and paths ONLY, no user-provided URLs.
+    parsed=urllib.parse.urlsplit(url)
+    if parsed.scheme!='https' or parsed.hostname!='groups.inf.ed.ac.uk' or (
+         not parsed.path.startswith('/vision/DATASETS/CAVIAR/CAVIARDATA2/')):
+        raise HTTPException(422,'远程地址不在已审核的数据集白名单')
+    request=urllib.request.Request(url,headers={'User-Agent':'ZD-CCTV-demo/1.0 (public research clip)'})
+    try:
+        with urllib.request.urlopen(request,timeout=35) as response:
+            final=urllib.parse.urlsplit(response.geturl())
+            if final.scheme!='https' or final.hostname not in (
+                 'groups.inf.ed.ac.uk','homepages.inf.ed.ac.uk'):
+                raise HTTPException(502,'数据站点发生非官方跨域跳转，拒绝下载')
+            chunks=[]
+            total=0
+            while True:
+                piece=response.read(min(262144,max_bytes-total+1))
+                if not piece:
+                    break
+                total+=len(piece)
+                if total>max_bytes:
+                    raise HTTPException(413,'公开测试素材超过单文件限制')
+                chunks.append(piece)
+            if not total:
+                raise HTTPException(502,'官方数据集文件为空')
+            return b''.join(chunks)
+    except HTTPException:
+        raise
+    except (OSError,TimeoutError) as exc:
+        raise HTTPException(502,'官方视频站点当前不可访问；没有生成虚假的成功数据') from exc
+
+
+def _annotations(xml_bytes, *, max_frames):
+    """Read CAVIAR CVML XML; object ID is camera-local, never identity.
+
+    CAVIAR frames normally begin at 1. XML files may be full-length, but
+    only decoded valid video frames may be included in the stored result.
+    """
+    if b'<!DOCTYPE' in xml_bytes.upper() or b'<!ENTITY' in xml_bytes.upper():
+        raise HTTPException(422,'不接受自定义 XML 实体')
+    try:
+        root=ET.fromstring(xml_bytes)
+    except ET.ParseError as exc:
+        raise HTTPException(422,'公开数据的 CVML 标注 XML 无法解析') from exc
+    points=[]
+    seen=set()
+    frames=0
+    for frame in root.iter('frame'):
+        try:
+            fn=int(frame.attrib['number'])
+        except (KeyError,ValueError) as exc:
+            raise HTTPException(422,'CVML frame 缺少合法帧号') from exc
+        frames+=1
+        if fn<1 or fn>max_frames:
+            continue
+        for obj in frame.findall('./objectlist/object'):
+            oid=obj.attrib.get('id')
+            box=obj.find('./box')
+            if oid is None or box is None:
+                continue
+            try:
+                xc,yc,w,h=(float(box.attrib[key]) for key in ('xc','yc','w','h'))
+            except (ValueError,KeyError) as exc:
+                raise HTTPException(422,'CVML 标注框字段不合法') from exc
+            if w<=0 or h<=0:
+                continue
+            record=(fn,str(oid),max(0,round(xc-w/2)),
+                    max(0,round(yc-h/2)),round(w),round(h))
+            key=(fn,str(oid))
+            if key not in seen:
+                seen.add(key)
+                points.append(record)
+    return frames,points
+
+
+def _probe_bytes(data: bytes, suffix='.mpg'):
+    with tempfile.NamedTemporaryFile(suffix=suffix) as f:
+        f.write(data)
+        f.flush()
+        cap=cv2.VideoCapture(f.name)
+        try:
+            if not cap.isOpened():
+                raise HTTPException(422,'官方 MPEG 文件未能由 OpenCV 解码')
+            count=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps=float(cap.get(cv2.CAP_PROP_FPS))
+            ok,frame=cap.read()
+            if not ok or frame is None or frame.size==0:
+                raise HTTPException(422,'官方 MPEG 文件未找到可解码帧')
+            if count<1:
+                raise HTTPException(422,'数据集帧数无法验证')
+            return {'frames':count,'fps':round(fps,3),
+                    'width':int(frame.shape[1]),'height':int(frame.shape[0])}
+        finally:
+            cap.release()
+
+
+@router.get('/api/cctv/datasets')
+def dataset_catalog(request:Request):
+    return {'mode':'real_fixed_camera_research_video',
+            'dataset':'CAVIAR','license':CAVIAR_LICENSE,
+            'scenarios':[{'id':key,'title':d['title'],'fixed_real_venue':d['venue_label'],
+               'views':list(d['views'])} for key,d in SCENARIOS.items()],
+            'important':'双机位拍同一走廊；标注轨迹是机位局部ID，不是人脸身份，也不证明跨场所行动。'}
+
+
+@router.post('/api/cctv/datasets/import',status_code=201)
+def import_video(data:ImportIn,request:Request):
+    _state_admin(request)
+    video_url,xml_url=_urls(data.scenario,data.view)
+    with _db() as c:
+        access.check_place(c,request,data.place_id)
+        admin._active_place(c,data.place_id)
+        existing=c.execute('''SELECT i.*,s.name FROM public_cctv_imports i
+            JOIN sources s ON i.source_id=s.id
+            WHERE i.scenario=? AND i.camera_view=? AND s.place_id=?
+            ORDER BY i.imported_at DESC LIMIT 1''',
+            (data.scenario,data.view,data.place_id)).fetchone()
+        if existing and c.execute('SELECT uri FROM sources WHERE id=?',
+                                  (existing['source_id'],)).fetchone():
+            stored=c.execute('SELECT uri FROM sources WHERE id=?',
+                             (existing['source_id'],)).fetchone()['uri']
+            if Path(stored).is_file():
+                return {'source_id':existing['source_id'],'status':'already_imported',
+                        'camera_view':data.view,'place_id':data.place_id,
+                        'mode':'real_fixed_camera_research_video',
+                        'annotation_boxes':c.execute('SELECT COUNT(*) FROM public_cctv_track_boxes WHERE source_id=?',
+                                                     (existing['source_id'],)).fetchone()[0]}
+    video=_fetch_allowlisted(video_url,MAX_VIDEO_BYTES)
+    annotation=_fetch_allowlisted(xml_url,MAX_XML_BYTES)
+    dimensions=_probe_bytes(video)
+    frame_count,boxes=_annotations(annotation,max_frames=dimensions['frames'])
+    digest=hashlib.sha256(video).hexdigest()
+    _store_dir.mkdir(parents=True,exist_ok=True)
+    dest=_store_dir/(digest[:24]+'.mpg')
+    if not dest.exists():
+        tmp=_store_dir/(digest[:24]+'.partial')
+        try:
+            with tmp.open('wb') as f:
+                f.write(video)
+            os.replace(tmp,dest)
+        finally:
+            tmp.unlink(missing_ok=True)
+    with _db() as c:
+        access.check_place(c,request,data.place_id)
+        admin._active_place(c,data.place_id)
+        # Every camera is a source; BOTH map to the same place_id. Any
+        # caller choosing different places has to configure that intentionally,
+        # not because 'front' looks like another 'venue'.
+        src=c.execute('INSERT INTO sources(place_id,name,kind,uri) VALUES(?,?,?,?)',
+                      (data.place_id,
+                       f"CAVIAR {data.scenario} / {data.view} 固定摄像机",
+                       'file',str(dest)))
+        c.execute('''INSERT INTO public_cctv_imports(source_id,dataset,scenario,camera_view,
+                  video_sha256,video_bytes,video_url,annotation_url,
+                  frames_available,xml_frame_count,license_note,imported_at)
+                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',
+                  (src.lastrowid,'CAVIAR',data.scenario,data.view,digest,len(video),
+                   video_url,xml_url,dimensions['frames'],frame_count,CAVIAR_LICENSE,_utc()))
+        c.executemany('''INSERT INTO public_cctv_track_boxes
+                   (source_id,frame_number,camera_local_track_id,x,y,width,height,provenance)
+                   VALUES(?,?,?,?,?,?,?,'CAVIAR_ANNOTATION')''',
+                   ((src.lastrowid,*row) for row in boxes))
+        admin.audit(c,'caviar_public_dataset_import',f"source:{src.lastrowid}",None,
+                    {'dataset':'CAVIAR','view':data.view,'place_id':data.place_id,
+                     'video_bytes':len(video),'annotation_boxes':len(boxes)})
+        return {'status':'imported','source_id':src.lastrowid,
+                'place_id':data.place_id,'camera_view':data.view,
+                'video':dimensions,'annotation_boxes':len(boxes),
+                'xml_frames':frame_count,'license':CAVIAR_LICENSE,
+                'mode':'real_fixed_camera_research_video',
+                'track_semantics':'camera_local_ground_truth_not_global_identity'}
+
+
+@router.get('/api/cctv/sources')
+def imported_sources(request:Request):
+    with _db() as c:
+        allowed={p['id'] for p in admin.place_rows(
+          c,access.effective_region(c,request,None))}
+        items=[dict(x) for x in c.execute('''SELECT i.*,s.place_id,s.name,p.name AS place_name
+            FROM public_cctv_imports i JOIN sources s ON s.id=i.source_id
+            JOIN places p ON p.id=s.place_id ORDER BY i.source_id DESC''')
+               if x['place_id'] in allowed]
+        for item in items:
+            item['video_sha256']=item['video_sha256'][:16]+'…'
+            item['local_track_count']=c.execute('''SELECT COUNT(DISTINCT camera_local_track_id)
+                FROM public_cctv_track_boxes WHERE source_id=?''',
+                (item['source_id'],)).fetchone()[0]
+            item['annotation_boxes']=c.execute('SELECT COUNT(*) FROM public_cctv_track_boxes WHERE source_id=?',
+                                               (item['source_id'],)).fetchone()[0]
+        return {'mode':'real_cctv_annotated','sources':items,
+                'counting_unit':'per_camera_local_tracks_not_unique_people'}
+
+
+@router.get('/api/cctv/sources/{source_id}/activity')
+def camera_activity(source_id:int,request:Request,
+                    limit:int=Query(100,ge=1,le=500)):
+    with _db() as c:
+        access.check_source(c,request,source_id)
+        entry=c.execute('SELECT * FROM public_cctv_imports WHERE source_id=?',
+                        (source_id,)).fetchone()
+        if not entry:
+            raise HTTPException(404,'该源不是已核验的CAVIAR固定摄像机素材')
+        tracks=[dict(x) for x in c.execute('''SELECT camera_local_track_id,
+             COUNT(*) AS annotated_frames,MIN(frame_number) AS first_frame,
+             MAX(frame_number) AS last_frame FROM public_cctv_track_boxes
+             WHERE source_id=? GROUP BY camera_local_track_id
+             ORDER BY annotated_frames DESC LIMIT ?''',(source_id,limit))]
+        return {'source_id':source_id,'camera_view':entry['camera_view'],
+                'dataset':'CAVIAR','mode':'research_ground_truth',
+                'local_tracks':tracks,'local_track_count':len(tracks),
+                'frame_annotation_count':c.execute('''SELECT COUNT(*) FROM public_cctv_track_boxes
+                     WHERE source_id=?''',(source_id,)).fetchone()[0],
+                'license':entry['license_note'],
+                'warning':'单摄像头人工标注轨迹不是唯一自然人；两个摄像头计数不可相加为去重人数，未做跨镜身份关联或风险认定。'}
