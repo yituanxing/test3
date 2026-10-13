@@ -218,6 +218,7 @@ def test_all_count_types_share_utc_days_and_review_never_mutates_raw(env):
     verdict=client.post(post,headers=user['county'],json={
         'verdict':'false_positive','reason':'原始帧复核确认为背景误检目标'})
     assert verdict.status_code==201,verdict.text
+    assert verdict.json()['quality_status']=='false_positive',verdict.text
     gtr=client.post('/api/site/occurrences/'+gt['occurrence_key']+'/quality',
                     headers=user['county'],json={
         'verdict':'valid_local_target','reason':'逐帧检查官方局部人工标注一致'})
@@ -227,7 +228,7 @@ def test_all_count_types_share_utc_days_and_review_never_mutates_raw(env):
     reviewed=qa.json()
     assert reviewed['window']==window
     assert reviewed['by_provider']['frigate']['local_occurrences']==raw
-    assert reviewed['by_provider']['frigate']['false_positive']==1
+    assert reviewed['by_provider']['frigate']['false_positive']==1,reviewed
     assert reviewed['by_provider']['frigate']['not_reviewed']==1
     assert reviewed['by_provider']['frigate']['accepted_local_targets']==0
     assert reviewed['by_provider']['caviar_ground_truth']['local_occurrences']==1
