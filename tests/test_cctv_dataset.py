@@ -103,7 +103,7 @@ def test_fixed_cameras_share_one_real_place_no_cross_camera_identity(context,mon
         data=activity.json()
         assert data['local_track_count']==2 and data['frame_annotation_count']==4
         assert {x['camera_local_track_id'] for x in data['local_tracks']}=={'0','1'}
-        picture=client.get(f'/api/cctv/sources/{source}/frame?frame=1',headers=root)
+        picture=client.get(f'/api/cctv/sources/{source}/frame?frame=2',headers=county)
         assert picture.status_code==200,picture.text[:120]
         assert picture.headers['content-type'].startswith('image/jpeg')
         assert picture.content[:2]==b'\xff\xd8'
