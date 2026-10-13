@@ -246,6 +246,24 @@ jobs:
             reports/cartoon-full-film-holdout/evaluation/consensus_result.json
             reports/cartoon-4m30-unseen-holdout/predictions/consensus_result.json
           if-no-files-found: warn
+      - name: Test frozen two-pose consensus on untouched Buck movie at 2m00 and 7m00
+        run: python -m scripts.cartoon_multiwindow_holdout
+      - name: Preserve first-time raw A/B visual evidence before manual truth labels
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-frozen-multiwindow-2m-7m-untouched
+          path: |
+            reports/cartoon-multiwindow-holdout/summary.json
+            reports/cartoon-multiwindow-holdout/original_2m00/consensus.json
+            reports/cartoon-multiwindow-holdout/original_2m00/predictions/result.json
+            reports/cartoon-multiwindow-holdout/original_2m00/first_untuned_ab.jpg
+            reports/cartoon-multiwindow-holdout/original_2m00/predictions/frames/*.jpg
+            reports/cartoon-multiwindow-holdout/original_7m00/consensus.json
+            reports/cartoon-multiwindow-holdout/original_7m00/predictions/result.json
+            reports/cartoon-multiwindow-holdout/original_7m00/first_untuned_ab.jpg
+            reports/cartoon-multiwindow-holdout/original_7m00/predictions/frames/*.jpg
+          if-no-files-found: warn
       - name: Group detector-generated cartoon boxes with existing ByteTrack
         run: python -m scripts.cartoon_video_track_existing
       - name: Preserve independently reviewed track consistency evidence
