@@ -44,10 +44,11 @@
       "excel_row": 9,
       "title": "各场所陌生人底库建立",
       "status": "synthetic_only",
-      "verified_scope": "指定天数、最早出现/次数优先/人工裁决、底库矫正发布链路在P###合成身份上通过",
+      "verified_scope": "指定天数、最早出现/次数优先/人工裁决、底库矫正发布链路在P###合成身份上通过；新增独立、仅州级研究管理员可操作的QA通过后D###匿名候选到访演示，但不向P###正式底库导入或验证真人身份",
       "evidence_files": [
         "tests/test_base_registry.py",
-        "tests/test_roster_maintenance.py"
+        "tests/test_roster_maintenance.py",
+        "tests/test_research_linkage.py"
       ],
       "remaining_gap": "真实人脸采集与聚类人脸照片底库尚未端到端实现"
     },
@@ -186,9 +187,10 @@
       "excel_row": 21,
       "title": "人员检索",
       "status": "partial",
-      "verified_scope": "合成人员编码搜索与已知P###历史出现可查",
+      "verified_scope": "合成人员编码搜索与已知P###历史出现可查；人工匿名标签D###可查询已复核的UTC机位事件与按场所候选会话，严格不等同真人身份证明",
       "evidence_files": [
-        "tests/test_insights.py"
+        "tests/test_insights.py",
+        "tests/test_research_linkage.py"
       ],
       "remaining_gap": "人脸图像检索与真实跨所关联尚无可核验能力"
     },
@@ -221,9 +223,10 @@
       "excel_row": 24,
       "title": "关系图谱",
       "status": "partial",
-      "verified_scope": "自动合成共现关系及网络可展示",
+      "verified_scope": "自动合成共现关系及网络可展示；补充人工审计式跨机位匿名研究分组、撤销与上游证据变动自动过期，不是自动生物特征匹配",
       "evidence_files": [
-        "tests/test_insights.py"
+        "tests/test_insights.py",
+        "tests/test_research_linkage.py"
       ],
       "remaining_gap": "人工建立关系及可信真实人员网络尚未完整实现"
     },
@@ -232,9 +235,10 @@
       "excel_row": 25,
       "title": "人员活动分析",
       "status": "partial",
-      "verified_scope": "合成P###出入场所与频次可查",
+      "verified_scope": "合成P###出入场所与频次可查；针对受控人工分组按同场所时间间隔合并候选会话并保留原始摄像机事件证据，不是现实唯一人员流动统计",
       "evidence_files": [
-        "tests/test_insights.py"
+        "tests/test_insights.py",
+        "tests/test_research_linkage.py"
       ],
       "remaining_gap": "缺现实人物唯一身份、地理区域热点及真实场所路线"
     },
@@ -286,5 +290,6 @@
       ],
       "remaining_gap": "账号删除为停用、保留历史审计"
     }
-  ]
+  ],
+  "last_review_note": "研究人工关联与会话已落地但仍是operator_assertion，未验证跨摄像机身份自动比对。#14图像人脸检索、#17真实地理轨迹继续missing；#3及七类规则仍synthetic_only。"
 }
