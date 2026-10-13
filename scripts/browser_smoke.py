@@ -161,6 +161,23 @@ def run():
                         expect(page.locator("#flowSummary")).to_contain_text("流入")
                         checks.append("shared_analytics_period_rank_flow_browser")
                         page.screenshot(path=str(OUT / "ui-shared-analytics.png"), full_page=True)
+                        # Excel #7/#11: one rule config drives repeated N-person
+                        # group matching and selected synthetic place/person lists.
+                        page.goto(base + "/business")
+                        expect(page.locator("#cfg_companion_min_people")).to_have_value("2", timeout=12000)
+                        page.locator("#cfg_companion_min_people").fill("3")
+                        page.locator("#watchMultiPlaces").select_option(label="测试场所 A")
+                        page.locator("#watchPeople").fill("P099")
+                        page.get_by_role("button",name="保存并重新分析").click()
+                        expect(page.locator("#cfg_companion_min_people")).to_have_value("3", timeout=12000)
+                        expect(page.locator("#watchPeople")).to_have_value("P099")
+                        rule_config=page.evaluate("""async()=> (await
+                            (await fetch('/api/business/config')).json())""")
+                        assert rule_config['companion_min_people']==3,rule_config
+                        assert rule_config['watch_person_ids']==['P099'],rule_config
+                        assert len(rule_config['watch_place_ids'])==1,rule_config
+                        checks.append("common_rule_n_person_and_multi_target_browser")
+                        page.screenshot(path=str(OUT/"ui-shared-rules.png"),full_page=True)
                         # Real video and actual browser interaction: never rely
                         # on a stubbed API or synthetic detector boxes.
                         page.goto(base+"/monitor")
