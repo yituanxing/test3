@@ -42,10 +42,64 @@ def _filtered(analysis: dict, *, days: int, place_ids: set[int]) -> dict:
     return {'first': first, 'last': last, 'visits': visits, 'alerts': alerts}
 
 
+
+def _period_visits(analysis: dict, first, last, place_ids: set[int]) -> list[dict]:
+    """Shared, consistent denominator for cards, rank, change and flows.
+
+    Counting unit is the synthetic visit session, NEVER an image/frame, face
+    box, unique real person or verified person/camera match.
+    """
+    return [v for v in analysis['visits']
+            if v['place_id'] in place_ids
+            and first <= stamp(v['started_at']).date() <= last]
+
+
+def _percent_change(current: int, previous: int) -> float | None:
+    # An empty previous period has no meaningful rate denominator.
+    return round((current - previous) * 100.0 / previous, 1) if previous else None
+
+
+def _place_movement(visits: list[dict], home: dict[str, int],
+                    place_ids: set[int]) -> tuple[dict[int, int], dict[int, int], list[dict]]:
+    """Cross-home synthetic visit sessions at visible destinations.
+
+    Incoming includes home elsewhere. Outgoing only describes source *and*
+    destination both in the selected scope, so aggregates cannot be used to
+    enumerate invisible neighbouring regions through origin details.
+    """
+    inbound = defaultdict(int)
+    outbound = defaultdict(int)
+    transfers = defaultdict(int)
+    for v in visits:
+        origin = home.get(v['person'])
+        target = v['place_id']
+        if origin is None or origin == target:
+            continue
+        inbound[target] += 1
+        if origin in place_ids:
+            outbound[origin] += 1
+            transfers[(origin, target)] += 1
+    flows = [{'from_place_id':a, 'to_place_id':b, 'synthetic_visits':n}
+             for (a,b),n in sorted(transfers.items(),
+                                   key=lambda item:(-item[1], item[0]))]
+    return inbound, outbound, flows
+
+
 def overview(analysis: dict, places: list[dict], *, days: int = 7) -> dict:
     scope = {p['id'] for p in places}
     data = _filtered(analysis, days=days, place_ids=scope)
     visits, alerts = data['visits'], data['alerts']
+    prior_start = data['first'] - timedelta(days=days)
+    prior_end = data['first'] - timedelta(days=1)
+    previous = _period_visits(analysis, prior_start, prior_end, scope)
+    homes = {row['person']:row['place_id'] for row in analysis['affiliation']}
+    inbound, outbound, flows = _place_movement(visits, homes, scope)
+    prev_inbound, prev_outbound, _ = _place_movement(previous, homes, scope)
+    prior_counts = defaultdict(int)
+    prior_people = defaultdict(set)
+    for v in previous:
+        prior_counts[v['place_id']] += 1
+        prior_people[v['place_id']].add(v['person'])
     by_id = {p['id']: p['name'] for p in places}
     series = {str(data['first'] + timedelta(days=i)):
               {'day':str(data['first'] + timedelta(days=i)), 'visits':0, 'people':set()}
@@ -66,7 +120,12 @@ def overview(analysis: dict, places: list[dict], *, days: int = 7) -> dict:
     people = {v['person'] for v in visits}
     trend = [{'day':v['day'], 'visits':v['visits'], 'unique_synthetic_people':len(v['people'])}
              for v in series.values()]
-    ranking = [{**v, 'unique_synthetic_people':len(v['people'])}
+    ranking = [{**v, 'unique_synthetic_people':len(v['people']),
+                'previous_visits':prior_counts[v['place_id']],
+                'visits_change':v['visits']-prior_counts[v['place_id']],
+                'visits_change_pct':_percent_change(v['visits'],prior_counts[v['place_id']]),
+                'cross_home_inbound':inbound[v['place_id']],
+                'cross_home_outbound_scoped':outbound[v['place_id']]}
                for v in grouped.values()]
     for v in ranking:
         del v['people']
@@ -81,10 +140,33 @@ def overview(analysis: dict, places: list[dict], *, days: int = 7) -> dict:
                  'unique_synthetic_people_in_window':len(people), 'rule_hits':len(alerts),
                  'published_roster_state':analysis['registry_status']['state']},
         'trend':trend, 'ranking':ranking, 'recent_alerts':recent,
+        'comparison':{
+            'period_start_day_utc':str(prior_start),
+            'period_end_day_utc':str(prior_end),
+            'current_visits':len(visits), 'previous_visits':len(previous),
+            'visits_change':len(visits)-len(previous),
+            'visits_change_pct':_percent_change(len(visits),len(previous)),
+            'current_synthetic_people':len(people),
+            'previous_synthetic_people':len({v['person'] for v in previous}),
+            'people_change':len(people)-len({v['person'] for v in previous}),
+            'people_change_pct':_percent_change(len(people),len({v['person'] for v in previous})),
+            'comparison_kind':'相邻等长UTC日期区间，不是去年同期；无基期时百分比返回null'
+        },
+        'movement':{
+            'cross_home_inbound':sum(inbound.values()),
+            'previous_cross_home_inbound':sum(prev_inbound.values()),
+            'scoped_outbound':sum(outbound.values()),
+            'previous_scoped_outbound':sum(prev_outbound.values()),
+            'flows':[{**f, 'from_place_name':by_id[f['from_place_id']],
+                      'to_place_name':by_id[f['to_place_id']]} for f in flows],
+            'definition':'仅合成到访；流入含范围外匿名主归属聚合，流出仅统计两端都在当前查询范围内的跨归属到访'
+        },
         'rule_counts':[{**r, 'count':sum(a['type']==r['type'] for a in alerts)} for r in analysis['rule_counts']],
         'notes':{'visits':'按合成观测聚合的到访会话；不是人脸识别结果',
                  'unique_synthetic_people_in_window':'仅指生成的 P### 虚构标识去重',
-                 'rule_hits':'对模拟规则结果进行场所交集过滤；不用于真实风险认定'},
+                 'rule_hits':'对模拟规则结果进行场所交集过滤；属于场景全量规则结果，不是本时间范围内的告警数',
+                 'comparison':'与紧邻的等长上一区间比较；基期=0时不计算变化百分比',
+                 'movement':'按模拟唯一归属对合成到访会话分组；不表示真人跨场所轨迹'},
     }
 
 
