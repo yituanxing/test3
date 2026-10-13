@@ -371,6 +371,10 @@ def run():
                             "needs_review",timeout=12000)
                         expect(page.locator("#qaHistory")).to_contain_text(
                             "浏览器人工质检测试样本",timeout=12000)
+                        expect(page.locator("#occurrenceCounts")).to_contain_text(
+                            "待审 1",timeout=12000)
+                        expect(page.locator("#occurrenceCounts")).to_contain_text(
+                            "1 条原始匿名事件",timeout=12000)
                         with main.db() as check:
                             assert check.execute(
                                 "SELECT COUNT(*) FROM anonymous_occurrence_reviews").fetchone()[0]==1
@@ -380,6 +384,12 @@ def run():
                         page.locator("#qaOccurrence").dispatch_event("change")
                         expect(page.locator("#qaStatus")).to_contain_text(
                             "stale_review",timeout=12000)
+                        page.locator("#loadOccurrences").click()
+                        expect(page.locator("#occurrenceCounts")).to_contain_text(
+                            "过期 1",timeout=12000)
+                        expect(page.locator("#occurrenceCounts")).to_contain_text(
+                            "1 条原始匿名事件",timeout=12000)
+                        checks.append("real_browser_qa_raw_vs_reviewed_window_consistency")
                         checks.append("real_browser_append_only_anonymous_quality_and_stale_evidence")
                         page.screenshot(path=str(OUT/"ui-anonymous-quality-review.png"),full_page=True)
                         # Verify end users can REVIEW item 221, not only call
