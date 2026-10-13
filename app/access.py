@@ -140,7 +140,9 @@ def permitted(actor: dict, method: str, path: str) -> bool:
         or re.fullmatch(r'/api/anime/scenes/sources/\d+/(suggest|graph)',path)
         or path in {'/api/cctv/datasets','/api/cctv/sources'}
         or path in {'/api/site/zones','/api/site/anonymous-events',
-                    '/api/site/occurrences','/api/site/occurrences/summary'}
+                    '/api/site/occurrences','/api/site/occurrences/summary',
+                    '/api/site/quality/summary'}
+        or re.fullmatch(r'/api/site/occurrences/[0-9a-f]{24}/quality',path)
         or re.fullmatch(r'/api/site/sources/\d+/bindings',path)
         or re.fullmatch(r'/api/cctv/sources/\d+/(activity|frame)',path)
     )
@@ -158,6 +160,9 @@ def permitted(actor: dict, method: str, path: str) -> bool:
         if method == 'PATCH' and re.fullmatch(r'/api/site/zones/\d+/state',path):
             return True
         if method == 'PUT' and re.fullmatch(r'/api/site/sources/\d+/binding',path):
+            return True
+        if method == 'POST' and re.fullmatch(
+                r'/api/site/occurrences/[0-9a-f]{24}/quality',path):
             return True
     return False
 
