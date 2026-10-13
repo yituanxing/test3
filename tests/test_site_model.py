@@ -281,3 +281,64 @@ def test_canonical_occurrence_100_frames_one_local_track_and_two_cameras(env):
     assert client.get(url+'/summary',headers=other).json()['by_provider']=={}
     assert client.get('/api/business/analysis',headers=root).json()['person_count']==0
     assert client.get('/api/monitoring/overview',headers=root).json()['counts']['person_objects']==2
+
+
+def test_large_other_jurisdiction_cannot_starve_county_pagination(env):
+    """Regression: global LIMIT 1500 then scope filter lost ALL 20 lawful rows."""
+    main,client,(pa,pb,remote),(root,county,other)=env
+    with main.db() as c:
+        rows=[]
+        for i in range(1520):
+            place=remote if i<1500 else pa
+            rows.append((f'cam_many_{i:04}',f'event_{i:04}',place,
+                         '2026-10-13T09:00:00+00:00' if place==pa
+                         else '2026-10-13T11:00:00+00:00',
+                         main.utcnow()))
+        c.executemany("""INSERT INTO frigate_object_events
+             (camera,event_id,place_id,label,started_at,score,has_snapshot,updated_at)
+             VALUES (?,?,?,'person',?,0.9,0,?)""",rows)
+    county_events=client.get('/api/site/occurrences?limit=100',headers=county)
+    assert county_events.status_code==200,county_events.text
+    values=county_events.json()
+    assert values['returned']==20 and values['truncated'] is False
+    assert all(x['venue_id']==pa for x in values['occurrences'])
+    assert values['next_offset'] is None
+    remote_events=client.get('/api/site/occurrences?limit=100',headers=other).json()
+    assert remote_events['returned']==100 and remote_events['truncated']
+    assert all(x['venue_id']==remote for x in remote_events['occurrences'])
+    # County sees all 20, NEVER 1500 foreign events or an empty false result.
+    assert client.get('/api/site/occurrences/summary',headers=county).json()[
+        'by_provider']['frigate']['camera_local_occurrences']==20
+
+
+def test_page_201_occurrence_can_be_quality_reviewed(env):
+    """Quality endpoint is NOT restricted to first 200 events in a UI batch."""
+    main,client,(pa,pb,remote),(root,county,other)=env
+    with main.db() as c:
+        c.executemany("""INSERT INTO frigate_object_events
+           (camera,event_id,place_id,label,started_at,score,has_snapshot,updated_at)
+           VALUES ('mass_cam',?,?,'person',?,0.87,0,?)""",
+          [(f'event_{i:04}',pa,'2026-10-13T09:00:00+00:00',main.utcnow())
+           for i in range(221)])
+    p1=client.get('/api/site/occurrences?limit=200',headers=county).json()
+    assert p1['returned']==200 and p1['truncated'] is True
+    assert p1['next_offset']==200 and p1['offset']==0
+    p2=client.get('/api/site/occurrences?limit=200&offset=200',headers=county).json()
+    assert p2['returned']==21 and p2['truncated'] is False
+    target=next(r for r in p2['occurrences'] if r['track_id']=='event_0220')
+    key=target['occurrence_key']
+    result=client.post('/api/site/occurrences/'+key+'/quality',
+        headers=county,json={'verdict':'valid_local_target',
+                            'reason':'已核对局部目标原始证据和事件源'})
+    assert result.status_code==201,result.text
+    assert result.json()['quality_status']=='valid_local_target'
+    q=client.get('/api/site/quality/summary',headers=county)
+    assert q.status_code==200,q.text
+    assert q.json()['camera_local_events_scanned']==221
+    assert q.json()['scan_bounded'] is False
+    assert q.json()['counts']['valid_local_target']==1
+    assert q.json()['counts']['not_reviewed']==220
+    assert client.get('/api/site/occurrences/'+key+'/quality',headers=other).status_code==404
+    assert client.post('/api/site/occurrences/'+key+'/quality',headers=other,json={
+        'verdict':'valid_local_target','reason':'越区不能审核该事件证据'}).status_code==404
+    assert client.get('/api/business/analysis',headers=root).json()['person_count']==0
