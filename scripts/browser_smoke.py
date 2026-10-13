@@ -39,6 +39,12 @@ def run():
                 "INSERT INTO sources(place_id,name,kind,uri) VALUES(?,?,?,?)",
                 (1, "browser-real-face-review", "file",
                  str(ROOT / "samples" / "astronaut-face-test.mp4"))).lastrowid
+            # Deliberately offline RTSP endpoint for capture UI start/stop
+            # contract testing. We do NOT pretend any decoded media exists.
+            rtsp_source_id = c.execute(
+                "INSERT INTO sources(place_id,name,kind,uri) VALUES(?,?,?,?)",
+                (1, "browser-offline-RTSP-contract", "rtsp",
+                 "rtsp://127.0.0.1:1/never-online")).lastrowid
         try:
             with (OUT / "ui-server.log").open("w") as log:
                 server = subprocess.Popen(
@@ -132,6 +138,35 @@ def run():
                         expect(page.locator("#gbPanel")).to_contain_text(
                             "WVP-PRO + ZLMediaKit")
                         checks.append("gb28181_not_configured_shown_as_unverified")
+                        # Actual Chromium click path for a registered local
+                        # RTSP source. The RTSP address intentionally has NO
+                        # broadcaster: verify start/stop workflow and truthful
+                        # failure state, not nonexistent video/identity results.
+                        expect(page.locator("#captureSource option")).to_contain_text(
+                            "browser-offline-RTSP-contract", timeout=12000)
+                        page.locator("#captureSource").select_option(str(rtsp_source_id))
+                        page.locator("#captureStart").click()
+                        expect(page.locator("#captureJobs")).to_contain_text(
+                            "已启用", timeout=12000)
+                        with main.db() as check:
+                            state = check.execute(
+                                "SELECT desired_enabled FROM capture_jobs WHERE source_id=?",
+                                (rtsp_source_id,)).fetchone()
+                            assert state and state[0] == 1
+                            assert check.execute(
+                                "SELECT COUNT(*) FROM samples WHERE source_id=?",
+                                (rtsp_source_id,)).fetchone()[0] == 0
+                        page.locator("#captureJobs").get_by_role(
+                            "button", name="停止任务").click()
+                        expect(page.locator("#captureJobs")).to_contain_text(
+                            "已停用", timeout=12000)
+                        with main.db() as check:
+                            assert check.execute(
+                                "SELECT desired_enabled FROM capture_jobs WHERE source_id=?",
+                                (rtsp_source_id,)).fetchone()[0] == 0
+                        checks.append("chromium_rtsp_capture_start_stop_without_false_media")
+                        page.screenshot(path=str(OUT/"ui-capture-start-stop.png"),
+                                        full_page=True)
                         actual = page.evaluate("""async sourceId => {
                             const r=await fetch('/api/sources/'+sourceId+
                               '/process?max_frames=10&sample_every=5',
