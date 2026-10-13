@@ -948,6 +948,7 @@ class SyntheticConfig(BaseModel):
     visit_gap_minutes: int = Field(default=20, ge=1, le=1440)
     encounter_window_minutes: int = Field(default=10, ge=1, le=120)
     companion_min_episodes: int = Field(default=2, ge=1, le=20)
+    companion_min_people: int = Field(default=2, ge=2, le=20)
     gathering_min_people: int = Field(default=3, ge=2, le=100)
     gathering_min_episodes: int = Field(default=1, ge=1, le=20)
     interaction_min_rounds: int = Field(default=1, ge=1, le=20)
@@ -963,6 +964,8 @@ class SyntheticConfig(BaseModel):
                                 'absence', 'appearance', 'headcount']] = Field(
         default_factory=lambda: list(RULE_NAMES))
     watch_place_id: int = Field(default=0, ge=0)
+    watch_place_ids: list[int] = Field(default_factory=list, max_length=30)
+    watch_person_ids: list[str] = Field(default_factory=list, max_length=50)
     affiliation_mode: Literal['earliest', 'frequency'] = 'earliest'
 
 
@@ -1041,6 +1044,22 @@ def put_synthetic_config(data: SyntheticConfig):
             raise HTTPException(422, '规则列表不得重复')
         if cfg['watch_place_id'] and not c.execute('SELECT 1 FROM places WHERE id=?',(cfg['watch_place_id'],)).fetchone():
             raise HTTPException(404, '指定关注场所不存在')
+        if len(cfg['watch_place_ids']) != len(set(cfg['watch_place_ids'])):
+            raise HTTPException(422, '关注场所列表不得重复')
+        if any(pid < 1 for pid in cfg['watch_place_ids']):
+            raise HTTPException(422, '关注场所 ID 必须为正整数')
+        if cfg['watch_place_ids']:
+            existing = {row['id'] for row in c.execute(
+                'SELECT id FROM places WHERE id IN (' +
+                ','.join('?' for _ in cfg['watch_place_ids']) + ')',
+                cfg['watch_place_ids'])}
+            if existing != set(cfg['watch_place_ids']):
+                raise HTTPException(404, '至少一个关注场所不存在')
+        import re
+        if len(cfg['watch_person_ids']) != len(set(cfg['watch_person_ids'])):
+            raise HTTPException(422, '虚构人员关注编号不得重复')
+        if any(not re.fullmatch(r'P[0-9]{3}',code) for code in cfg['watch_person_ids']):
+            raise HTTPException(422, '关注人员只接受 P### 虚构编号')
         c.execute('INSERT INTO synthetic_settings(id,json_value) VALUES(1,?) '
                   'ON CONFLICT(id) DO UPDATE SET json_value=excluded.json_value',
                   (json.dumps(cfg,ensure_ascii=False),))
