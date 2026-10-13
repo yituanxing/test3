@@ -266,6 +266,23 @@ def run():
                             assert check.execute(
                                 'SELECT COUNT(*) FROM face_box_reviews').fetchone()[0] == 2
                         checks.append("real_video_face_box_append_only_review_ui")
+                        # Anime scene map is a STORYBOARD, not GPS. Open a real
+                        # decoded file and accept one candidate manually.
+                        page.goto(base+"/anime-scenes")
+                        expect(page.get_by_role("heading",name="动画场景 · 时间轴 · 示意图")).to_be_visible()
+                        page.locator("#source").select_option(str(face_source_id))
+                        page.locator("#seconds").fill("2")
+                        page.locator("#suggest").click()
+                        expect(page.locator("#candidates [data-adopt]").first).to_be_visible(
+                            timeout=20000)
+                        page.locator("#candidate_0").fill("测试镜头（人工命名）")
+                        page.locator("#candidates [data-adopt]").first.click()
+                        expect(page.locator("#segments")).to_contain_text(
+                            "测试镜头（人工命名）",timeout=12000)
+                        assert page.locator("#graph").locator("svg").count()==1
+                        assert page.locator("#characters").inner_text().find("暂无人工标注角色")>=0
+                        checks.append("real_file_scene_cut_to_manual_storyboard_no_fake_character")
+                        page.screenshot(path=str(OUT/"ui-anime-storyboard.png"),full_page=True)
                         page.goto(base+"/portal")
                         page.set_viewport_size({"width": 390, "height": 844})
                         page.screenshot(path=str(OUT / "ui-mobile.png"), full_page=True)
