@@ -207,6 +207,8 @@ async def upload_local_clip(request:Request,place_id:int=Query(gt=0)):
             display=(Path(client_name).stem.strip() or '动画样本')[:70]
             row=c.execute("""INSERT INTO sources(place_id,name,kind,uri)
                VALUES(?,?,?,?)""",(place_id,'上传动画 · '+display,'file',str(final)))
+            from app import site_model
+            site_model.record_initial(c,row.lastrowid,place_id)
             admin.audit(c,'anime_video_uploaded',f"source:{row.lastrowid}",None,
                         {'place_id':place_id,'size_bytes':count,
                          'kind':'file','mode':'local_demo_clip'})
