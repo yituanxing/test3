@@ -231,6 +231,14 @@ def import_video(data:ImportIn,request:Request):
     with _db() as c:
         access.check_place(c,request,data.place_id)
         admin._active_place(c,data.place_id)
+        # CAVIAR corridor and front are literally the same shopping hallway.
+        # Never let a UI/API caller turn the two camera angles into two
+        # different Excel venues and manufacture a cross-site event.
+        prior_places={x['place_id'] for x in c.execute("""SELECT DISTINCT s.place_id
+            FROM public_cctv_imports i JOIN sources s ON i.source_id=s.id
+            WHERE i.scenario=?""",(data.scenario,))}
+        if prior_places and prior_places!={data.place_id}:
+            raise HTTPException(409,'该 CAVIAR 真实走廊已经绑定一个固定场所；双机位必须属于同一场所')
         existing=c.execute('''SELECT i.*,s.name FROM public_cctv_imports i
             JOIN sources s ON i.source_id=s.id
             WHERE i.scenario=? AND i.camera_view=? AND s.place_id=?
