@@ -310,3 +310,88 @@ def test_actual_pretrained_yolo_person_on_video_when_optional_model_installed(co
     assert result['counted_unique_people'] is False
     assert sum(x['automatically_detected_person_boxes']
                for x in result['frame_summaries'])==result['predicted_person_boxes']
+
+
+def test_real_detector_runs_enter_canonical_anonymous_occurrences_and_qa_with_versions(context,monkeypatch):
+    """Test unified persistence contract without pretending a mocked detector is real.
+
+    Real pretrained YOLO inference is independently exercised by the owner
+    real-media job; these DB fixture boxes exercise immutable evidence flow.
+    """
+    from app import person_detection_adapter
+    main,mod,client,place,root,county=context
+    clip=(Path(__file__).resolve().parents[1]/'samples'/'astronaut-face-test.mp4').read_bytes()
+    monkeypatch.setattr(mod,'_fetch_allowlisted',
+                        lambda url,max_bytes: xml() if url.endswith('.xml') else clip)
+    imp=client.post('/api/cctv/datasets/import',headers=root,
+                    json={'place_id':place,'view':'corridor'})
+    assert imp.status_code==201,imp.text
+    sid=imp.json()['source_id']
+    with main.db() as c:
+        sha=c.execute('SELECT video_sha256 FROM public_cctv_imports WHERE source_id=?',
+                      (sid,)).fetchone()[0]
+    def fixture_run(c,source_id,*,max_frames,sample_every,confidence):
+        assert source_id==sid and max_frames==12
+        return {
+            'source_id':sid,'video_sha256':sha,'place_id':place,
+            'model':'controlled-fixture-for-persistence','tracker':'roboflow_trackers_bytetrack',
+            'frames_decoded':12,'frames_inferred':12,'sampling_step':sample_every,
+            'local_track_boxes':[
+                {'frame_number':n,'local_track_id':'7','x':10+n,
+                 'y':18,'width':38,'height':61,'confidence':.8}
+                for n in range(1,13)],
+            'real_pretrained_person_detector_ran':False,
+            'existing_automatic_tracker_ran':False,
+            'cross_camera_identity_matching_ran':False,
+        }
+    monkeypatch.setattr(person_detection_adapter,'run_real_person_detector',fixture_run)
+    route=f'/api/cctv/sources/{sid}/person-detector-run?max_frames=12'
+    assert client.post(route).status_code==401
+    assert client.post(route,headers=county).status_code==403
+    out=client.post(route,headers=root)
+    assert out.status_code==200,out.text
+    assert out.json()['status']=='saved'
+    assert out.json()['stored_local_boxes']==12
+    assert out.json()['eligible_for_real_identity_or_visit'] is False
+    again=client.post(route,headers=root)
+    assert again.status_code==200
+    assert again.json()['status']=='existing'
+    assert again.json()['run_key']==out.json()['run_key']
+    evidence=client.get('/api/site/occurrences',headers=county)
+    assert evidence.status_code==200,evidence.text
+    records=evidence.json()['occurrences']
+    yolo=[row for row in records if row['provider']=='yolo_bytetrack']
+    manual=[row for row in records if row['provider']=='caviar_ground_truth']
+    assert len(yolo)==1 and len(manual)==2
+    item=yolo[0]
+    assert item['first_seen']==1 and item['last_seen']==12
+    assert item['annotation_frames']==12 and item['track_id']=='7'
+    assert item['time_basis']=='archival_video_frame_number'
+    assert item['subject_id'] is None and item['counts_as_visit'] is False
+    assert item['occurrence_key'] not in {x['occurrence_key'] for x in manual}
+    counted=client.get('/api/site/occurrences/summary?days=7',headers=county).json()
+    assert counted['by_provider']['yolo_bytetrack']['camera_local_occurrences']==1
+    assert counted['by_provider']['yolo_bytetrack']['annotated_frames']==12
+    assert counted['by_provider']['caviar_ground_truth']['camera_local_occurrences']==2
+    before=client.get('/api/site/quality/summary',headers=county).json()
+    assert before['by_provider']['yolo_bytetrack']['not_reviewed']==1
+    route_qa='/api/site/occurrences/'+item['occurrence_key']+'/quality'
+    verdict=client.post(route_qa,headers=county,json={
+        'verdict':'valid_local_target','reason':'研究模型局部目标框人工确认有效'})
+    assert verdict.status_code==201,verdict.text
+    assert verdict.json()['quality_status']=='valid_local_target'
+    assert client.get('/api/site/quality/summary',headers=county).json()[
+        'by_provider']['yolo_bytetrack']['valid_local_target']==1
+    # When the actual stored tracker geometry changes, QA must become stale.
+    with main.db() as c:
+        c.execute("""UPDATE model_track_boxes SET x=x+1 WHERE run_key=?
+             AND frame_number=6""",(out.json()['run_key'],))
+    old=client.get(route_qa,headers=county).json()
+    assert old['quality_status']=='stale_review'
+    assert old['review_stale'] is True
+    with main.db() as c:
+        assert c.execute('SELECT COUNT(*) FROM model_track_runs').fetchone()[0]==1
+        assert c.execute('SELECT COUNT(*) FROM model_track_boxes').fetchone()[0]==12
+        assert c.execute('SELECT COUNT(*) FROM public_cctv_track_boxes').fetchone()[0]==4
+        assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
+        assert c.execute('SELECT COUNT(*) FROM research_occurrence_links').fetchone()[0]==0
