@@ -666,24 +666,56 @@ def review_real_face_box(sample_id:int,box_id:int,data:FaceBoxReviewIn,request:R
                 'note':'复核仅修改人工判断状态；原始人脸框和匿名事实不变。'}
 
 
+def _utc_query_timestamp(value:str|None,parameter:str):
+    if value is None:
+        return None
+    try:
+        parsed=datetime.fromisoformat(value.replace('Z','+00:00'))
+    except ValueError as exc:
+        raise HTTPException(422,f'{parameter} 必须是带时区的ISO8601时间') from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise HTTPException(422,f'{parameter} 必须明确包含UTC时区偏移')
+    return parsed.astimezone(timezone.utc).isoformat(timespec='microseconds')
+
+
 @app.get('/api/video/observations')
 def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
                        source_id:int|None=Query(None,ge=1),
-                       region_id:int|None=Query(None,ge=1)):
+                       region_id:int|None=Query(None,ge=1),
+                       place_id:int|None=Query(None,ge=1),
+                       offset:int=Query(0,ge=0),
+                       from_utc:str|None=Query(None),
+                       until_utc:str|None=Query(None),
+                       only_with_boxes:bool=False,
+                       review_decision:Literal['false_positive','plausible','unreviewed']|None=None):
     """Authenticated, jurisdiction-filtered provenance with real face rectangles.
 
     No images/embeddings/person identities are returned; quality labels are
     uncalibrated blur/size heuristics, not actual recognition confidence.
     """
+    start=_utc_query_timestamp(from_utc,'from_utc')
+    end=_utc_query_timestamp(until_utc,'until_utc')
+    if start is not None and end is not None and start>=end:
+        raise HTTPException(422,'from_utc 必须早于 until_utc')
     with db() as c:
         scope=access.effective_region(c,request,region_id)
         allowed={p['id'] for p in admin.place_rows(c,scope)}
+        if place_id is not None:
+            access.check_place(c,request,place_id)
+            if place_id not in allowed:
+                raise HTTPException(403,'场所不在所选辖区范围内')
         if source_id is not None:
             src=c.execute('SELECT place_id FROM sources WHERE id=?',(source_id,)).fetchone()
             if not src or src['place_id'] not in allowed:
                 raise HTTPException(403,'视频源不在当前辖区')
         if not allowed:
             return {'mode':'real_video_anonymous','observations':[],
+                    'matched_total':0,'offset':offset,'next_offset':None,
+                    'filters':{'place_id':place_id,'source_id':source_id,
+                               'from_utc':start,'until_utc':end,
+                               'only_with_boxes':only_with_boxes,
+                               'review_decision':review_decision},
+                    'quality_total_scope':'authorized_sources_all_time_unfiltered',
                     'counts':{'sampled_frames':0,'face_boxes':0},
                     'quality_totals':{'sampled_frame_records':0,'raw_face_detections':0,
                                       'no_face_frames':0,'boxes_with_geometry':0,
@@ -727,15 +759,41 @@ def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
             'quality_assessment':'uncalibrated_heuristic',
             'legacy_detections_without_geometry':max(
                 0,int(totals['raw_face_detections'])-int(quality['boxes_with_geometry']))}
+        # Evidence search uses the ORIGINAL sample venue, not the source's
+        # current place after a camera relocation. All filters run in SQL
+        # BEFORE LIMIT/OFFSET, and their count never means unique people.
+        search_sql=scope_sql
+        search_args=list(bind)
+        if place_id is not None:
+            search_sql+=' AND s.place_id=?'
+            search_args.append(place_id)
+        if start is not None:
+            search_sql+=' AND s.ingested_at>=?'
+            search_args.append(start)
+        if end is not None:
+            search_sql+=' AND s.ingested_at<?'
+            search_args.append(end)
+        if only_with_boxes or review_decision is not None:
+            predicate='''EXISTS(SELECT 1 FROM face_boxes eb
+                  WHERE eb.sample_id=s.id'''
+            if review_decision is not None:
+                predicate+=''' AND COALESCE(
+                    (SELECT r.decision FROM face_box_reviews r
+                     WHERE r.box_id=eb.id ORDER BY r.id DESC LIMIT 1),
+                    'unreviewed')=?'''
+                search_args.append(review_decision)
+            search_sql+=' AND '+predicate+')'
+        total_matches=c.execute('SELECT COUNT(*) FROM samples s WHERE '+search_sql,
+                                search_args).fetchone()[0]
         rows=[dict(x) for x in c.execute(f'''SELECT s.id,s.source_id,s.place_id,
             so.name AS source_name,p.name AS place_name,s.ingested_at,
             s.frame_index,s.video_offset_ms,s.detector,s.detected_faces,
             s.source_revision
             FROM samples s JOIN sources so ON s.source_id=so.id
             JOIN places p ON p.id=s.place_id
-            WHERE s.origin='video' AND s.place_id IN ({marks}){filter_source}
-            ORDER BY s.id DESC LIMIT ?''',
-            (*bind,limit))]
+            WHERE {search_sql}
+            ORDER BY s.id DESC LIMIT ? OFFSET ?''',
+            (*search_args,limit,offset))]
         for row in rows:
             faces=[]
             for v in c.execute('''SELECT b.id,b.x,b.y,b.w,b.h,b.frame_width,b.frame_height,
@@ -751,12 +809,19 @@ def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
                 faces.append(b)
             row['boxes']=faces
         return {'mode':'real_video_anonymous','observations':rows,
+                'matched_total':total_matches,'offset':offset,
+                'next_offset':offset+len(rows) if offset+len(rows)<total_matches else None,
+                'filters':{'place_id':place_id,'source_id':source_id,
+                           'from_utc':start,'until_utc':end,
+                           'only_with_boxes':only_with_boxes,
+                           'review_decision':review_decision},
+                'quality_total_scope':'authorized_sources_all_time_unfiltered',
                 # Legacy 'counts' remain PAGE counts for existing callers.
                 'counts':{'sampled_frames':len(rows),
                           'face_boxes':sum(len(x['boxes']) for x in rows)},
                 'quality_totals':all_quality,
                 'bounded_by_limit':limit,'snapshot_images_stored':False,
-                'note':'仅含视频抽样与真实人脸检测框；没有人物身份或人脸图片存储。'}
+                'note':'按真实入库UTC时间、历史场所、摄像机源和最新框审核状态检索；matched_total是匹配帧数，不是独立真人数；一帧匹配筛选后仍展示该帧所有检测框。quality_totals单独表示授权来源全部历史统计。没有人脸图片存储或身份推断。'}
 
 
 @app.post('/api/demo/seed')
