@@ -160,13 +160,20 @@ async function saveOccurrenceQuality(){
 $('qaOccurrence').addEventListener('change',loadOccurrenceQuality);
 async function refreshOccurrences(){
  try{
-   const summary=await api('/api/site/occurrences/summary');
+   // Monitoring overview uses the SAME rolling UTC calendar-day window.
+   // CAVIAR is historical clip-relative reference; it has no UTC calendar date.
+   const [summary,quality]=await Promise.all([
+     api('/api/site/occurrences/summary?days=7'),
+     api('/api/site/quality/summary?days=7')]);
    const gt=summary.by_provider.caviar_ground_truth||{cameras:0,camera_local_occurrences:0,annotated_frames:0};
    const live=summary.by_provider.frigate||{cameras:0,camera_local_occurrences:0,annotated_frames:0};
+   const reviewed=quality.by_provider.frigate||{valid_local_target:0,false_positive:0,needs_review:0,stale_review:0,not_reviewed:0};
    $('occurrenceCounts').innerHTML=
-     '<span class="badge">研究监控 '+gt.cameras+' 路 / '+gt.camera_local_occurrences+' 条局部轨迹</span>'+
-     '<span class="badge yellow">官方人工框 '+gt.annotated_frames+' 条（不是人数）</span>'+
-     '<span class="badge">Frigate '+live.cameras+' 路 / '+live.camera_local_occurrences+' 条匿名事件</span>';
+     '<span class="badge">历史研究整片 '+gt.cameras+' 路 / '+gt.camera_local_occurrences+' 条局部轨迹</span>'+
+     '<span class="badge yellow">官方整片人工框 '+gt.annotated_frames+' 条（不是人数）</span>'+
+     '<span class="badge">Frigate近7个UTC自然日 '+live.cameras+' 路 / '+live.camera_local_occurrences+' 条原始匿名事件</span>'+
+     '<span class="badge">同期局部目标质检：合理 '+reviewed.valid_local_target+' / 误检 '+reviewed.false_positive+
+       ' / 待审 '+(reviewed.not_reviewed+reviewed.needs_review)+' / 过期 '+reviewed.stale_review+'</span>';
    $('occurrenceRows').innerHTML=summary.by_camera.map(x=>
      '<tr><td>'+esc(x.provider==='caviar_ground_truth'?'CAVIAR研究标注':'Frigate匿名事件')+
      '</td><td>'+esc(x.venue_name)+'</td><td>'+esc(x.camera_key)+
@@ -174,7 +181,9 @@ async function refreshOccurrences(){
      '</td><td>'+esc(x.time_basis==='archival_video_frame_number'?'原片帧号':'UTC事件时间')+
      '</td></tr>').join('')||'<tr><td colspan="6">当前没有已导入的真实匿名事件；不会生成模拟数。</td></tr>';
    $('occurrenceNote').textContent='已查询 '+summary.visible_cameras+
-       ' 个机位；不合并跨机位轨迹、不将视频帧累计为人数、不混合研究视频与实时UTC。';
+       ' 个机位；Frigate原始数和质检后状态分列、质检不删除原始事件。'+
+       '不合并跨机位轨迹，CAVIAR整片历史帧不进入近7日实时计数；'+
+       '不将视频帧累计为人数、不混合研究视频与实时UTC。';
  }catch(e){$('occurrenceNote').textContent='读取局部事件失败：'+e.message}
 }
 function choose(id){$('source').value=String(id);$('frame').value='1';loadTracks();viewFrame()}
