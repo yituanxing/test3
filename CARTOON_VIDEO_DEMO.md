@@ -70,3 +70,18 @@ python -m scripts.cartoon_video_ui
 第一轮 DINOv2 兔子余弦分数最高约 0.498，最初未校准的 0.50 阈值使识别 NO_MATCH，CI 因此失败；这是诚实的失败，不是视频读取失败。进一步实验调整到 0.42 探索阈值，并用 NMS 对重叠的自动检测框去重；须至少两处独立的视频时间戳识别出 Buck 才算 PASS。阈值是事后根据首轮片段观察选取的，**不代表泛化精度**。
 
 首轮证据：https://github.com/yituanxing/test3/actions/runs/38341068383/artifacts/11786891489
+
+
+## 原始动画视频上传端到端，已经验收通过（2026-10-13）
+
+[真实 CI #38343247734](https://github.com/yituanxing/test3/actions/runs/38343247734)：**SUCCESS**。
+
+- 命令行从 **10 秒真实 Big Buck Bunny 动画 MP4**（W3Schools 许可示例）解码并抽样 8 帧；Grounding DINO 自动产生 11 个去重候选框；DINOv2 用**两个独立电影完整截图、均由检测器自动裁剪**形成 Buck 的参考特征。8 个视频时刻中，4 个时刻识别到 Buck 候选。
+- 运行了真正的本地 Gradio Web 服务，`gradio_client` 使用标准 VideoData 上传**原始完整动画 MP4**，不是提供已裁剪的静态图片，也没有绕过 API 直接调用分析函数。Web 端返回 7 张自动框图、4 个视频时刻有 Buck 候选。
+- 浏览器返回的标注视频经过 FFmpeg `libx264` 实际转为 **H.264**；CI 还使用 `ffprobe` 验证视频编码。
+- 两种入口（CLI 与 Web）产生的帧采样时间不同，所以 8 帧和 7 帧不应混为一个准确率分母。当前候选阈值 0.42 是探索参数，不属于已标定的泛化准确率。
+- GitHub Actions 工件： [真实视频/自动框/H.264 文件](https://github.com/yituanxing/test3/actions/runs/38343247734/artifacts/11787279893) 和 [完整视频上传 API 验收 JSON](https://github.com/yituanxing/test3/actions/runs/38343247734/artifacts/11788095737)。
+
+**本地需安装 FFmpeg（含 libx264）以生成浏览器通用的 H.264 视频**。只有 OpenCV 而无 FFmpeg 时，程序会在结果 JSON 中明确标记 MPEG-4 回退，此类预览可能无法在浏览器直接播放。
+
+**当前已达成的目标**：上传不经人工预裁剪的完整动画视频，系统自己找出 Buck 候选、框出位置，并给出与参考角色的相似度；可直接观看真实推理的标注抽样视频。**未达成**：对原片每帧都稳定识别、自动给所有新角色命名或任意动漫识别均准确。初版仅识别已有 Buck 参考图的候选，暂不扩展其他业务。
