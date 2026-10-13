@@ -169,3 +169,95 @@ def test_provider_scope_and_frigate_upstream_revision_invalidation(env):
                       headers=user['state']).status_code==404
     assert client.get('/api/site/occurrences/'+'bad'+'/quality',
                       headers=user['state']).status_code==422  # state admin sees input validation
+
+
+def test_all_count_types_share_utc_days_and_review_never_mutates_raw(env):
+    """One clock, one region, several counting UNITS across the whole system.
+
+    Frigate raw objects are NOT independently identified humans. Manual
+    CAVIAR GT boxes belong to a historical clip, outside the UTC window.
+    Accepted/rejected QA decisions are overlays, not deleted original events.
+    """
+    main,client,source,place,user=env
+    from app import monitoring
+    today=datetime.now(timezone.utc)
+    old=(today-timedelta(days=55)).isoformat()
+    current=today.isoformat()
+    with main.db() as c:
+        c.executemany("""INSERT INTO frigate_object_events
+            (camera,event_id,place_id,label,started_at,score,has_snapshot,updated_at)
+            VALUES('camera_gate',?,?,'person',?,0.8,0,?)""",
+            [('old-track',place,old,current),
+             ('recent-extra',place,current,current)])
+    monitored=client.get('/api/monitoring/overview?days=7',headers=user['county'])
+    assert monitored.status_code==200,monitored.text
+    raw=monitored.json()['counts']['person_objects']
+    assert raw==2  # original local-1 + recent-extra; old-track excluded
+    window=monitored.json()['window']
+    summary_url='/api/site/occurrences/summary?days=7'
+    event_count=client.get(summary_url,headers=user['county'])
+    assert event_count.status_code==200,event_count.text
+    sums=event_count.json()
+    assert sums['window']==window
+    assert sums['by_provider']['frigate']['camera_local_occurrences']==raw
+    assert sums['by_provider']['caviar_ground_truth']=={
+        'camera_local_occurrences':1,'cameras':1,'annotated_frames':5}
+    assert sums['research_time_scope']=='archival_clip_frames_all_time_not_calendar_days'
+    all_time=client.get('/api/site/occurrences/summary',headers=user['county']).json()
+    assert all_time['by_provider']['frigate']['camera_local_occurrences']==raw+1
+    assert all_time['by_provider']['caviar_ground_truth']==sums['by_provider']['caviar_ground_truth']
+    # The live time window must not silently be used for footage with frame
+    # numbers and no real calendar-clock capture time.
+
+    events=client.get('/api/site/occurrences?limit=100',headers=user['county']).json()['occurrences']
+    assert {x['track_id'] for x in events if x['provider']=='frigate'}=={
+        'local-1','recent-extra','old-track'}
+    first=next(x for x in events if x['track_id']=='local-1')
+    gt=next(x for x in events if x['provider']=='caviar_ground_truth')
+    post='/api/site/occurrences/'+first['occurrence_key']+'/quality'
+    verdict=client.post(post,headers=user['county'],json={
+        'verdict':'false_positive','reason':'原始帧复核确认为背景误检目标'})
+    assert verdict.status_code==201,verdict.text
+    gtr=client.post('/api/site/occurrences/'+gt['occurrence_key']+'/quality',
+                    headers=user['county'],json={
+        'verdict':'valid_local_target','reason':'逐帧检查官方局部人工标注一致'})
+    assert gtr.status_code==201,gtr.text
+    qa=client.get('/api/site/quality/summary?days=7',headers=user['county'])
+    assert qa.status_code==200,qa.text
+    reviewed=qa.json()
+    assert reviewed['window']==window
+    assert reviewed['by_provider']['frigate']['local_occurrences']==raw
+    assert reviewed['by_provider']['frigate']['false_positive']==1
+    assert reviewed['by_provider']['frigate']['not_reviewed']==1
+    assert reviewed['by_provider']['frigate']['accepted_local_targets']==0
+    assert reviewed['by_provider']['caviar_ground_truth']['local_occurrences']==1
+    assert reviewed['by_provider']['caviar_ground_truth']['accepted_local_targets']==1
+    assert reviewed['raw_event_counts_unchanged_by_quality_review'] is True
+    assert reviewed['counts_real_people'] is False
+    assert reviewed['counts_site_visits'] is False
+    assert client.get('/api/monitoring/overview?days=7',
+                      headers=user['county']).json()['counts']['person_objects']==raw
+    assert client.get(summary_url,headers=user['county']).json()[
+        'by_provider']['frigate']['camera_local_occurrences']==raw
+
+    # A changed upstream detection invalidates its old quality conclusion;
+    # it must NOT silently delete or accept Frigate raw target events.
+    with main.db() as c:
+        c.execute("""UPDATE frigate_object_events SET score=0.96,updated_at=?
+           WHERE camera='camera_gate' AND event_id='local-1'""",(current,))
+    stale=client.get('/api/site/quality/summary?days=7',headers=user['county']).json()
+    assert stale['by_provider']['frigate']['stale_review']==1
+    assert stale['by_provider']['frigate']['false_positive']==0
+    assert stale['by_provider']['frigate']['local_occurrences']==raw
+    assert client.get('/api/monitoring/overview?days=7',
+                      headers=user['county']).json()['counts']['person_objects']==raw
+    remote=client.get('/api/site/quality/summary?days=7',headers=user['remote']).json()
+    assert remote['by_provider']['frigate']['local_occurrences']==1
+    assert remote['by_provider'].get('caviar_ground_truth') is None
+    assert client.get('/api/site/occurrences/summary?days=7',
+                      headers=user['remote']).json()['by_provider']['frigate'][
+                          'camera_local_occurrences']==1
+    assert client.get('/api/site/quality/summary?days=32',
+                      headers=user['county']).status_code==422
+    assert client.get('/api/site/occurrences/summary?days=0',
+                      headers=user['county']).status_code==422
