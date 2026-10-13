@@ -15,14 +15,19 @@ from pathlib import Path
 
 def analyze_uploaded_video(video_filepath: str):
     import gradio as gr
-    from scripts.cartoon_video_recognize import run
+    from scripts.cartoon_video_recognize import ROOT, run
     from scripts.cartoon_video_track_existing import analyze, render_evidence
 
     if not video_filepath or not Path(video_filepath).is_file():
         raise gr.Error("请先上传一个完整动画视频")
     out = Path(tempfile.mkdtemp(prefix="zd-cartoon-video-"))
     try:
-        result = run(Path(video_filepath), out)
+        fixture = ROOT / "reports/cartoon-reference-fixtures"
+        frozen_refs = [fixture / "reference_auto_crop.jpg",
+                       fixture / "reference_auto_crop_buck_bow.jpg"]
+        result = run(Path(video_filepath), out,
+                     reference_crops=frozen_refs if all(x.is_file() for x in frozen_refs)
+                     else None)
         # ByteTrack groups already model-detected boxes across the uploaded
         # video. We never overwrite the raw DINOv2 similarities or verdicts.
         tracked = analyze(result)
