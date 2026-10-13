@@ -90,16 +90,36 @@ def main():
                 assert ocsort_metrics['ground_truth_boxes']==tracker_metrics['ground_truth_boxes']
                 # REAL pretrained person detector on independent VIDEO frames,
                 # not CVML GT boxes fed as detections. Keep bounded for CPU CI.
-                from app.person_detection_adapter import run_real_person_detector
-                with server.db() as db:
-                    detector_metrics=run_real_person_detector(
-                        db,got['source_id'],max_frames=24,sample_every=1)
+                detector_route=(f"/api/cctv/sources/{got['source_id']}"
+                                "/person-detector-run?max_frames=24&sample_every=1")
+                evidence_response=client.post(detector_route,headers=auth)
+                assert evidence_response.status_code==200,evidence_response.text[:700]
+                detector_metrics=evidence_response.json()
+                assert detector_metrics['status'] in ('saved','existing')
+                assert detector_metrics['run_key']
+                assert detector_metrics['recorded_as_archival_local_evidence'] is True
+                assert detector_metrics['eligible_for_real_identity_or_visit'] is False
                 assert detector_metrics['frames_inferred']==24
                 assert detector_metrics['frames_decoded']==24
                 assert detector_metrics['real_pretrained_person_detector_ran'] is True
                 assert detector_metrics['detector_received_ground_truth_boxes'] is False
                 assert detector_metrics['existing_automatic_tracker_ran'] is True
                 assert detector_metrics['cross_camera_identity_matching_ran'] is False
+                current=client.get('/api/site/occurrences',headers=auth)
+                assert current.status_code==200,current.text[:500]
+                matching=[x for x in current.json()['occurrences']
+                    if x['provider']=='yolo_bytetrack'
+                    and x['source_id']==got['source_id']
+                    and x['run_key']==detector_metrics['run_key']]
+                assert len(matching)==detector_metrics['camera_local_tracker_ids']
+                if matching:
+                    qa=client.post('/api/site/occurrences/'+matching[0]['occurrence_key']+
+                                   '/quality',headers=auth,json={
+                        'verdict':'needs_review',
+                        'reason':'官方真实CAVIAR模型目标检测需人工核对，不自动确认自然人'})
+                    assert qa.status_code==201,qa.text[:600]
+                    assert qa.json()['provider']=='yolo_bytetrack'
+                    detector_metrics['first_local_track_quality_id']=qa.json()['created_review_id']
                 report['verified_cameras'].append({
                     'real_yolo_person_detector_to_existing_bytetrack':detector_metrics,
 
