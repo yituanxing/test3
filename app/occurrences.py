@@ -48,7 +48,8 @@ def _scoped_rows(c,allowed,*,limit=500,offset=0):
           i.video_sha256 AS file_sha, s.place_id AS venue_id,
           b.camera_local_track_id AS track_id,
           MIN(b.frame_number) AS first_seen,MAX(b.frame_number) AS last_seen,
-          COUNT(*) AS annotation_frames,NULL AS score
+          COUNT(*) AS annotation_frames,NULL AS score,
+          NULL AS binding_epoch_id
         FROM public_cctv_track_boxes b
         JOIN public_cctv_imports i ON i.source_id=b.source_id
         JOIN sources s ON s.id=b.source_id
@@ -57,7 +58,7 @@ def _scoped_rows(c,allowed,*,limit=500,offset=0):
                  b.camera_local_track_id
         UNION ALL
         SELECT 'frigate',NULL,e.camera,NULL,e.place_id,e.event_id,
-               e.started_at,e.ended_at,NULL,e.score
+               e.started_at,e.ended_at,NULL,e.score,e.binding_epoch_id
         FROM frigate_object_events e
         WHERE e.place_id IN ({marks})
     )
@@ -75,6 +76,7 @@ def _project(row,allowed):
             'occurrence_key':key,'provider':'frigate',
             'evidence_kind':'upstream_anonymous_person_event',
             'camera_key':row['camera_key'],'source_id':None,
+          'binding_epoch_id':row['binding_epoch_id'],
             'track_id':row['track_id'],'venue_id':row['venue_id'],
             'venue_name':allowed[row['venue_id']]['name'],
             'first_seen':row['first_seen'],'last_seen':row['last_seen'],
@@ -89,6 +91,7 @@ def _project(row,allowed):
         'provider':'caviar_ground_truth',
         'evidence_kind':'published_manual_local_tracking_annotation',
         'camera_key':row['camera_key'],'source_id':source_id,
+        'binding_epoch_id':None,
         'track_id':str(row['track_id']),'venue_id':row['venue_id'],
         'venue_name':allowed[row['venue_id']]['name'],
         'first_seen':row['first_seen'],'last_seen':row['last_seen'],
