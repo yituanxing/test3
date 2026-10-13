@@ -14,6 +14,19 @@ def _to_utc(value: str) -> datetime:
     return datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(timezone.utc)
 
 
+def utc_day_window(days: int, *, now: datetime | None = None):
+    """One UTC calendar-day window contract shared by all real-video counters.
+
+    Half-open [start,end); historical research clips have no real UTC shooting
+    date and must NEVER enter this calendar-day measurement.
+    """
+    if not 1 <= days <= 31:
+        raise ValueError('days must be in 1..31')
+    now=(now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    end=now.replace(hour=0,minute=0,second=0,microsecond=0)+timedelta(days=1)
+    return end-timedelta(days=days),end
+
+
 def overview(conn, *, days: int = 7, now: datetime | None = None,
              region_id: int | None = None, allowed_region_ids: set[int] | None = None) -> dict:
     """Aggregate raw upstream measurements without guessing person identities.
@@ -21,11 +34,7 @@ def overview(conn, *, days: int = 7, now: datetime | None = None,
     Uses a fixed UTC window [today-days+1, tomorrow). Event counts are keyed
     by Frigate event id. Frame detections are kept in separate measurements.
     """
-    if not 1 <= days <= 31:
-        raise ValueError('days must be in 1..31')
-    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    end = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-    start = end - timedelta(days=days)
+    start,end=utc_day_window(days,now=now)
     places = [dict(r) for r in conn.execute('SELECT id,name,region_id FROM places ORDER BY id')]
     if allowed_region_ids is not None:
         places = [p for p in places if p['region_id'] in allowed_region_ids]
@@ -131,11 +140,9 @@ def face_activity_details(conn, *, days: int = 7, limit: int = 50,
     full requested time window before limiting the display, so counts agree
     with monitoring.overview instead of hiding older windows behind LIMIT.
     """
-    if not 1 <= days <= 31 or not 1 <= limit <= 250:
-        raise ValueError("invalid days or display limit")
-    now = datetime.now(timezone.utc)
-    end = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-    start = end - timedelta(days=days)
+    if not 1 <= limit <= 250:
+        raise ValueError("invalid display limit")
+    start,end=utc_day_window(days)
     places = [dict(row) for row in conn.execute(
         "SELECT id,name,region_id FROM places ORDER BY id")]
     if allowed_region_ids is not None:
