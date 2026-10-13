@@ -187,7 +187,8 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
             ids = [i for ep in eps for v in ep['visits'] if v['person'] in cohort
                    for i in v['observation_ids']]
             members = '、'.join(cohort)
-            alerts.append(_hit('companion', [min_companions, *cohort],
+            key_parts = list(cohort) if min_companions == 2 else [min_companions, *cohort]
+            alerts.append(_hit('companion', key_parts,
                 f"{members} 在其他场所共同出现 {len(eps)} 个时间窗口",
                 cohort, [ep['place_id'] for ep in eps], ids,
                 '同一合成成员组重复共同出现；不证明现实中的结伴同行。'))
