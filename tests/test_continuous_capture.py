@@ -137,3 +137,38 @@ def test_reenable_uses_persisted_desired_state(context, monkeypatch):
     recovered.clear()
     jobs.start_pending()
     assert recovered == []
+
+
+def test_gb_same_binding_can_enable_only_one_source_and_stops_with_session(context, monkeypatch):
+    client, main, jobs, first_source, _ = context
+    from app import gb28181
+    monkeypatch.setattr(jobs, "_spawn", lambda source_id: None)
+    monkeypatch.setattr(gb28181, "_wvp_get", lambda route, params=None: {"code": 0})
+    with main.db() as c:
+        place = c.execute("SELECT place_id FROM sources WHERE id=?",
+                          (first_source,)).fetchone()[0]
+        binding = c.execute("""INSERT INTO gb28181_channel_bindings
+            (place_id,device_id,channel_id,name,created_at)
+            VALUES(?,?,?,?,?)""", (place, "1"*20, "2"*20,
+                                   "capture test", main.utcnow())).lastrowid
+        second = c.execute("""INSERT INTO sources(place_id,name,kind,uri,enabled)
+            VALUES(?,'second live source','rtsp','rtsp://127.0.0.1:8554/second',1)""",
+                           (place,)).lastrowid
+        session_a = c.execute("""INSERT INTO gb28181_stream_sessions
+            (binding_id,source_id,mode,upstream_stream,state,created_at)
+            VALUES(?,?,'live','stream_a','active',?)""",
+                              (binding,first_source,main.utcnow())).lastrowid
+        c.execute("""INSERT INTO gb28181_stream_sessions
+            (binding_id,source_id,mode,upstream_stream,state,created_at)
+            VALUES(?,?,'live','stream_b','active',?)""",
+                  (binding,second,main.utcnow()))
+    assert client.post(f"/api/capture/jobs/{first_source}/start").status_code == 200
+    blocked = client.post(f"/api/capture/jobs/{second}/start")
+    assert blocked.status_code == 409
+    stopped = client.post(f"/api/gb28181/sessions/{session_a}/stop")
+    assert stopped.status_code == 200, stopped.text
+    with main.db() as c:
+        row = c.execute("SELECT desired_enabled FROM capture_jobs WHERE source_id=?",
+                        (first_source,)).fetchone()
+        assert row["desired_enabled"] == 0
+    assert client.post(f"/api/capture/jobs/{second}/start").status_code == 200
