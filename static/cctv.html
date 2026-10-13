@@ -57,7 +57,10 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 </div>
 <div class="panel"><h2>⑤ 实际视频解码与人员检测分开验收</h2>
 <p>第一条链路：从官方素材读取视频帧。第二条链路：CAVIAR 官方人体框帮助验证目标出现。第三条链路：我们自己的模型检测与跟踪必须单独评估。</p>
-<div class="row"><button id="process" class="secondary">运行已有匿名人脸检测</button></div>
+<div class="row"><button id="process" class="secondary">运行已有匿名人脸检测</button>
+<button id="benchmarkTracker" class="secondary">用现成 ByteTrack 验证本机轨迹</button></div>
+<p class="small">ByteTrack 使用 Roboflow 已有开源实现，输入是官方 CAVIAR 人工人体框，不是我们的检测预测。只验证本机自动跟踪稳定性，不能识别跨镜头同一真人；需安装可选跟踪依赖。</p>
+<pre id="trackerBaseline" class="small" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
 <p class="small">目前项目已有 OpenCV 的人脸候选检测；监控分辨率仅384×288，可能检测到0张脸。这不等于没有人员！后续的人体检测必须单独实测。</p>
 <pre id="detection" class="small" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
 <h3 style="margin-top:22px">当前机位内的人工轨迹</h3>
@@ -233,6 +236,22 @@ async function refreshOccurrences(){
        '不将视频帧累计为人数、不混合研究视频与实时UTC。';
  }catch(e){$('occurrenceNote').textContent='读取局部事件失败：'+e.message}
 }
+async function evaluateExistingTracker(){
+ const source=current();
+ if(!source){$('trackerBaseline').textContent='尚未导入研究视频';return}
+ const button=$('benchmarkTracker');button.disabled=true;
+ $('trackerBaseline').textContent='正在调用外部 ByteTrack，核验官方逐帧人体框的局部轨迹…';
+ try{
+  const r=await api('/api/cctv/sources/'+source+'/tracking-baseline?max_frames=400');
+  $('trackerBaseline').textContent='现成算法：Roboflow ByteTrack\n'+
+    '摄像机：'+r.camera_view+'；官方人体框：'+r.ground_truth_boxes+
+    '；人工局部轨迹：'+r.ground_truth_local_track_count+
+    '；确认框：'+r.assigned_boxes+'；待确认：'+r.unconfirmed_boxes+
+    '\n分配覆盖率：'+r.assignment_coverage+'；局部ID变换：'+r.local_id_changes+
+    '\n这是人工GT框→现成自动跟踪器的测试；没有运行人体检测器，也没有跨机真人身份匹配。';
+ }catch(e){$('trackerBaseline').textContent='未能运行基线：'+e.message}
+ finally{button.disabled=false}
+}
 function choose(id){$('source').value=String(id);$('frame').value='1';loadTracks();viewFrame()}
 async function loadPair(){
  const b=$('loadPair');b.disabled=true;
@@ -284,5 +303,7 @@ async function start(){
  }catch(e){setStatus('无法加载：'+e.message,true)}
 }
 $('loadPair').onclick=loadPair;$('viewFrame').onclick=()=>viewFrame().catch(e=>$('frameNote').textContent=e.message);
-$('process').onclick=detect;$('source').onchange=loadTracks;start();
+$('process').onclick=detect;
+$('benchmarkTracker').onclick=evaluateExistingTracker;
+$('source').onchange=loadTracks;start();
 </script></body></html>
