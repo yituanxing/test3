@@ -50,6 +50,11 @@ def initialize(c):
         updated_at TEXT NOT NULL
     );
     """)
+    # Schema migration for a database created by the earliest scheduler prototype.
+    cols = {r["name"] for r in c.execute("PRAGMA table_info(capture_jobs)")}
+    if "binding_id" not in cols:
+        c.execute("ALTER TABLE capture_jobs ADD COLUMN binding_id INTEGER "
+                  "REFERENCES gb28181_channel_bindings(id)")
     # Only one desired worker per real GB device/channel binding, even when
     # WVP creates a NEW RTSP source for another live session.
     c.execute("""CREATE UNIQUE INDEX IF NOT EXISTS one_active_gb_capture
@@ -163,7 +168,18 @@ def _run(source_id):
                 # This function always runs the actual image decoding/inference path.
                 result = _process(source_id)
             except HTTPException as exc:
-                failure = f"HTTP_{exc.status_code}"
+                # Fixed categorical codes only; never persist untrusted stream URLs.
+                detail = str(exc.detail)
+                if exc.status_code == 400 and "视频无法打开" in detail:
+                    failure = "STREAM_OPEN_FAILED"
+                elif exc.status_code == 400 and "未读到帧" in detail:
+                    failure = "STREAM_NO_FRAMES"
+                elif exc.status_code == 409 and "视频源已停用" in detail:
+                    failure = "SOURCE_DISABLED"
+                elif exc.status_code == 500 and "检测器初始化失败" in detail:
+                    failure = "DETECTOR_INIT_FAILED"
+                else:
+                    failure = f"HTTP_{exc.status_code}"
             except Exception as exc:
                 # Do not persist exception messages: OpenCV may include RTSP secrets.
                 failure = type(exc).__name__[:80]
@@ -188,6 +204,12 @@ def _run(source_id):
                           source_id, token))
                     delay = 0.5
                 else:
+                    if failure == "SOURCE_DISABLED":
+                        c.execute("""UPDATE capture_jobs SET desired_enabled=0,
+                            state='stopping', last_error_code=?, updated_at=?
+                            WHERE source_id=? AND owner_token=?""",
+                                  (failure, _stamp(), source_id, token))
+                        break
                     failures = row["failure_count"] + 1
                     c.execute("""
                       UPDATE capture_jobs SET state='retrying', failure_count=?,
