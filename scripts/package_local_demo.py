@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 DIST.mkdir(exist_ok=True)
 TARGET = DIST / "zd-demo-local-source.zip"
-FOLDERS = ("app", "static", "scripts", "samples", "deploy")
+FOLDERS = ("app", "static", "scripts", "samples", "deploy", "config")
 FILES = (
     "README.md", "THIRD_PARTY.md", "DEMO_INTEGRATION.md",
     "PRODUCT_FLOW_V1.3.md", "ACCESS_CONTROL_V1.2.md",
