@@ -53,6 +53,15 @@ def main() -> None:
             raise AssertionError("UI did not produce a playable annotated preview")
         if result.get("preview_codec") != "h264_browser_compatible":
             raise AssertionError("Video browser preview was not encoded H.264")
+        temporal = result.get("temporal_consistency")
+        if not isinstance(temporal, dict):
+            raise AssertionError("Upload UI did not compute real ByteTrack associations")
+        raw_times = set(temporal["raw_matching_timestamps"])
+        supported_times = set(temporal["temporally_supported_timestamps"])
+        if not raw_times <= supported_times:
+            raise AssertionError("Temporal review unexpectedly discarded a raw match")
+        if not set(temporal["extra_timestamps_recovered"]).isdisjoint(raw_times):
+            raise AssertionError("Temporal extras overlap previously recognized times")
         report = {
             "status": "PASS",
             "submitted_media": actual_video.name,
@@ -62,6 +71,12 @@ def main() -> None:
             "distinct_matching_timestamps": result["distinct_timestamps_with_buck"],
             "preview_codec": result["preview_codec"],
             "gallery_items": len(gallery),
+            "raw_matching_timestamps": sorted(raw_times),
+            "temporally_supported_timestamps": sorted(supported_times),
+            "additional_timestamps_by_existing_ByteTrack":
+                temporal["extra_timestamps_recovered"],
+            "weak_observations_recovered":
+                temporal["weak_observations_recovered"],
         }
         (report_dir / "result.json").write_text(
             json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
