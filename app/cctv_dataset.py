@@ -402,6 +402,39 @@ def person_detector_baseline(source_id:int,request:Request,
                  sample_every=sample_every,confidence=confidence)
 
 
+@router.post('/api/cctv/sources/{source_id}/person-detector-run')
+def save_person_detector_evidence(source_id:int,request:Request,
+                             max_frames:int=Query(32,ge=1,le=64),
+                             sample_every:int=Query(1,ge=1,le=4),
+                             confidence:float=Query(.25,ge=.1,le=.9)):
+    """Append proven YOLO+ByteTrack local boxes into canonical evidence index.
+
+    The resulting records are archival frame-relative occurrences only,
+    never actual identities, UTC arrivals or automatic Excel risk alerts.
+    """
+    _state_admin(request)
+    from app.person_detection_adapter import (
+        run_real_person_detector,persist_detection_run)
+    with _db() as c:
+        access.check_source(c,request,source_id)
+        result=run_real_person_detector(c,source_id,max_frames=max_frames,
+                sample_every=sample_every,confidence=confidence)
+        saved=persist_detection_run(c,result)
+        admin.audit(c,"caviar_real_person_detector",
+                    f"source:{source_id}",None,{
+                        "run_key":saved["run_key"],"status":saved["status"],
+                        "model":result["model"],"tracker":result["tracker"],
+                        "recorded_local_boxes":saved["stored_local_boxes"],
+                        "cross_camera_identity_matched":False,
+                        "actual_video_sha256":result["video_sha256"]})
+        # The UI should see an evidence reference, not assume a real identity.
+        return {**{k:v for k,v in result.items()
+                   if k!="local_track_boxes"},**saved,
+                "recorded_as_archival_local_evidence":True,
+                "eligible_for_real_identity_or_visit":False,
+                "note":"模型本机轨迹已入统一匿名证据查询；只有原片帧号，绝不直接推断真实独立人或跨场所事件。"}
+
+
 @router.get('/api/cctv/sources/{source_id}/pair-tracking-baseline')
 def compare_caviar_pair(source_id:int,request:Request,
                         max_frames:int=Query(400,ge=1,le=600)):
