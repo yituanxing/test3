@@ -180,6 +180,12 @@ def test_actual_roboflow_bytetrack_tracks_camera_local_ground_truth_when_install
     for source in ids:
         r=client.get(f'/api/cctv/sources/{source}/tracking-baseline?max_frames=8',
                      headers=county)
+        oc=client.get(f'/api/cctv/sources/{source}/tracking-baseline?max_frames=8&algorithm=ocsort',
+                      headers=county)
+        assert oc.status_code==200,oc.text
+        assert oc.json()['tracker']=='roboflow_trackers_ocsort'
+        assert oc.json()['ground_truth_boxes']==4
+        assert oc.json()['cross_camera_matching_ran'] is False
         assert r.status_code==200,r.text
         data=r.json()
         assert data['tracker']=='roboflow_trackers_bytetrack'
@@ -193,6 +199,8 @@ def test_actual_roboflow_bytetrack_tracks_camera_local_ground_truth_when_install
         assert data['assignment_coverage'] is not None
         assert data['assigned_boxes']+data['unconfirmed_boxes']==4
         outputs.append(data)
+    assert client.get(f'/api/cctv/sources/{ids[0]}/tracking-baseline?algorithm=unknown',
+                      headers=county).status_code==422
     assert outputs[0]['source_id']!=outputs[1]['source_id']
     assert {x['camera_view'] for x in outputs}=={'front','corridor'}
     with main.db() as c:
