@@ -113,5 +113,6 @@ jobs:
           name: gb28181-sip-actual-registration
           path: |
             reports/verify-gb28181-real-sip.json
+            reports/verify-gb28181-real-app.json
             reports/gb28181-decoded-ci.jpg
           if-no-files-found: error
