@@ -73,6 +73,11 @@ window.addEventListener('load',async()=>{
 <div class="scroll"><table><thead><tr><th>场所</th><th>设备及通道</th><th>名称</th><th>操作</th></tr></thead><tbody id="gbBindings"></tbody></table></div>
 <div class="scroll"><table><thead><tr><th>会话</th><th>模式</th><th>视频源 ID</th><th>状态</th><th>操作</th></tr></thead><tbody id="gbSessions"></tbody></table></div>
 <p class="hint">操作后需对新 RTSP 源做实际 ffprobe/解码，才能确认画面正常；WVP 返回地址并不等于真实 SIP+RTP 已验证。不会把匿名目标当作真实唯一人员。</p></section>
+<section class="card wide" id="capturePanel">
+<div class="row"><h2>持续采集任务 · 断流重试与运行状态</h2><button class="subtle" onclick="captureRefresh()">刷新任务</button></div>
+<p class="hint">先通过国标实时点播获取视频源，再在国标会话行点击“持续采集”。同源与同国标通道禁止重复运行；发生 OpenCV 解码异常时指数退避并重试原 RTSP 源。暂不自动重新 INVITE，网关旧流失效后需重新点播。检测框仍然不是独立人数。</p>
+<div class="scroll"><table><thead><tr><th>源 ID</th><th>运行状态</th><th>成功批次</th><th>新入库抽样帧</th><th>连续失败</th><th>最后成功</th><th>错误码</th><th>操作</th></tr></thead><tbody id="captureJobs"><tr><td colspan="8">读取任务状态中……</td></tr></tbody></table></div>
+</section>
 <section class="card"><h2>真伪边界 · 测试矩阵</h2><div class="stage"><div><div class="stname">本地 MP4 → OpenCV → SQLite</div><div class="stnote">点击上方「验证本地视频」可实际解码与写入</div></div><span class="status good">可运行</span></div><div class="stage"><div><div class="stname">Frigate HTTP 适配 → SQLite</div><div class="stnote">使用本机真实HTTP回环服务器执行契约测试</div></div><span class="status good">自动化可测</span></div><div class="stage"><div><div class="stname">MediaMTX → Frigate 目标检测</div><div class="stnote">需Docker和合法人物录像；当前无此测试结果</div></div><span class="status warn">需现场验收</span></div><div class="stage"><div><div class="stname">GB28181 国标SIP接入</div><div class="stnote">开源WVP + ZLMediaKit + GB设备模拟器已经CI验证完整视频解码及OpenCV人脸框入库；当前实例连通性需独立验证</div></div><span class="status good">CI已验证</span></div></section>
 </div><p class="note">新增加的「有脸采集窗口」仅将同源同UTC日期、入库时间间隔不超过20秒的有脸帧合并，并不能确认同一人；多人可共享窗口，同一人可跨窗口。本页面不显示“人员识别成功”或“出入到访人数”，因为当前视频模型和目标事件无法提供可靠的唯一身份。合成身份规则可到「合成业务闭环」完整演示配置、纠错、审核、审计。</p><footer>本地演示程序 · API 已配置令牌鉴权，默认仅用于受控环境；涉及授权测试素材时遵守使用许可、数据最小化和保存期限要求。</footer>
 </main><div id="toast"></div><script>
@@ -142,9 +147,29 @@ async function gbRefresh(){
     $('gbSessions').innerHTML=(sessions.sessions||[]).map(z=>'<tr><td>'+z.id+
       '</td><td>'+esc(z.mode)+'</td><td>'+z.source_id+
       '</td><td>'+esc(z.state)+'</td><td>'+
-      (writable&&z.state==='active'?'<button class="subtle" onclick="gbProbe('+z.source_id+')">实际探测</button> <button class="subtle" onclick="gbStop('+z.id+')">停流</button>':'—')+
+      (writable&&z.state==='active'?'<button class="subtle" onclick="gbProbe('+z.source_id+')">实际探测</button> <button class="subtle" onclick="captureAction('+z.source_id+',&quot;start&quot;)">持续采集</button> <button class="subtle" onclick="gbStop('+z.id+')">停流</button>':'—')+
       '</td></tr>').join('')||'<tr><td colspan="5">尚无上游成功返回的国标视频会话。</td></tr>';
   }catch(e){$('gbStatus').textContent='国标状态获取失败：'+e.message}
+}
+async function captureRefresh(){
+  try {
+    const [data,actor]=await Promise.all([api('/api/capture/jobs'),api('/api/auth/me')]);
+    const writable=actor.level===1;
+    $('captureJobs').innerHTML=(data.jobs||[]).map(j=>'<tr><td>'+j.source_id+
+      '</td><td>'+esc(j.state)+(j.desired_enabled?' · 已启用':' · 已停用')+
+      '</td><td>'+j.successful_batches+'</td><td>'+j.sampled_frames+
+      '</td><td>'+j.failure_count+'</td><td>'+t(j.last_success_at)+
+      '</td><td>'+esc(j.last_error_code||'—')+'</td><td>'+
+      (writable&&j.desired_enabled?'<button class="subtle" onclick="captureAction('+j.source_id+',&quot;stop&quot;)">停止任务</button>':'—')+
+      '</td></tr>').join('')||'<tr><td colspan="8">没有持续采集任务；先通过国标实时点播获得 RTSP 源。</td></tr>';
+  }catch(e){$('captureJobs').innerHTML='<tr><td colspan="8">'+esc('读取失败：'+e.message)+'</td></tr>'}
+}
+async function captureAction(sourceId,action){
+  try{
+    const x=await api('/api/capture/jobs/'+sourceId+'/'+action,'POST',{});
+    toast('视频源 '+sourceId+' 持续采集状态：'+x.state);
+    await captureRefresh();
+  }catch(e){toast('持续采集操作失败：'+e.message,true)}
 }
 async function gbDiscover(){
   try{
@@ -211,4 +236,5 @@ async function runVideo(){let b=$('videoButton');b.disabled=true;try{let sources
 async function syncFrigate(){let b=$('syncButton');b.disabled=true;try{let x=await api('/api/frigate/sync?limit=200','POST');toast(`已同步：新增${x.inserted}、更新${x.updated}、跳过${x.skipped}。`);await reload()}catch(e){toast('同步失败：'+e.message,true)}finally{b.disabled=false}}
 reload();
 gbRefresh();
+captureRefresh();
 </script></body></html>
