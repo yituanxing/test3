@@ -1,0 +1,65 @@
+{
+  "schema_version": "cartoon_consensus_5m30_first_holdout_visual_review_v1",
+  "original_movie_seconds": [
+    330,
+    355
+  ],
+  "frozen_video_sha256": "9c14da7be000e8143619b4c3595083f95bfa6ecf24373ebe77dfe1ed4f7dad9e",
+  "model_run_first_untouched": "https://github.com/yituanxing/test3/actions/runs/38356219809",
+  "source_artifact": "cartoon-harmonic-consensus-untouched-5m30 (run 38356219809)",
+  "labels_made_after_observing_A_B_output": true,
+  "visual_review_not_blinded": true,
+  "notes": "10 automatically sampled frames of original Big Buck Bunny film. One closeup depicts only Buck hands/belly, excluded. Label other eight as absence based on actual full-frame inspection, not model text.",
+  "frames": [
+    {
+      "second": 0.5,
+      "buck": "uncertain",
+      "why": "Tight closeup only of pale rabbit's belly and hands pulling bamboo; insufficient unique character cues to identify Buck from the isolated frame."
+    },
+    {
+      "second": 3,
+      "buck": "absent",
+      "why": "Three small forest squirrels only; no large Buck rabbit."
+    },
+    {
+      "second": 5.5,
+      "buck": "present",
+      "why": "Large pale rabbit Buck clearly visible in closeup behind bamboo/vine with eye and cheek."
+    },
+    {
+      "second": 8,
+      "buck": "absent",
+      "why": "Forest canopy only, no Buck."
+    },
+    {
+      "second": 10.5,
+      "buck": "absent",
+      "why": "Three squirrels in closeup, no Buck."
+    },
+    {
+      "second": 13,
+      "buck": "absent",
+      "why": "Small squirrels on suspended wooden bar, no Buck."
+    },
+    {
+      "second": 15.5,
+      "buck": "absent",
+      "why": "Three squirrels closeup, no Buck."
+    },
+    {
+      "second": 18,
+      "buck": "absent",
+      "why": "Small squirrel on hanging wood, no Buck."
+    },
+    {
+      "second": 20.5,
+      "buck": "absent",
+      "why": "Brown squirrel face closeup, no Buck."
+    },
+    {
+      "second": 23,
+      "buck": "absent",
+      "why": "Open sky and tree canopy, no Buck."
+    }
+  ]
+}
