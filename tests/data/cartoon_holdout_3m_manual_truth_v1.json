@@ -1,0 +1,61 @@
+{
+  "schema_version": "cartoon-holdout-manual-v1",
+  "source": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+  "original_segment_start_second": 180,
+  "segment_duration_seconds": 25,
+  "segment_sha256": "0b8d842f8c6e83627d91a847c29328b31831835829226ea14e7e07c8079d24c7",
+  "annotation_method": "Visual review of all ten annotated frame images, completed AFTER frozen-model prediction; NOT blinded. Model labels are not used as truth.",
+  "output_provenance": "GitHub Actions #38350364558, artifact cartoon-frozen-full-film-holdout",
+  "labels": [
+    {
+      "second": 0.5,
+      "truth": "absent",
+      "note": "Only three smaller forest animals; Buck absent."
+    },
+    {
+      "second": 3,
+      "truth": "absent",
+      "note": "Only three smaller forest animals; Buck absent."
+    },
+    {
+      "second": 5.5,
+      "truth": "ambiguous",
+      "note": "Only gray ears partially rise into view; identity not reliably identifiable, exclude from metrics."
+    },
+    {
+      "second": 8,
+      "truth": "present",
+      "note": "Large white/gray Buck rabbit clearly visible."
+    },
+    {
+      "second": 10.5,
+      "truth": "present",
+      "note": "Buck front-facing, clearly visible."
+    },
+    {
+      "second": 13,
+      "truth": "present",
+      "note": "Buck standing in meadow, clearly visible."
+    },
+    {
+      "second": 15.5,
+      "truth": "absent",
+      "note": "Smaller forest animals only; Buck absent."
+    },
+    {
+      "second": 18,
+      "truth": "absent",
+      "note": "Smaller forest animals only; Buck absent."
+    },
+    {
+      "second": 20.5,
+      "truth": "absent",
+      "note": "Pink butterfly only; Buck absent."
+    },
+    {
+      "second": 23,
+      "truth": "absent",
+      "note": "Small brown squirrel and pink butterfly; NO Buck. Model incorrectly labeled squirrel buck_candidate."
+    }
+  ]
+}
