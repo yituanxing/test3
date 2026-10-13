@@ -189,15 +189,28 @@ def _probe_bytes(data: bytes, suffix='.mpg'):
         try:
             if not cap.isOpened():
                 raise HTTPException(422,'官方 MPEG 文件未能由 OpenCV 解码')
-            count=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            # MPEG2 program streams often report an incorrect CAP_PROP_FRAME_COUNT.
+            # Actual CAVIAR CI evidence: OpenCV metadata claimed 4 frames while
+            # the matching official CVML contains 383. COUNT DECODED FRAMES.
             fps=float(cap.get(cv2.CAP_PROP_FPS))
-            ok,frame=cap.read()
-            if not ok or frame is None or frame.size==0:
+            count=0
+            first=None
+            while count<30000:
+                ok,frame=cap.read()
+                if not ok:
+                    break
+                if frame is None or frame.size==0:
+                    continue
+                if first is None:
+                    first=frame
+                count+=1
+            if first is None or count==0:
                 raise HTTPException(422,'官方 MPEG 文件未找到可解码帧')
-            if count<1:
-                raise HTTPException(422,'数据集帧数无法验证')
+            if count==30000:
+                raise HTTPException(413,'实际视频帧数超出本地验收上限')
             return {'frames':count,'fps':round(fps,3),
-                    'width':int(frame.shape[1]),'height':int(frame.shape[0])}
+                    'width':int(first.shape[1]),'height':int(first.shape[0]),
+                    'frame_count_method':'actual_decoded_frames_not_unreliable_mpeg_header'}
         finally:
             cap.release()
 
@@ -345,9 +358,14 @@ def annotated_frame(source_id:int,request:Request,
     try:
         if not capture.isOpened():
             raise HTTPException(409,'已登记CAVIAR视频文件目前不可读')
-        capture.set(cv2.CAP_PROP_POS_FRAMES,frame-1)
-        ok,picture=capture.read()
-        if not ok:
+        # MPEG2 random-access frame indexes may be unreliable, too.
+        # On the bounded tiny proof clip, decoding sequentially is exact.
+        picture=None
+        for index in range(frame):
+            ok,picture=capture.read()
+            if not ok:
+                raise HTTPException(409,'指定的监控帧目前无法解码')
+        if picture is None:
             raise HTTPException(409,'指定的监控帧目前无法解码')
         for box in boxes:
             x,y,w,h=box['x'],box['y'],box['width'],box['height']
