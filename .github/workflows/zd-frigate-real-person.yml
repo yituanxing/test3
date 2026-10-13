@@ -139,6 +139,22 @@ jobs:
           python -m pip install pillow requests numpy
       - name: Recognize Big Buck Bunny across distinct licensed film stills
         run: python -m scripts.verify_cartoon_character
+      - name: Install existing pretrained open-vocabulary video detector
+        run: python -m pip install -r requirements-cartoon-video.txt
+      - name: Feed genuine 15-second Big Buck Bunny video and auto-detect rabbit boxes
+        run: python -m scripts.cartoon_video_recognize --demo-video --interval 2.5 --max-frames 6
+      - name: Save actual video detection and matching artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-uncropped-video-detection
+          path: |
+            reports/cartoon-video-proof/result.json
+            reports/cartoon-video-proof/reference_auto_crop.jpg
+            reports/cartoon-video-proof/annotated_samples.mp4
+            reports/cartoon-video-proof/frames/*.jpg
+            reports/cartoon-video-proof/crops/*.jpg
+          if-no-files-found: warn
       - name: Publish true similarity ranking and evidence
         if: always()
         uses: actions/upload-artifact@v4
