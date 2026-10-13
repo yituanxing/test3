@@ -105,6 +105,7 @@ def run():
                         page.get_by_role("button", name="新建账号").click()
                         expect(page.locator("#accountsBody")).to_contain_text("smokecommunity")
                         checks.append("admin_four_tier_account_creation")
+                        page.screenshot(path=str(OUT / "ui-admin-operations.png"), full_page=True)
 
                         # Business-critical browser acceptance: actual server DB
                         # recomputes the truth case; this is not a UI mock.
