@@ -38,7 +38,7 @@ CASES = [
     {"name": "buck_with_bow", "file": "Big.Buck.Bunny.-.Bunny.with.Bow.png",
      "role": "candidate", "truth": "Buck", "crop": [0.0, 0.0, 1.0, 1.0]},
     {"name": "small_animal_negative", "file": "Big.Buck.Bunny.-.Frank.Bunny.png",
-     "role": "candidate", "truth": "other", "crop": [0.0, 0.25, 0.33, 0.66]},
+     "role": "candidate", "truth": "other", "crop": [0.29, 0.21, 0.51, 0.70]},
 ]
 
 
