@@ -72,6 +72,9 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <option value="false_positive">误检/错误标注</option><option value="needs_review">仍需复核</option></select></label>
 <label>审核理由<input id="qaReason" maxlength="400" style="min-width:280px" value="已核查原始视频帧和摄像机局部轨迹证据"></label>
 <button id="qaSave" class="secondary" onclick="saveOccurrenceQuality()">追加审核记录</button></div>
+<div class="row"><button id="qaPrev" class="secondary" disabled onclick="changeQualityPage(-1)">上一页</button>
+<button id="qaNext" class="secondary" disabled onclick="changeQualityPage(1)">下一页</button>
+<span id="qaPageStatus" class="small">匿名事件列表第一页，按权限分页而不是截断成最多200条</span></div>
 <p id="qaStatus" class="small">暂无可审核目标；此处不会制造虚构人员或自动身份。</p>
 <div class="scroller"><table><thead><tr><th>审核记录ID</th><th>结论</th><th>依据</th><th>证据摘要</th></tr></thead>
 <tbody id="qaHistory"><tr><td colspan="4">选择一条实际匿名事件</td></tr></tbody></table></div>
@@ -86,7 +89,7 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 const token=sessionStorage.getItem('zd_access_token');if(!token)location.replace('/login');
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let imported=[],lastImage=null;
+let imported=[],lastImage=null,qaOffset=0,qaNextOffset=null,qaPageSize=200;
 async function api(path,method='GET',body){const r=await fetch(path,{method,
  headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
  body:body===undefined?undefined:JSON.stringify(body)});
@@ -108,7 +111,13 @@ async function refresh(){const d=await api('/api/cctv/sources');imported=d.sourc
 }
 async function refreshQuality(){
  try{
-   const response=await api('/api/site/occurrences?limit=200');
+   const response=await api('/api/site/occurrences?limit='+qaPageSize+'&offset='+qaOffset);
+   qaNextOffset=response.next_offset;
+   $('qaPrev').disabled=qaOffset===0;
+   $('qaNext').disabled=qaNextOffset===null;
+   $('qaPageStatus').textContent='当前第 '+(Math.floor(qaOffset/qaPageSize)+1)+
+      ' 页；本页 '+response.returned+' 条匿名局部事件'+
+      (qaNextOffset===null?'（末页）':'（仍有下一页）');
    const saved=$('qaOccurrence').value;
    $('qaOccurrence').innerHTML=response.occurrences.map(x=>
      '<option value="'+x.occurrence_key+'">'+esc(x.provider)+' / '+esc(x.camera_key)+
@@ -118,6 +127,11 @@ async function refreshQuality(){
    else{$('qaStatus').textContent='没有可供审核的真实匿名局部目标；未生成模拟数据。';
         $('qaHistory').innerHTML='<tr><td colspan="4">还没有可审核的目标</td></tr>';}
  }catch(e){$('qaStatus').textContent='读取匿名证据失败：'+e.message}
+}
+async function changeQualityPage(direction){
+  if(direction>0){if(qaNextOffset===null)return;qaOffset=qaNextOffset}
+  else{qaOffset=Math.max(0,qaOffset-qaPageSize)}
+  await refreshQuality();
 }
 async function loadOccurrenceQuality(){
  const key=$('qaOccurrence').value;if(!key)return;
