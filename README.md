@@ -41,6 +41,14 @@ python -m uvicorn app.main:app --port 8001
 
 参见 [CORE_VIDEO_ROSTER_SPEC_V1.md](CORE_VIDEO_ROSTER_SPEC_V1.md)：区分原始帧检测、连续事件、有效出现、到访会话及底库人员。次数优先依据明确事件分组后的有效出现数；已发布快照不可直接修改，必须生成新草稿后裁决发布。真实视频匿名事件不能冒充已确认人员身份。
 
+## 持续采集与验收边界
+
+持续采集的启停、去重防护、SQLite 状态与自动退避见
+[持续采集 MVP 说明](deploy/CONTINUOUS_CAPTURE_MVP.md)。正常工作时保持同一个
+RTSP 解码器跨批次读取，只有失败才重建连接；支持场所/视频源配置变化隔离。
+本次 PR 必须通过真实 WVP/SIP/RTP/PS 媒体流的**后台工作者 API 两批次**验收，
+不能只把单次视频处理通过作为持续采集验收。
+
 ## GB28181 国标视频接入（WVP-PRO + ZLMediaKit，非自行实现SIP）
 
 现有 `/monitor` 页面已增加设备/通道查询、绑定辖区场所、实时点播、历史录像回放和 RTSP 实测探测。由 [648540858/wvp-GB28181-pro](https://github.com/648540858/wvp-GB28181-pro) 执行 SIP 注册、目录、INVITE/Playback，由 [ZLMediaKit](https://github.com/ZLMediaKit/ZLMediaKit) 收 RTP/PS 并转成 RTSP；test3 只做受控 WVP API 适配和现有匿名视频分析，**不创建虚构摄像头或真实人员身份**。
