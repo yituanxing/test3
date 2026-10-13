@@ -155,6 +155,8 @@ jobs:
           python -m pip install pillow requests numpy
       - name: Install existing pretrained open-vocabulary video detector
         run: python -m pip install -r requirements-cartoon-video.txt
+      - name: Check frozen label ambiguity rule without network
+        run: python -m unittest -v tests.test_cartoon_label_guard
       - name: Ensure actual browser-compatible H.264 encoder is available
         run: |
           if ! command -v ffmpeg >/dev/null 2>&1; then
@@ -191,6 +193,28 @@ jobs:
             reports/cartoon-full-film-holdout/whole_film_contact.jpg
             reports/cartoon-full-film-holdout/evaluation/result.json
             reports/cartoon-full-film-holdout/evaluation/frames/*.jpg
+          if-no-files-found: warn
+      - name: Record A/B decisions on DEVELOPMENT error-reproduction scene
+        run: |
+          python -m scripts.cartoon_holdout_score
+          python -m scripts.cartoon_label_guard \
+            --input reports/cartoon-full-film-holdout/evaluation/result.json \
+            --output reports/cartoon-full-film-holdout/guarded_development.json
+      - name: Run genuinely unseen 4m30–4m55 original-film A/B with same frozen models
+        run: python -m scripts.cartoon_second_holdout
+      - name: Preserve untouched A/B holdout evidence, raw scores and ambiguous marks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-untuned-second-holdout-ab
+          path: |
+            reports/cartoon-4m30-unseen-holdout/summary.json
+            reports/cartoon-4m30-unseen-holdout/guarded_result.json
+            reports/cartoon-4m30-unseen-holdout/predictions/result.json
+            reports/cartoon-4m30-unseen-holdout/holdout_4m30_visual_comparison.jpg
+            reports/cartoon-4m30-unseen-holdout/predictions/frames/*.jpg
+            reports/cartoon-full-film-holdout/audited_metrics.json
+            reports/cartoon-full-film-holdout/guarded_development.json
           if-no-files-found: warn
       - name: Group detector-generated cartoon boxes with existing ByteTrack
         run: python -m scripts.cartoon_video_track_existing
