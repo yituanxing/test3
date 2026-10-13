@@ -46,7 +46,12 @@ def main():
                 got=response.json()
                 assert got['status']=='imported',got
                 assert got['annotation_boxes']>0,got
-                assert got['video']['frames']>0,got
+                # Regression guard for the actual CAVIAR MPEG2 codec quirk:
+                # CAP_PROP_FRAME_COUNT previously claimed 4; real decode is 383.
+                assert got['video']['frames'] >= 300,got
+                assert got['xml_frames'] >= 300,got
+                assert got['annotation_boxes'] >= 100,got
+                assert got['video']['frame_count_method']=='actual_decoded_frames_not_unreliable_mpeg_header'
                 assert got['track_semantics']=='camera_local_ground_truth_not_global_identity'
                 with server.db() as db:
                     row=db.execute('SELECT uri FROM sources WHERE id=?',
@@ -57,7 +62,8 @@ def main():
                 tracks=activity.json()
                 assert tracks['local_track_count']>0,tracks
                 assert tracks['frame_annotation_count']>0
-                selected=max(1,tracks['local_tracks'][0]['first_frame'])
+                selected=min(80,tracks['local_tracks'][0]['last_frame'])
+                assert selected > 4,"Actual mid-clip frame test must exceed false MPEG frame header count"
                 photo=client.get(f"/api/cctv/sources/{got['source_id']}/frame?frame={selected}",
                                  headers=auth)
                 assert photo.status_code==200,photo.text[:150]
