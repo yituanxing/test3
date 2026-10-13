@@ -382,6 +382,33 @@ def run():
                             "stale_review",timeout=12000)
                         checks.append("real_browser_append_only_anonymous_quality_and_stale_evidence")
                         page.screenshot(path=str(OUT/"ui-anonymous-quality-review.png"),full_page=True)
+                        # Verify end users can REVIEW item 221, not only call
+                        # its direct backend URL. This is a deliberate fake
+                        # upstream event fixture, not a real detected person.
+                        with main.db() as check:
+                            check.execute("""INSERT OR IGNORE INTO frigate_camera_bindings
+                                (camera,place_id) VALUES('zz_qa_page_demo',1)""")
+                            check.executemany("""INSERT INTO frigate_object_events
+                              (camera,event_id,place_id,label,started_at,score,has_snapshot,updated_at)
+                              VALUES('zz_qa_page_demo',?,1,'person',?,0.84,0,?)""",
+                              [(f'browser_{i:04}',main.utcnow(),main.utcnow())
+                               for i in range(220)])
+                        page.reload()
+                        expect(page.locator("#qaNext")).to_be_enabled(timeout=12000)
+                        page.locator("#qaNext").click()
+                        expect(page.locator("#qaPageStatus")).to_contain_text("当前第 2 页",timeout=12000)
+                        last_key=page.locator("#qaOccurrence option").last.get_attribute("value")
+                        page.locator("#qaOccurrence").select_option(last_key)
+                        expect(page.locator("#qaStatus")).to_contain_text("not_reviewed",timeout=12000)
+                        page.locator("#qaReason").fill("实际浏览器第二页审核，验证超过200条事件仍可达")
+                        page.locator("#qaSave").click()
+                        expect(page.locator("#qaStatus")).to_contain_text(
+                            "valid_local_target",timeout=12000)
+                        with main.db() as check:
+                            assert check.execute("""SELECT COUNT(*) FROM anonymous_occurrence_reviews
+                                 WHERE occurrence_key=?""",(last_key,)).fetchone()[0]==1
+                        checks.append("browser_page_221_local_occurrence_quality_reachable")
+                        page.screenshot(path=str(OUT/"ui-anonymous-quality-page2.png"),full_page=True)
                         page.goto(base+"/portal")
                         page.set_viewport_size({"width": 390, "height": 844})
                         page.screenshot(path=str(OUT / "ui-mobile.png"), full_page=True)
