@@ -8,6 +8,7 @@ Only a local 127.0.0.1 site; no account, database or remote uploads.
 """
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -27,7 +28,7 @@ def analyze_uploaded_video(video_filepath: str):
         tracked = analyze(result)
         render_evidence(tracked, out)
         (out / "tracked_result.json").write_text(
-            __import__("json").dumps(tracked, indent=2, ensure_ascii=False),
+            json.dumps(tracked, indent=2, ensure_ascii=False),
             encoding="utf-8")
         result["temporal_consistency"] = {
             "tracker": tracked["tracker"],
