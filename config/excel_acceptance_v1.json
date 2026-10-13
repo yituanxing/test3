@@ -1,0 +1,288 @@
+{
+  "source_file": "ZD场所预警分析-原型设计-20261012-v1.0.xlsx",
+  "source_worksheet": "需求",
+  "source_rows": "7:29",
+  "source_verified_count": 23,
+  "generated_on": "2026-10-13",
+  "ci_reference": "https://github.com/yituanxing/test3/actions/runs/38405307609",
+  "ci_head": "4c844ef64062aaabd2fca5a7c9fdcaac086c97df",
+  "statuses": {
+    "verified_real": "现有真实管理/授权接口与自动化验收通过（仍按条目文字保留例外）",
+    "synthetic_only": "合成已知P###业务演示通过；不能当作真实人脸/身份证明",
+    "partial": "部分实现；Excel完整原要求未验收",
+    "missing": "Excel关键验收能力尚未具备"
+  },
+  "warning": "这是一份需求追踪与验收边界声明，不是对全部23项合格的承诺；真实视频身份识别、跨机真人同一身份、地图GPS需独立真值和测试。",
+  "requirements": [
+    {
+      "id": 1,
+      "excel_row": 7,
+      "title": "前端视频流人脸解析",
+      "status": "partial",
+      "verified_scope": "国标设备接入与部分真人媒体处理已有验证；多路实时/历史28181人脸解析、聚类比对与特征全链未通过",
+      "evidence_files": [
+        "tests/test_gb28181_wvp_adapter.py",
+        "tests/test_real_face_boxes.py"
+      ],
+      "remaining_gap": "多路历史国标+真人身份聚类/比对需真实端到端验收"
+    },
+    {
+      "id": 2,
+      "excel_row": 8,
+      "title": "四级架构",
+      "status": "verified_real",
+      "verified_scope": "四级角色登录、分辖区权限及不同平台视图已有API/浏览器回归",
+      "evidence_files": [
+        "tests/test_access_v12.py",
+        "tests/test_admin.py",
+        "tests/test_portal_v13.py"
+      ],
+      "remaining_gap": "演示前仍要使用州/县/街道/社区账号逐个走读"
+    },
+    {
+      "id": 3,
+      "excel_row": 9,
+      "title": "陌生人底库建立与矫正",
+      "status": "synthetic_only",
+      "verified_scope": "指定天数、最早出现/次数优先/人工裁决、底库矫正发布链路在P###合成身份上通过",
+      "evidence_files": [
+        "tests/test_base_registry.py",
+        "tests/test_roster_maintenance.py"
+      ],
+      "remaining_gap": "真实人脸采集与聚类人脸照片底库尚未端到端实现"
+    },
+    {
+      "id": 4,
+      "excel_row": 10,
+      "title": "场所态势",
+      "status": "partial",
+      "verified_scope": "场所/流量/底库/趋势有合成业务视图，真实视频只有匿名目标统计",
+      "evidence_files": [
+        "tests/test_insights.py",
+        "tests/test_monitoring.py"
+      ],
+      "remaining_gap": "真实独立人数、真实串所人数不可从匿名轨迹得到"
+    },
+    {
+      "id": 5,
+      "excel_row": 11,
+      "title": "异常人员态势",
+      "status": "partial",
+      "verified_scope": "同比/环比、排行、出入关联及关系图在合成数据上有部分表现",
+      "evidence_files": [
+        "tests/test_insights.py",
+        "tests/test_rules_v11.py"
+      ],
+      "remaining_gap": "没有真实人身份热点地理图、完整场所热力和真人串所网络"
+    },
+    {
+      "id": 6,
+      "excel_row": 12,
+      "title": "串所预警",
+      "status": "synthetic_only",
+      "verified_scope": "P###跨场所规则引擎与实例/审查功能可演示",
+      "evidence_files": [
+        "tests/test_business.py",
+        "tests/test_rules_v11.py"
+      ],
+      "remaining_gap": "真人跨机位身份真值不足，不能触发真实串所"
+    },
+    {
+      "id": 7,
+      "excel_row": 13,
+      "title": "串所同行人预警",
+      "status": "synthetic_only",
+      "verified_scope": "规则引擎可对合成人员的重复同行和人数阈值建模",
+      "evidence_files": [
+        "tests/test_rules_v11.py",
+        "tests/test_business.py"
+      ],
+      "remaining_gap": "未对真实行人做跨机身份关联"
+    },
+    {
+      "id": 8,
+      "excel_row": 14,
+      "title": "串所互动预警",
+      "status": "synthetic_only",
+      "verified_scope": "A/B互访和设定次数的规则逻辑在合成事件上有测试",
+      "evidence_files": [
+        "tests/test_rules_v11.py",
+        "tests/test_business.py"
+      ],
+      "remaining_gap": "未有真人互访身份真值"
+    },
+    {
+      "id": 9,
+      "excel_row": 15,
+      "title": "串所聚集预警",
+      "status": "synthetic_only",
+      "verified_scope": "多人合成底库归属/共同场所出现和阈值已有规则测试",
+      "evidence_files": [
+        "tests/test_rules_v11.py",
+        "tests/test_business.py"
+      ],
+      "remaining_gap": "未有真实多人唯一身份识别与跨机聚集真值"
+    },
+    {
+      "id": 10,
+      "excel_row": 16,
+      "title": "久未出现预警",
+      "status": "synthetic_only",
+      "verified_scope": "合成人员未出现与完整检查周期阈值有负向回归",
+      "evidence_files": [
+        "tests/test_rules_v11.py"
+      ],
+      "remaining_gap": "真实人库未建立，不能真正给现实中的人发缺席预警"
+    },
+    {
+      "id": 11,
+      "excel_row": 17,
+      "title": "出现预警",
+      "status": "synthetic_only",
+      "verified_scope": "合成P###出现名单/场所配置可由规则实例触发并审核",
+      "evidence_files": [
+        "tests/test_rule_instances.py",
+        "tests/test_integrated_excel_contract.py"
+      ],
+      "remaining_gap": "真实视频仍仅有匿名局部检测"
+    },
+    {
+      "id": 12,
+      "excel_row": 18,
+      "title": "场所人数异常预警",
+      "status": "synthetic_only",
+      "verified_scope": "合成到访人数与底库数比较，按活动结束时间和阈值触发",
+      "evidence_files": [
+        "tests/test_rules_v11.py"
+      ],
+      "remaining_gap": "真实独立人数不可直接用检测框数代替"
+    },
+    {
+      "id": 13,
+      "excel_row": 19,
+      "title": "场所出入口抓拍与识别",
+      "status": "partial",
+      "verified_scope": "场所摄像机、视频源、帧截图及人工标注可查询",
+      "evidence_files": [
+        "tests/test_cctv_dataset.py",
+        "tests/test_integrated_excel_contract.py"
+      ],
+      "remaining_gap": "真实人脸抓拍和识别结果全链、真人检索未完成"
+    },
+    {
+      "id": 14,
+      "excel_row": 20,
+      "title": "跨场所人脸检索",
+      "status": "missing",
+      "verified_scope": "未提供经验证的人脸照片输入到真人跨摄像机识别检索闭环",
+      "evidence_files": [
+        "tests/test_insights.py"
+      ],
+      "remaining_gap": "合成P###文本查询不是人脸图像检索"
+    },
+    {
+      "id": 15,
+      "excel_row": 21,
+      "title": "人脸+编码人员检索",
+      "status": "partial",
+      "verified_scope": "合成人员编码搜索与已知P###历史出现可查",
+      "evidence_files": [
+        "tests/test_insights.py"
+      ],
+      "remaining_gap": "人脸图像检索与真实跨所关联尚无可核验能力"
+    },
+    {
+      "id": 16,
+      "excel_row": 22,
+      "title": "抓拍结果查询",
+      "status": "partial",
+      "verified_scope": "视频抽样帧、研究监控底图/人工框和来源时间可追溯",
+      "evidence_files": [
+        "tests/test_cctv_dataset.py",
+        "tests/test_real_face_boxes.py"
+      ],
+      "remaining_gap": "抓拍人脸图、真人特征/身份仍不完整"
+    },
+    {
+      "id": 17,
+      "excel_row": 23,
+      "title": "地图轨迹回放",
+      "status": "missing",
+      "verified_scope": "缺乏原片证据支持的真人GPS/地理轨迹；不生成虚假地图移动",
+      "evidence_files": [
+        "tests/test_insights.py"
+      ],
+      "remaining_gap": "需实际场所地理坐标、可信真人关联和轨迹真值"
+    },
+    {
+      "id": 18,
+      "excel_row": 24,
+      "title": "关系图谱",
+      "status": "partial",
+      "verified_scope": "自动合成共现关系及网络可展示",
+      "evidence_files": [
+        "tests/test_insights.py"
+      ],
+      "remaining_gap": "人工建立关系及可信真实人员网络尚未完整实现"
+    },
+    {
+      "id": 19,
+      "excel_row": 25,
+      "title": "人员活动分析",
+      "status": "partial",
+      "verified_scope": "合成P###出入场所与频次可查",
+      "evidence_files": [
+        "tests/test_insights.py"
+      ],
+      "remaining_gap": "缺现实人物唯一身份、地理区域热点及真实场所路线"
+    },
+    {
+      "id": 20,
+      "excel_row": 26,
+      "title": "场所管理",
+      "status": "verified_real",
+      "verified_scope": "场所创建、修改、禁用/软删除及摄像机区域绑定有后端测试",
+      "evidence_files": [
+        "tests/test_admin.py",
+        "tests/test_site_model.py"
+      ],
+      "remaining_gap": "删除采用软删除留审计，不是物理删除"
+    },
+    {
+      "id": 21,
+      "excel_row": 27,
+      "title": "场所人员底库管理",
+      "status": "synthetic_only",
+      "verified_scope": "可对合成底库手工增加/移除及迁移归属并留版本审计",
+      "evidence_files": [
+        "tests/test_base_registry.py",
+        "tests/test_roster_maintenance.py"
+      ],
+      "remaining_gap": "真人底库及真实人脸照片编辑尚未完成"
+    },
+    {
+      "id": 22,
+      "excel_row": 28,
+      "title": "预警设置管理",
+      "status": "synthetic_only",
+      "verified_scope": "规则实例新增、启停、编辑、归档、审计均是真实API/SQLite；命中效果用合成P###",
+      "evidence_files": [
+        "tests/test_rule_instances.py",
+        "tests/test_integrated_excel_contract.py"
+      ],
+      "remaining_gap": "不能据此声称真人预警已完成"
+    },
+    {
+      "id": 23,
+      "excel_row": 29,
+      "title": "账号角色权限管理",
+      "status": "verified_real",
+      "verified_scope": "账户创建、禁用/软删除、密码重置与四级权限隔离有真实API测试",
+      "evidence_files": [
+        "tests/test_access_v12.py",
+        "tests/test_admin.py"
+      ],
+      "remaining_gap": "账号删除为停用、保留历史审计"
+    }
+  ]
+}
