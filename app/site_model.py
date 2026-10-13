@@ -251,49 +251,49 @@ def assign_binding(source_id:int,data:BindingChange,request:Request):
 
 @router.get('/api/site/anonymous-events')
 def anonymous_events(request:Request,limit:int=Query(default=100,ge=1,le=300)):
-    """Read-only common local-track contract; no implicit subject links.
+    """Compatibility view over THE canonical camera-local read model.
 
-    CAVIAR = archival clip frame numbers; Frigate = actual UTC observed_at.
-    They can share a *schema* but cannot share 'time' or identity semantics.
+    Avoid maintaining a second provider-specific parser with its own global
+    LIMIT, identity semantics, or jurisdiction logic. Historic response field
+    names remain available to existing clients; new integrations should use
+    /api/site/occurrences and its offset-paged variant.
     """
+    from app import occurrences
     with _db() as c:
-        allowed={p['id'] for p in admin.place_rows(
-            c,access.effective_region(c,request,None))}
-        records=[]
-        for x in c.execute("""SELECT camera,event_id,place_id,started_at,ended_at
-            FROM frigate_object_events ORDER BY started_at DESC LIMIT 600"""):
-            if x['place_id'] not in allowed:
-                continue
-            records.append({'provider':'frigate','source_id':None,
-                'camera':x['camera'],'local_track_key':x['event_id'],
-                'place_id':x['place_id'],'zone_id':None,'time_basis':'UTC_event_clock',
-                'start':x['started_at'],'end':x['ended_at'],
-                'evidence_origin':'upstream_anonymous_person_event',
-                'subject_id':None,'unique_person_counted':False})
-        for x in c.execute("""SELECT i.source_id,s.place_id,i.camera_view,
-               b.camera_local_track_id,MIN(b.frame_number) AS first_frame,
-               MAX(b.frame_number) AS last_frame,COUNT(*) AS boxes
-               FROM public_cctv_track_boxes b
-               JOIN public_cctv_imports i ON i.source_id=b.source_id
-               JOIN sources s ON s.id=b.source_id
-               GROUP BY i.source_id,s.place_id,i.camera_view,b.camera_local_track_id
-               ORDER BY i.source_id,b.camera_local_track_id LIMIT 600"""):
-            if x['place_id'] not in allowed:
-                continue
-            bound=_current(c,x['source_id'])
-            records.append({'provider':'caviar_ground_truth',
-                'source_id':x['source_id'],'camera':x['camera_view'],
-                'local_track_key':x['camera_local_track_id'],
-                'place_id':x['place_id'],'zone_id':bound['zone_id'] if bound else None,
-                'time_basis':'archival_video_frame_number',
-                'start':x['first_frame'],'end':x['last_frame'],
-                'annotation_boxes':x['boxes'],
-                'evidence_origin':'published_camera_local_manual_annotation',
-                'subject_id':None,'unique_person_counted':False})
-        records.sort(key=lambda x:(x['provider'],str(x['source_id']),x['camera'],x['local_track_key']))
-        return {'mode':'anonymous_observation_only','events':records[:limit],
-                'total_returned':min(limit,len(records)),
-                'limited':len(records)>limit,
-                'identity_verified':False,
+        allowed=occurrences._allowed(c,request)
+        # The legacy endpoint allowed up to 300 results. Fetch canonical
+        # pages rather than reimplementing a competing SQL event query.
+        rows=[]
+        offset=0
+        while len(rows)<limit+1:
+            batch,more=occurrences.occurrences(
+                c,allowed,limit=min(occurrences.MAX_PAGE,limit+1-len(rows)),
+                offset=offset)
+            rows.extend(batch)
+            offset+=len(batch)
+            if not more or not batch:
+                break
+        truncated=len(rows)>limit
+        view=[]
+        for x in rows[:limit]:
+            is_caviar=x['provider']=='caviar_ground_truth'
+            view.append({
+                'provider':x['provider'],'source_id':x['source_id'],
+                'camera':x['camera_key'],'local_track_key':x['track_id'],
+                'place_id':x['venue_id'],
+                # A current source.zone_id is NOT historic physical-location
+                # evidence for a freely rewound public MPEG video.
+                'zone_id':None,
+                'time_basis':x['time_basis'],
+                'start':x['first_seen'],'end':x['last_seen'],
+                'annotation_boxes':x['annotation_frames'] if is_caviar else None,
+                'evidence_origin':x['evidence_kind'],
+                'occurrence_key':x['occurrence_key'],
+                'subject_id':None,'unique_person_counted':False,
+            })
+        return {'mode':'anonymous_observation_only',
+                'events':view,'total_returned':len(view),
+                'limited':truncated,'identity_verified':False,
                 'count_is_unique_people':False,
-                'note':'这是匿名机位局部轨迹投影：不能将 Frigate 和 CAVIAR 的时间或局部编号混用，也不会向 P### 合成底库创建人员。'}
+                'read_model':'/api/site/occurrences',
+                'note':'兼容旧接口：实际使用同一个已授权事件投影；无身份去重、不能生成真人到访。'}
