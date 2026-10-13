@@ -152,6 +152,19 @@ jobs:
         run: |
           python -m scripts.cartoon_video_recognize --demo-video --interval 1.25 --max-frames 10
           test "$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 reports/cartoon-video-proof/annotated_samples.mp4)" = h264
+      - name: Run once-only frozen parameter holdout vs fresh cartoon movie and negative Sintel
+        run: python -m scripts.cartoon_holdout_eval
+      - name: Preserve independent holdout scores, non-overlap screening and negative control
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-locked-holdout-evaluation
+          path: |
+            reports/cartoon-holdout-v1/holdout_result.json
+            reports/cartoon-holdout-v1/*_contact.jpg
+            reports/cartoon-holdout-v1/unseen_buck/result.json
+            reports/cartoon-holdout-v1/negative_sintel/result.json
+          if-no-files-found: warn
       - name: Group detector-generated cartoon boxes with existing ByteTrack
         run: python -m scripts.cartoon_video_track_existing
       - name: Preserve independently reviewed track consistency evidence
