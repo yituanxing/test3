@@ -154,6 +154,9 @@ async function saveOccurrenceQuality(){
    await api('/api/site/occurrences/'+key+'/quality','POST',{
         verdict:$('qaVerdict').value,reason:$('qaReason').value.trim()});
    await loadOccurrenceQuality();
+   // A QA verdict changes the REVIEW overlay, never raw Frigate counts.
+   // Refresh the shared live/archive counters immediately after the append.
+   await refreshOccurrences();
  }catch(e){$('qaStatus').textContent='质量复核未保存：'+e.message}
  finally{$('qaSave').disabled=false}
 }
