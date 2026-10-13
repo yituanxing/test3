@@ -17,6 +17,7 @@ from app import access, admin
 router = APIRouter(prefix="/api/capture")
 _db = None
 _process = None
+_make_session = None
 _workers: dict[int, threading.Thread] = {}
 _guard = threading.RLock()
 _shutdown = threading.Event()
@@ -62,9 +63,9 @@ def initialize(c):
         WHERE desired_enabled=1 AND binding_id IS NOT NULL""")
 
 
-def register(app, get_db, process):
-    global _db, _process
-    _db, _process = get_db, process
+def register(app, get_db, process, *, make_session=None):
+    global _db, _process, _make_session
+    _db, _process, _make_session = get_db, process, make_session
     app.include_router(router)
     # Server-owned lifespan in app.main starts and stops capture workers.
     # FastAPI >= 0.143 removed add_event_handler.
@@ -149,6 +150,7 @@ def _release(source_id, token):
 
 def _run(source_id):
     token = uuid.uuid4().hex
+    session = None
     try:
         while not _shutdown.is_set():
             with _db() as c:
@@ -165,8 +167,14 @@ def _run(source_id):
             beat.start()
             result, failure = None, None
             try:
-                # This function always runs the actual image decoding/inference path.
-                result = _process(source_id)
+                # One decoder per active RTSP session. Batches preserve the open
+                # transport and only reconnect after a real read/open failure.
+                if _make_session is not None:
+                    if session is None:
+                        session = _make_session(source_id)
+                    result = session.next_batch()
+                else:
+                    result = _process(source_id)
             except HTTPException as exc:
                 # Fixed categorical codes only; never persist untrusted stream URLs.
                 detail = str(exc.detail)
@@ -186,6 +194,9 @@ def _run(source_id):
             finally:
                 done.set()
                 beat.join(timeout=1)
+                if failure is not None and session is not None:
+                    session.close()
+                    session = None
 
             with _db() as c:
                 row = _row(c, source_id)
@@ -219,6 +230,8 @@ def _run(source_id):
                     delay = min(MAX_BACKOFF_SECONDS, 2 ** min(failures, 6))
             _shutdown.wait(delay)
     finally:
+        if session is not None:
+            session.close()
         _release(source_id, token)
         with _guard:
             if _workers.get(source_id) is threading.current_thread():
