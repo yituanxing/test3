@@ -227,6 +227,18 @@ def test_all_count_types_share_utc_days_and_review_never_mutates_raw(env):
     assert qa.status_code==200,qa.text
     reviewed=qa.json()
     assert reviewed['window']==window
+    from app import occurrences,occurrence_reviews
+    with main.db() as c:
+        allowed={place:{'id':place,'name':'测试场所 A'}}
+        unfiltered=occurrences.occurrence_by_key(c,allowed,first['occurrence_key'])
+        wstart,wend=monitoring.utc_day_window(7)
+        filtered=next(x for x in occurrences.iter_occurrences(
+            c,allowed,live_start=wstart,live_end=wend)
+            if x['occurrence_key']==first['occurrence_key'])
+        assert occurrence_reviews._signature(c,unfiltered)==occurrence_reviews._signature(
+            c,filtered),(unfiltered,filtered)
+    directly=client.get(post,headers=user['county']).json()
+    assert directly['quality_status']=='false_positive',(directly,reviewed)
     assert reviewed['by_provider']['frigate']['local_occurrences']==raw
     assert reviewed['by_provider']['frigate']['false_positive']==1,reviewed
     assert reviewed['by_provider']['frigate']['not_reviewed']==1
