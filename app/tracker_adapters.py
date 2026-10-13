@@ -80,16 +80,27 @@ def run_caviar_tracking(c, source_id: int, max_frames: int = 400,
             [[b["x"],b["y"],b["x"]+b["width"],b["y"]+b["height"]]
              for b in frame],
             dtype=np.float32).reshape((-1,4))
+        # Roboflow ByteTrack/OC-SORT may return detections REORDERED.
+        # sv.Detections.data is indexed by their internal selection and
+        # preserves the matching ground-truth row ID. Never zip output
+        # tracker_id to original input order (it corrupts identity metrics).
         detections = sv.Detections(
             xyxy=xyxy,
             confidence=np.full(len(frame),0.99,dtype=np.float32),
             class_id=np.zeros(len(frame),dtype=np.int32),
+            data={"input_index":np.arange(len(frame),dtype=np.int32)},
         )
         result = tracker.update(detections)
         ids = result.tracker_id
-        if ids is None or len(ids) != len(frame):
-            raise RuntimeError("ByteTrack returned IDs not aligned to its input detections")
-        for b,raw_id in zip(frame,ids):
+        original_indices = result.data.get("input_index")
+        if (ids is None or original_indices is None or
+            len(ids)!=len(original_indices) or len(ids)!=len(frame)):
+            raise RuntimeError("External tracker omitted or duplicated detections; cannot attribute a GT ID")
+        original_indices = [int(x) for x in original_indices]
+        if sorted(original_indices)!=list(range(len(frame))):
+            raise RuntimeError("External tracker returned invalid original-index map")
+        for original_index,raw_id in zip(original_indices,ids):
+            b=frame[original_index]
             tracker_id = int(raw_id)
             if tracker_id < 0:
                 pending += 1
