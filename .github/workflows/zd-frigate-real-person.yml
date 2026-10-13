@@ -9,6 +9,10 @@ name: ZD Frigate Real Person CI
       - "app/**"
       - "tests/**"
       - "static/**"
+      # GB protocol/test harness edits must NOT silently miss PR acceptance.
+      # The expensive gb-sip-protocol job remains opt-in via gb-e2e label.
+      - "scripts/ci_verify_gb28181_sip.sh"
+      - "scripts/verify_gb28181_real_app.py"
       - ".github/workflows/zd-frigate-real-person.yml"
 
 permissions:
