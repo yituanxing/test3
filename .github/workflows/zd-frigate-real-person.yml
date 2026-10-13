@@ -165,7 +165,7 @@ jobs:
             reports/cartoon-holdout-v1/unseen_buck/result.json
             reports/cartoon-holdout-v1/negative_sintel/result.json
           if-no-files-found: warn
-      - name: Evaluate frozen matching on complete unseen 10-minute Blender movie
+      - name: Evaluate frozen matching on untested 3-minute-mark scene of full Big Buck Bunny film
         run: python -m scripts.cartoon_full_film_holdout
       - name: Publish full-film holdout audit before any post-evaluation tuning
         if: always()
