@@ -158,7 +158,7 @@ def test_rebinding_camera_does_not_reassign_historical_person_events(tmp_path,mo
         later_event['start_time']=time.time()
         # An upstream replay of the old event must NOT migrate it to B.
         response.json.return_value=[
-          {**first_event,'end_time':1791795630.0,
+          {**first_event,'end_time':first_event['start_time']+30,
            'data':{'top_score':0.7},'has_snapshot':False},later_event]
         changed=cli.post('/api/frigate/sync').json()
         assert changed['updated']==1 and changed['inserted']==1
