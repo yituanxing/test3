@@ -25,6 +25,8 @@ def env(monkeypatch,tmp_path):
     monkeypatch.delenv('ZD_AUTH_TEST_COMPAT',raising=False)
     monkeypatch.setattr(main,'DB',tmp_path/'anime-scenes.sqlite3')
     main.setup_db()
+    from app import anime_scenes
+    monkeypatch.setattr(anime_scenes,'_upload_dir',tmp_path/'anime_uploads')
     movie=tmp_path/'fictional-clip.avi'
     make_clip(movie)
     with main.db() as c:
@@ -154,3 +156,40 @@ def test_nonfile_stream_rejected_without_capture_or_leaking_uri(env):
                       'rtsp://example.invalid:554/no-stream')).lastrowid
     assert client.get(f'/api/anime/scenes/sources/{stream}/suggest',headers=state).status_code==422
     assert client.get(f'/api/anime/scenes/sources/{stream}/graph',headers=county).status_code==422
+
+
+def test_raw_video_browser_upload_reuses_real_decode_and_scope(env):
+    from app import anime_scenes
+    main,client,movie,source,other_source,state,county,other=env
+    with main.db() as c:
+        place=c.execute('SELECT place_id FROM sources WHERE id=?',(source,)).fetchone()['place_id']
+    url=f'/api/anime/scenes/uploads?place_id={place}'
+    payload=movie.read_bytes()
+    headers={**state,'X-Upload-Name':'cartoon-demo.avi',
+             'Content-Type':'application/octet-stream'}
+    assert client.post(url,content=payload).status_code==401
+    assert client.post(url,headers={**county,'X-Upload-Name':'clip.avi'},
+                       content=payload).status_code==403
+    no=client.post(url,headers={**state,'X-Upload-Name':'script.py'},
+                   content=payload)
+    assert no.status_code==422
+    fake=client.post(url,headers={**state,'X-Upload-Name':'fake.avi'},content=b'not a video')
+    assert fake.status_code==422
+    assert not list((anime_scenes._upload_dir).glob('*.avi'))
+    uploaded=client.post(url,headers=headers,content=payload)
+    assert uploaded.status_code==201,uploaded.text
+    data=uploaded.json()
+    assert data['kind']=='file' and data['size_bytes']==len(payload)
+    assert data['source_revision']==main._file_revision(str(movie))
+    with main.db() as c:
+        stored=c.execute('SELECT uri,name FROM sources WHERE id=?',(data['id'],)).fetchone()
+        assert stored and stored['name']=='上传动画 · cartoon-demo'
+        uploaded_path=Path(stored['uri'])
+        assert uploaded_path.exists() and uploaded_path.parent==anime_scenes._upload_dir
+        assert uploaded_path.read_bytes()==payload
+    shots=client.get(f"/api/anime/scenes/sources/{data['id']}/suggest?sample_stride=1&max_seconds=4",
+                     headers=state)
+    assert shots.status_code==200,shots.text
+    assert len(shots.json()['segments'])==3
+    summary=client.get(f"/api/anime/scenes/sources/{data['id']}/graph",headers=state)
+    assert summary.status_code==200 and summary.json()['characters']=={}
