@@ -19,7 +19,7 @@ from app.detector import choose_detector, detector_info, box_quality
 from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
-from app.monitoring import overview as monitoring_overview
+from app.monitoring import overview as monitoring_overview, face_activity_details
 from app import admin, base_registry, insights, access, gb28181
 import httpx
 from pydantic import BaseModel, Field
@@ -333,6 +333,16 @@ def get_monitoring_overview(request:Request, days: int = Query(7, ge=1, le=31), 
         region_id=access.effective_region(c,request,region_id)
         return monitoring_overview(c, days=days,region_id=region_id,
                       allowed_region_ids=admin.subtree_ids(c,region_id))
+
+
+@app.get('/api/monitoring/face-activity')
+def get_face_activity_details(request:Request, days:int=Query(7,ge=1,le=31),
+                              limit:int=Query(50,ge=1,le=250),
+                              region_id:int|None=Query(None,ge=1)):
+    with db() as c:
+        region_id=access.effective_region(c,request,region_id)
+        return face_activity_details(c,days=days,limit=limit,region_id=region_id,
+                   allowed_region_ids=admin.subtree_ids(c,region_id))
 
 
 @app.get('/api/health')

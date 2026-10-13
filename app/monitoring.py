@@ -6,7 +6,8 @@ The synthetic business simulator is never mixed into these results.
 from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from app.activity_windows import count_face_activity_windows, DEFAULT_GAP_SECONDS
+from app.activity_windows import (count_face_activity_windows,
+    build_face_activity_windows, DEFAULT_GAP_SECONDS)
 
 
 def _to_utc(value: str) -> datetime:
@@ -100,3 +101,55 @@ def overview(conn, *, days: int = 7, now: datetime | None = None,
             'synthetic_business_isolated':True,
         },
     }
+
+
+def face_activity_details(conn, *, days: int = 7, limit: int = 50,
+                          region_id: int | None = None,
+                          allowed_region_ids: set[int] | None = None) -> dict:
+    """Authorized read-only source-level detail behind overview.window count.
+
+    Never emits stream URLs, face crops or inferred person IDs. Fetches the
+    full requested time window before limiting the display, so counts agree
+    with monitoring.overview instead of hiding older windows behind LIMIT.
+    """
+    if not 1 <= days <= 31 or not 1 <= limit <= 250:
+        raise ValueError("invalid days or display limit")
+    now = datetime.now(timezone.utc)
+    end = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    start = end - timedelta(days=days)
+    places = [dict(row) for row in conn.execute(
+        "SELECT id,name,region_id FROM places ORDER BY id")]
+    if allowed_region_ids is not None:
+        places = [p for p in places if p["region_id"] in allowed_region_ids]
+    place_names = {p["id"]:p["name"] for p in places}
+    result = {
+        "window":{"start_utc":start.isoformat(),
+                  "end_exclusive_utc":end.isoformat(),"days":days},
+        "total_windows":0, "windows":[], "bounded_by_limit":limit,
+        "counts_unique_people":False, "gap_seconds":DEFAULT_GAP_SECONDS,
+        "note":"同源连续有脸抽样帧的匿名采集窗口，不代表到访或唯一人数。数据来自视频入库时间，不是摄像机物理拍摄时间。",
+    }
+    if not place_names:
+        return result
+    placeholders = ",".join("?" for _ in place_names)
+    samples = conn.execute(f"""SELECT s.place_id,s.source_id,s.ingested_at,
+         COALESCE((SELECT r.corrected_faces FROM reviews r
+                   WHERE r.sample_id=s.id ORDER BY r.id DESC LIMIT 1),
+                  s.detected_faces) AS effective_faces
+         FROM samples s
+         WHERE s.origin='video' AND s.source_id IS NOT NULL
+           AND s.ingested_at>=? AND s.ingested_at<?
+           AND s.place_id IN ({placeholders})""",
+         (start.isoformat(),end.isoformat(),*sorted(place_names))).fetchall()
+    windows = build_face_activity_windows(samples)
+    source_names = {r["id"]:r["name"] for r in conn.execute(
+        f"SELECT id,name FROM sources WHERE place_id IN ({placeholders})",
+        tuple(sorted(place_names)))}
+    windows.sort(key=lambda w:(w["last_positive_utc"],w["started_utc"],
+                               w["source_id"]),reverse=True)
+    result["total_windows"] = len(windows)
+    result["windows"] = [{
+        **w, "place_name":place_names[w["place_id"]],
+        "source_name":source_names.get(w["source_id"],"（视频源已删除）"),
+    } for w in windows[:limit]]
+    return result

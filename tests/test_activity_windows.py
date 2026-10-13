@@ -87,3 +87,15 @@ def test_monitoring_face_positive_windows_are_separate_from_people_and_frames(ap
     assert sum(d["face_activity_windows"] for d in data["timeline"]) == 3
     assert data["counts"]["person_objects"] == 0
     assert "face_activity_windows" in data["provenance"]
+    details = client.get("/api/monitoring/face-activity?days=7&limit=2")
+    assert details.status_code == 200, details.text
+    payload = details.json()
+    assert payload["total_windows"] == data["face_activity"]["windows"] == 3
+    assert len(payload["windows"]) == 2  # limit only affects displayed rows
+    assert payload["counts_unique_people"] is False
+    assert all("uri" not in x and "identity" not in x for x in payload["windows"])
+    assert all(x["source_name"] == "activity unit" for x in payload["windows"])
+    assert sorted(w["positive_sampled_frames"] for w in
+                  client.get("/api/monitoring/face-activity?days=7").json()["windows"]) == [1, 1, 3]
+    assert client.get("/api/monitoring/face-activity?days=32").status_code == 422
+    assert client.get("/api/monitoring/face-activity?limit=251").status_code == 422

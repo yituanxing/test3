@@ -131,7 +131,7 @@ def permitted(actor: dict, method: str, path: str) -> bool:
         path in {'/api/regions', '/api/places', '/api/sources',
                  '/api/gb28181/status', '/api/gb28181/bindings',
                  '/api/gb28181/sessions',
-                 '/api/monitoring/overview', '/api/frigate/events',
+                 '/api/monitoring/overview', '/api/monitoring/face-activity', '/api/frigate/events',
                  '/api/frigate/cameras', '/api/frigate/summary',
                  '/api/insights/overview', '/api/insights/people',
                  '/api/insights/relationships', '/api/video/observations'}
