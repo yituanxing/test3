@@ -34,7 +34,7 @@ code{background:#f1f4fa;padding:1px 5px;border-radius:5px}
 <strong>不把 OpenCV 人脸框自动当成动漫角色身份</strong>。</section>
 <section class="panel"><h2>① 上传/选择实际动画视频并提出镜头候选</h2>
 <div class="row"><label>选择本机动画片段<input type="file" id="uploadFile" accept=".mp4,.mov,.mkv,.avi,video/*"></label>
-<label>绑定场所<select id="uploadPlace"></select></label>
+<label>视频文件权限归属（不是剧情场所）<select id="uploadPlace"></select></label>
 <button id="upload">上传并登记视频</button><span class="info">浏览器直接上传本地视频，单文件最多128MiB，仅州级管理员。不会自动识别动画角色。</span></div>
 <div class="row"><label>本地视频源<select id="source"></select></label>
 <label>像素差阈值<input id="threshold" type="number" value="32" min="5" max="200"></label>
@@ -44,14 +44,33 @@ code{background:#f1f4fa;padding:1px 5px;border-radius:5px}
 <p class="info">为保证 Demo 快速响应，默认只扫描前45秒、每4帧取一个样本；只对服务器可访问的本地视频文件开放，RTSP 实时流暂不运行耗时扫描。</p>
 <div class="table"><table><thead><tr><th>候选</th><th>视频起点</th><th>视频终点</th><th>像素变化分数</th><th>人工场景命名</th><th>操作</th></tr></thead>
 <tbody id="candidates"><tr><td colspan="6">点击扫描获取候选</td></tr></tbody></table></div></section>
-<div class="cols"><section class="panel"><h2>② 已人工确认的镜头时间线</h2>
+<section class="panel" id="ontologyPanel">
+<h2>② 剧情场所 / 场景分组：先定义“在哪儿”，再谈角色流动</h2>
+<p class="info">原监控摄像头固定，镜头默认看同一场所；动漫恰好相反，<b>一部视频可以不断切换剧情地点</b>。
+这里明确分开“镜头”“重复出现的场景（如同一教室）”和“业务场所（如学校A）”。教室和校门可以归同一学校；不同学校必须分开；不能仅凭镜头连续就认定人物跨场所。</p>
+<div class="row">
+<label>建立剧中业务场所（如学校A）<input id="venueName" maxlength="80" placeholder="学校A"></label>
+<button id="createVenue" class="ghost">新增剧情场所</button>
+<label>选择已有场所<select id="venueSelect"></select></label>
+<label>建立场景组（如教室、校门）<input id="groupName" maxlength="80" placeholder="教室"></label>
+<button id="createGroup" class="ghost">新增场景组</button></div>
+<div class="row">
+<label>选择视频镜头<select id="assignSegment"></select></label>
+<label>关联到已有场景组<select id="assignGroup"></select></label>
+<label>确认理由<input id="assignReason" maxlength="300" value="人工确认固定背景属于同一剧情地点" style="min-width:265px"></label>
+<button id="assign">归并镜头到场景</button></div>
+<div id="ontologyStatus" class="info">场所与场景必须人工确认；同一名字不自动视为同一剧情空间。</div>
+<div class="table"><table><thead><tr><th>归属的剧情场所</th><th>可复用场景组</th><th>已确认镜头数</th></tr></thead>
+<tbody id="groupRows"><tr><td colspan="3">暂无已确认分组</td></tr></tbody></table></div>
+</section>
+<div class="cols"><section class="panel"><h2>③ 已人工确认的镜头时间线</h2>
 <div class="table"><table><thead><tr><th>镜头</th><th>时间区间</th><th>实际抽帧样本</th><th>操作</th></tr></thead>
 <tbody id="segments"><tr><td colspan="4">暂无</td></tr></tbody></table></div>
 <p class="info">同一视频版本的镜头不能重叠；视频文件内容改变后，历史注释会标记为过期，不会被误当作新素材证据。</p></section>
-<section class="panel"><h2>③ 场景关系图（非地理位置）</h2>
+<section class="panel"><h2>④ 场景关系图（非地理位置）</h2>
 <div id="graph"><p class="info">命名场景后出现节点，连线表示剪辑时间顺序，不表示物理道路或行进。</p></div>
 <p id="graphDetails" class="info"></p></section></div>
-<section class="panel"><h2>④ 动画角色人工证据与故事板路径</h2><p class="info">使用虚构编号 C001、C002 等。只允许引用该视频当前版本里真实解码、时间落入指定镜头的样本 ID。</p>
+<section class="panel"><h2>⑤ 动画角色人工证据与故事板路径</h2><p class="info">使用虚构编号 C001、C002 等。只允许引用该视频当前版本里真实解码、时间落入指定镜头的样本 ID。</p>
 <div class="row"><label>人工确认镜头<select id="targetScene"></select></label>
 <label>虚构角色编号<input id="character" maxlength="4" placeholder="C001" value="C001"></label>
 <label>实际视频样本 ID<select id="sampleId"></select></label>
@@ -68,6 +87,49 @@ const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch]));
 const ms=x=>{let n=Math.max(0,Number(x));return String(Math.floor(n/60000)).padStart(2,'0')+':'+String(Math.floor(n%60000/1000)).padStart(2,'0')+'.'+String(n%1000).padStart(3,'0')};
 let state=null;
+let state=null,ontology={venues:[],scene_groups:[]};
+function selectOpts(id,items,format){
+ const sel=$(id),prior=sel.value;
+ sel.innerHTML=items.map(x=>`<option value="${x.id}">${esc(format(x))}</option>`).join('');
+ if(items.some(x=>String(x.id)===prior))sel.value=prior;
+}
+async function reloadOntology(){
+ try{
+  ontology=await api('/api/anime/ontology');
+  selectOpts('venueSelect',ontology.venues,x=>x.name);
+  selectOpts('assignGroup',ontology.scene_groups,x=>x.venue_name+' / '+x.name);
+  renderOntology();
+ }catch(e){$('ontologyStatus').textContent='场景字典仅供州级演示管理员管理：'+e.message}
+}
+function renderOntology(){
+ const counters={};
+ for(const x of (state?.segments||[]))if(x.canonical_scene_group_id)
+    counters[x.canonical_scene_group_id]=(counters[x.canonical_scene_group_id]||0)+1;
+ $('groupRows').innerHTML=ontology.scene_groups.map(x=>
+  `<tr><td>${esc(x.venue_name)}</td><td>${esc(x.name)}</td><td>${counters[x.id]||0}</td></tr>`).join('')||
+ '<tr><td colspan="3">请先建立剧情场所与场景组，再将镜头绑定到同一组</td></tr>';
+}
+async function createVenue(){
+ try{const x=await api('/api/anime/ontology/venues','POST',{name:$('venueName').value});
+      await reloadOntology();$('venueSelect').value=String(x.id);
+      $('ontologyStatus').textContent='已建立剧情场所 '+x.name}
+ catch(e){$('ontologyStatus').textContent='操作失败：'+e.message}
+}
+async function createGroup(){
+ try{const x=await api('/api/anime/ontology/venues/'+Number($('venueSelect').value)+'/scenes',
+     'POST',{name:$('groupName').value});
+     await reloadOntology();$('assignGroup').value=String(x.id);
+     $('ontologyStatus').textContent='已建立可复用场景 '+x.venue_name+' / '+x.name}
+ catch(e){$('ontologyStatus').textContent='操作失败：'+e.message}
+}
+async function assignGroup(){
+ try{const x=await api('/api/anime/ontology/segments/'+Number($('assignSegment').value)+'/group',
+      'PUT',{scene_group_id:Number($('assignGroup').value),reason:$('assignReason').value});
+      await reload();$('ontologyStatus').textContent='已确认镜头归属 '+x.story_venue_name+' / '+x.scene_group_name+
+      '；这是人工剧情地点分类，不是自动检测出的GPS位置。'}
+ catch(e){$('ontologyStatus').textContent='操作失败：'+e.message}
+}
+
 async function api(path,method='GET',body){
  const r=await fetch(path,{method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
  body:body===undefined?undefined:JSON.stringify(body)});
@@ -103,7 +165,7 @@ async function reload(){
  if(!sid())return;
  const d=await api('/api/anime/scenes/sources/'+sid()+'/graph');state=d;
  $('segments').innerHTML=d.segments.map(s=>`<tr><td>${esc(s.label)}<br><span class="pill">人工命名</span></td>
- <td>${ms(s.start_ms)} → ${ms(s.end_ms)}</td><td>${s.decoded_sample_count}</td>
+ <td>${ms(s.start_ms)} → ${ms(s.end_ms)}</td><td>${s.decoded_sample_count}<br><small class="info">${esc(s.canonical_venue_name?(s.canonical_venue_name+' / '+s.canonical_scene_name):'未归属剧情场所')}</small></td>
  <td><button class="ghost" data-scene="${s.id}">选择</button></td></tr>`).join('')||
  '<tr><td colspan="4">暂无已标注镜头</td></tr>';
  $('segments').querySelectorAll('[data-scene]').forEach(b=>b.onclick=()=>{
@@ -111,7 +173,17 @@ async function reload(){
  const selected=$('targetScene').value;
  $('targetScene').innerHTML=d.segments.map(x=>`<option value="${x.id}">${esc(x.label)} · ${ms(x.start_ms)}</option>`).join('');
  if(d.segments.some(x=>String(x.id)===selected))$('targetScene').value=selected;
- fillSamples();drawing(d.nodes,d.edges);
+ fillSamples();
+ selectOpts('assignSegment',d.segments,x=>'#'+x.id+' '+x.label+' '+ms(x.start_ms));
+ const mapped=d.canonical_scenes.map(x=>({
+   label:(d.canonical_venues.find(v=>v.id===x.story_venue_id)?.name||'未知场所')+' / '+x.name,
+   scene_group_id:x.id}));
+ const byId=new Map(mapped.map(x=>[x.scene_group_id,x.label]));
+ const visualEdges=d.canonical_scene_transitions.map(e=>({
+   from_scene:byId.get(e.from_scene_group_id),
+   to_scene:byId.get(e.to_scene_group_id),cuts:e.shot_cuts})).filter(x=>x.from_scene&&x.to_scene);
+ drawing(mapped.length?mapped:d.nodes,mapped.length?visualEdges:d.edges);
+ renderOntology();
  $('characters').innerHTML=Object.entries(d.characters).map(([code,route])=>
  `<tr><td>${esc(code)}<br><span class="pill">逐帧人工证据</span></td>
  <td>${route.map(x=>esc(x.scene_label)+' @'+ms(x.at_ms)).join(' → ')}</td>
@@ -171,8 +243,11 @@ async function start(){try{
  $('uploadPlace').innerHTML=places.filter(x=>x.active).map(x=>
  `<option value="${x.id}">${esc(x.name)}</option>`).join('');
  if(!n){say('请先通过上方按钮上传本地动画文件',true);return}
- await reload()}catch(e){say('加载失败：'+e.message,true)}}
+ await Promise.all([reload(),reloadOntology()])}catch(e){say('加载失败：'+e.message,true)}}
 $('upload').onclick=upload;
+$('createVenue').onclick=createVenue;
+$('createGroup').onclick=createGroup;
+$('assign').onclick=assignGroup;
 $('suggest').onclick=suggest;$('reload').onclick=()=>reload().catch(e=>say(e.message,true));
 $('source').onchange=()=>{state=null;$('candidates').innerHTML='<tr><td colspan="6">切换来源后请重新扫描</td></tr>';reload().catch(e=>say(e.message,true))};
 $('targetScene').onchange=fillSamples;$('tag').onclick=tag;
