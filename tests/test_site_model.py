@@ -287,10 +287,13 @@ def test_large_other_jurisdiction_cannot_starve_county_pagination(env):
     """Regression: global LIMIT 1500 then scope filter lost ALL 20 lawful rows."""
     main,client,(pa,pb,remote),(root,county,other)=env
     with main.db() as c:
+        c.executemany('INSERT INTO frigate_camera_bindings(camera,place_id) VALUES(?,?)',
+                      [('scope_remote_cam',remote),('scope_visible_cam',pa)])
         rows=[]
         for i in range(1520):
             place=remote if i<1500 else pa
-            rows.append((f'cam_many_{i:04}',f'event_{i:04}',place,
+            rows.append(('scope_visible_cam' if place==pa else 'scope_remote_cam',
+                         f'event_{i:04}',place,
                          '2026-10-13T09:00:00+00:00' if place==pa
                          else '2026-10-13T11:00:00+00:00',
                          main.utcnow()))
@@ -320,6 +323,8 @@ def test_page_201_occurrence_can_be_quality_reviewed(env):
     """Quality endpoint is NOT restricted to first 200 events in a UI batch."""
     main,client,(pa,pb,remote),(root,county,other)=env
     with main.db() as c:
+        c.execute('INSERT INTO frigate_camera_bindings(camera,place_id) VALUES(?,?)',
+                  ('mass_cam',pa))
         c.executemany("""INSERT INTO frigate_object_events
            (camera,event_id,place_id,label,started_at,score,has_snapshot,updated_at)
            VALUES ('mass_cam',?,?,'person',?,0.87,0,?)""",
