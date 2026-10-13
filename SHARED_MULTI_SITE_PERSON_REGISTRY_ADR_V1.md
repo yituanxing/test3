@@ -117,6 +117,23 @@ Alert             rule_instance_id, visit/occurrence_refs,
 
 **结论：现在应当暂停扩大检测器/跟踪器、地图图层或新业务页面的范围；这几类是可单独补充的插件，不需要重写 Excel #3 主归属逻辑。先守住上面四处共有数据契约，再逐步加入真实检测/跟踪。**
 
+## 实施补充：首批公共契约已落地（2026-10-13）
+
+本 ADR 编写初始提出的“四处共有数据契约”，本次真正落地了**第一项及第二项的匿名只读投影基础**，而不是把全部任务标为已验收。
+
+- `app/site_model.py` 新增 `site_zones` 和 `source_site_bindings` 两套公共表：
+  `places` 是业务场所，`site_zones` 是同一场所下的可复用区域；
+  `sources` 可绑定具体 zone；改变区域或管理场所时，**只结束旧区间、追加新绑定**，不覆盖旧绑定。
+- 遗留视频源首次升级数据库时只从**升级时刻开始**建立 `legacy_backfill`，更早的设备位置明确为未知；绝不反推上周它就在当前场所。新创建的 RTSP/普通文件/浏览器动画文件/官方 CAVIAR 视频在登记时写入真实初始绑定。
+- 服务端提供 `/api/site/zones`、`/api/site/sources/{id}/bindings`、`PUT /api/site/sources/{id}/binding`、`/api/site/anonymous-events`。后者把已有 Frigate 目标事件和 CAVIAR 单机位人工 track 投影成**相同结构但不同 `time_basis`** 的只读匿名事实。字段 `subject_id=null`、`unique_person_counted=false`，不会凭相同数字 track ID 合并真实人物。
+- 县级仅操作自己辖区的库存，低级只读符合授权的数据；跨县移动的同一摄像机绑定历史采取**所有相关历史场所都必须有权限**的保守策略，防止新属地泄漏旧属地场所名称。
+- `static/admin.html` 沿用原有管理页面，加入场所内场景创建、摄像机区域绑定和历史记录查看；**没有引入新的 workflow/job 和新的业务页面**。
+- 已保留不可变 `samples.place_id` 等旧事实：改绑 source 时旧样本场所不变化。当前 CAVIAR 双路研究素材禁止改绑到其他场所，避免同走廊两机位伪造“跨场所移动”。
+- **门禁**：[#38384732871](https://github.com/yituanxing/test3/actions/runs/38384732871)，`127 passed, 1 skipped`，Chromium **23项真实页面检查**通过；测试包括多摄像机归同一场所/zone、摄像机重绑历史区间、越区过滤、匿名投影互不冒充真人，以及UI刷新后保存生效。
+
+**尚未完成，不得冒称已设计并实现全套真人底库**：
+真正的研究视频人物身份链接与同人多机位去重、规范化可信主体 Visit、向已有 P### `base_registry` 提供受控真实主体适配、Frigate 通道自带的独立历史绑定版本。当前只证实“公共地址/场景/摄像机关系 + 匿名轨迹可复用结构 + 合成底库规则”，人物关联是未来独立门槛。
+
 ## 当前实现与证据
 
 - `app/base_registry.py` / `app/roster_maintenance.py` / `CORE_VIDEO_ROSTER_SPEC_V1.md`
