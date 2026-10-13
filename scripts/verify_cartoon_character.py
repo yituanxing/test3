@@ -35,6 +35,10 @@ CASES = [
      "role": "candidate", "truth": "Buck", "crop": [0.22, 0.09, 0.75, 0.91]},
     {"name": "buck_profile", "file": "Big.Buck.Bunny.-.Frank.Bunny.png",
      "role": "candidate", "truth": "Buck", "crop": [0.32, 0.0, 1.0, 1.0]},
+    {"name": "buck_with_bow", "file": "Big.Buck.Bunny.-.Bunny.with.Bow.png",
+     "role": "candidate", "truth": "Buck", "crop": [0.0, 0.0, 1.0, 1.0]},
+    {"name": "group_frank_negative", "file": "Big.Buck.Bunny.-.Frank.Rinky.Gimera.png",
+     "role": "candidate", "truth": "other", "crop": [0.07, 0.0, 0.50, 0.92]},
     {"name": "ricky_negative", "file": "Big.Buck.Bunny.-.Ricky.png",
      "role": "candidate", "truth": "other", "crop": [0.0, 0.0, 1.0, 1.0]},
 ]
@@ -152,13 +156,15 @@ def main(argv=None) -> int:
             for e, score in zip(CASES[1:], sim)
         ]
         rows.sort(key=lambda x: x["cosine_similarity"], reverse=True)
-        top_two = rows[:2]
-        ranked_correct = all(x["expected_same_character"] for x in top_two)
+        positive_count = sum(x["expected_same_character"] for x in rows)
+        ranked_correct = all(x["expected_same_character"] for x in rows[:positive_count])
         positives = [x["cosine_similarity"] for x in rows if x["expected_same_character"]]
         negatives = [x["cosine_similarity"] for x in rows if not x["expected_same_character"]]
         report.update({
             "comparisons": rows,
             "positive_above_all_negatives": ranked_correct,
+            "positive_count": positive_count,
+            "negative_count": len(rows) - positive_count,
             "positive_min_similarity": min(positives),
             "negative_max_similarity": max(negatives),
             "positive_negative_margin": round(min(positives) - max(negatives), 6),
