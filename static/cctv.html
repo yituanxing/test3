@@ -39,14 +39,23 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <div class="scroller"><table><thead><tr><th>机位</th><th>所属场所</th><th>视频帧数</th><th>人工框记录</th><th>机位内局部轨迹</th><th>查看</th></tr></thead><tbody id="sources"><tr><td colspan="6">尚未导入公开视频</td></tr></tbody></table></div>
 <p class="small">局部轨迹数量是标注对象数；两台摄像机可能拍到同一批人，因此局部轨迹数量不能简单相加成为全场去重人数。这里没有直接生成 P### 模拟身份。</p>
 </section>
+<section class="panel" id="occurrencePanel">
+<h2>③ 公共匿名出现事件 · 摄像机级去重</h2>
+<p class="small">统一数据契约：Frigate真实目标事件与CAVIAR官方逐帧标注分开统计。<b>单个摄像机的100帧同一轨迹只记作1条局部出现事件</b>，两路摄像机同名轨迹仍然是两条不同证据；没有跨机位真实人物去重，也不进入P###人库或业务到访统计。</p>
+<div id="occurrenceCounts" class="row"><span class="small">正在查询局部轨迹…</span></div>
+<div class="scroller"><table><thead><tr><th>视频来源</th><th>场所</th><th>机位/摄像机</th><th>匿名局部事件</th><th>逐帧原始人体框</th><th>时间依据</th></tr></thead>
+<tbody id="occurrenceRows"><tr><td colspan="6">暂无已验证局部事件</td></tr></tbody></table></div>
+<div class="row"><button class="secondary" id="loadOccurrences" onclick="refreshOccurrences()">刷新匿名事件</button>
+<span id="occurrenceNote" class="small">这是摄像机局部目标段，不是唯一人员数；无论多少帧，都不生成自然人身份。</span></div>
+</section>
 <section class="grid">
-<div class="panel"><h2>③ 实际 MPEG 帧与原始标注框</h2><div class="row"><label>当前机位<select id="source"></select></label>
+<div class="panel"><h2>④ 实际 MPEG 帧与原始标注框</h2><div class="row"><label>当前机位<select id="source"></select></label>
 <label>视频帧<input type="number" min="1" value="1" id="frame" style="max-width:135px"></label>
 <button id="viewFrame" class="secondary">解码并显示帧</button></div>
 <div class="viewport"><img id="photo" alt="未选择真实监控文件"></div>
 <p id="frameNote" class="small">绿色方框：官方 CAVIAR 人工标注，并不是模型检测结果。</p>
 </div>
-<div class="panel"><h2>④ 实际视频解码与人员检测分开验收</h2>
+<div class="panel"><h2>⑤ 实际视频解码与人员检测分开验收</h2>
 <p>第一条链路：从官方素材读取视频帧。第二条链路：CAVIAR 官方人体框帮助验证目标出现。第三条链路：我们自己的模型检测与跟踪必须单独评估。</p>
 <div class="row"><button id="process" class="secondary">运行已有匿名人脸检测</button></div>
 <p class="small">目前项目已有 OpenCV 的人脸候选检测；监控分辨率仅384×288，可能检测到0张脸。这不等于没有人员！后续的人体检测必须单独实测。</p>
@@ -82,6 +91,26 @@ async function refresh(){const d=await api('/api/cctv/sources');imported=d.sourc
  $('source').innerHTML=imported.map(x=>`<option value="${x.source_id}">${esc(x.camera_view)} / ${esc(x.place_name)}</option>`).join('');
  if(imported.some(x=>x.source_id===original))$('source').value=String(original);
  if(imported.length)await loadTracks();
+ await refreshOccurrences();
+}
+async function refreshOccurrences(){
+ try{
+   const summary=await api('/api/site/occurrences/summary');
+   const gt=summary.by_provider.caviar_ground_truth||{cameras:0,camera_local_occurrences:0,annotated_frames:0};
+   const live=summary.by_provider.frigate||{cameras:0,camera_local_occurrences:0,annotated_frames:0};
+   $('occurrenceCounts').innerHTML=
+     '<span class="badge">研究监控 '+gt.cameras+' 路 / '+gt.camera_local_occurrences+' 条局部轨迹</span>'+
+     '<span class="badge yellow">官方人工框 '+gt.annotated_frames+' 条（不是人数）</span>'+
+     '<span class="badge">Frigate '+live.cameras+' 路 / '+live.camera_local_occurrences+' 条匿名事件</span>';
+   $('occurrenceRows').innerHTML=summary.by_camera.map(x=>
+     '<tr><td>'+esc(x.provider==='caviar_ground_truth'?'CAVIAR研究标注':'Frigate匿名事件')+
+     '</td><td>'+esc(x.venue_name)+'</td><td>'+esc(x.camera_key)+
+     '</td><td>'+x.local_occurrences+'</td><td>'+(x.annotated_frames??'—')+
+     '</td><td>'+esc(x.time_basis==='archival_video_frame_number'?'原片帧号':'UTC事件时间')+
+     '</td></tr>').join('')||'<tr><td colspan="6">当前没有已导入的真实匿名事件；不会生成模拟数。</td></tr>';
+   $('occurrenceNote').textContent='已查询 '+summary.visible_cameras+
+       ' 个机位；不合并跨机位轨迹、不将视频帧累计为人数、不混合研究视频与实时UTC。';
+ }catch(e){$('occurrenceNote').textContent='读取局部事件失败：'+e.message}
 }
 function choose(id){$('source').value=String(id);$('frame').value='1';loadTracks();viewFrame()}
 async function loadPair(){
