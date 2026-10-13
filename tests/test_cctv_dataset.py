@@ -73,6 +73,17 @@ def test_fixed_cameras_share_one_real_place_no_cross_camera_identity(context,mon
         assert out['track_semantics']=='camera_local_ground_truth_not_global_identity'
         created.append(out['source_id'])
     assert created[0]!=created[1]
+    # Shared region monitoring shows archive evidence only in its own lane;
+    # changing imported GT must never manufacture current-day people/events.
+    metrics=client.get('/api/monitoring/overview',headers=root)
+    assert metrics.status_code==200,metrics.text
+    evidence=metrics.json()['licensed_research_video']
+    assert evidence['fixed_camera_sources']==2
+    assert evidence['camera_local_tracks']==4
+    assert evidence['manual_person_boxes']==8
+    assert evidence['counts_unique_people'] is False
+    assert evidence['counts_for_date_window'] is False
+    assert metrics.json()['counts']['person_objects']==0
     assert client.post(url,headers=root,json={
         'place_id':place,'view':'front'}).json()['status']=='already_imported'
     with main.db() as db:
