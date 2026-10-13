@@ -15,6 +15,7 @@ FILES = (
     "CORE_VIDEO_ROSTER_SPEC_V1.md", "DELIVERY_SCOPE_20261013.md",
     "SHARED_BUSINESS_MODEL_V1.md",
     "ANIME_SCENE_MAP_V0.1.md",
+    "ANIME_EXCEL_SITE_MODEL_V1.md",
     "INSIGHTS_V1.0.md", "UI_ACCEPTANCE_V1.4.md",
     "requirements.txt", "requirements-business.txt",
 )
