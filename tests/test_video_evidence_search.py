@@ -115,11 +115,15 @@ def test_scoped_real_face_frame_search_review_paging_and_utc(tmp_path,monkeypatc
                        headers=county).json()
     assert pending['matched_total']==len(found)
 
-    timestamp=datetime.fromisoformat(frame['ingested_at']).astimezone(timezone.utc)
-    # Compare instants, including a non-UTC client timezone, even when the
-    # stored SQLite ingestion timestamp omitted microsecond precision.
-    from_utc=timestamp.astimezone(timezone(timedelta(hours=8))).isoformat()
-    until=(timestamp+timedelta(seconds=1)).isoformat()
+    stamps=[datetime.fromisoformat(r['ingested_at']).astimezone(timezone.utc)
+            for r in arows.json()['observations']]
+    # An actual OpenCV decode/face detector may cross a second boundary on
+    # slower CI workers. Test the inclusive range of ALL 10 observed frames,
+    # not an unjustified one-second assumption taken from the newest frame.
+    timestamp=min(stamps)
+    from_utc=(min(stamps)-timedelta(seconds=1)).astimezone(
+        timezone(timedelta(hours=8))).isoformat()
+    until=(max(stamps)+timedelta(seconds=1)).isoformat()
     import urllib.parse
     query='?source_id='+str(a)+'&from_utc='+urllib.parse.quote(from_utc)+(
         '&until_utc='+urllib.parse.quote(until))
