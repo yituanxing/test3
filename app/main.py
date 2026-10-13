@@ -533,6 +533,18 @@ def _process_source_impl(source_id: int, max_frames: int = 90,
             raise HTTPException(409, '分析完成后源文件不可读；未保存这批观测') from exc
     new_samples, previously_imported, new_boxes = 0, 0, 0
     with db() as c:
+        # Check the configuration INSIDE the final SQLite write transaction:
+        # the operator may rebind or disable the camera while decoding a long
+        # file/RTSP batch. Without this guard old frames could be attributed to
+        # a now-different physical source. The write lock prevents a rebind
+        # racing between the check and the persisted evidence.
+        c.execute('BEGIN IMMEDIATE')
+        current=c.execute('SELECT kind,uri,place_id,enabled FROM sources WHERE id=?',
+                          (source_id,)).fetchone()
+        if (current is None or not current['enabled'] or
+            (current['kind'],current['uri'],current['place_id']) !=
+            (source['kind'],source['uri'],source['place_id'])):
+            raise HTTPException(409,'视频源在解码期间已重绑或停用；本批观测未入库')
         for sample,frame_width,frame_height,boxes in detections:
             cur=c.execute('''INSERT OR IGNORE INTO samples
                    (source_id,place_id,origin,ingested_at,video_offset_ms,frame_index,
