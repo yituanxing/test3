@@ -163,6 +163,10 @@ def main():
                 max_frames=LOCKED_PARAMETERS["max_frames"],
                 box_threshold=LOCKED_PARAMETERS["box_threshold"],
                 match_threshold=LOCKED_PARAMETERS["match_threshold"],
+                reference_crops=[
+                    ROOT / "reports/cartoon-reference-fixtures/reference_auto_crop.jpg",
+                    ROOT / "reports/cartoon-reference-fixtures/reference_auto_crop_buck_bow.jpg",
+                ],
             )
             uniqueness = audit_uniqueness(baselines[0], video)
             frames = evaluation["frames"]
