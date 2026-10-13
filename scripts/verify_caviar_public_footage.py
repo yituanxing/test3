@@ -105,6 +105,34 @@ def main():
                 })
             assert len(report['verified_cameras'])==2
             assert len({x['source_id'] for x in report['verified_cameras']})==2
+            # Exercise the SAME authenticated two-camera API used by the UI;
+            # a module-only benchmark cannot prove the joined product route.
+            paired=client.get(
+                f"/api/cctv/sources/{report['verified_cameras'][0]['source_id']}"
+                "/pair-tracking-baseline?max_frames=500",headers=auth)
+            assert paired.status_code==200,paired.text[:600]
+            joined=paired.json()
+            assert joined['camera_count']==2
+            assert joined['automatic_camera_local_tracking_ran'] is True
+            assert joined['cross_camera_identity_matching_ran'] is False
+            assert joined['shared_global_identity_ground_truth'] is False
+            assert {c['camera_view'] for c in joined['cameras']}=={'front','corridor'}
+            assert all(len(c['algorithms'])==2 for c in joined['cameras'])
+            prior={c['camera_view']:c for c in report['verified_cameras']}
+            for cam in joined['cameras']:
+                for alg in cam['algorithms']:
+                    expected=prior[cam['camera_view']][
+                        'existing_bytetrack_baseline' if alg['algorithm']=='bytetrack'
+                        else 'existing_ocsort_baseline']
+                    assert alg['assigned_boxes']==expected['assigned_boxes']
+                    assert alg['ground_truth_boxes']==expected['ground_truth_boxes']
+            report['joined_two_camera_http_proof']={
+                'endpoint':'/api/cctv/sources/{source_id}/pair-tracking-baseline',
+                'cameras':joined['camera_count'],
+                'algorithms':joined['algorithms'],
+                'uses_actual_downloaded_official_media':True,
+                'cross_camera_identity_matching_ran':False
+            }
             report['tracker_vendor']='Roboflow trackers 2.6.0 / ByteTrack + OC-SORT'
             report['baseline_kind']='published manual CVML detection boxes fed to existing ByteTrack'
             report['global_id_ground_truth']='NOT PRESENT; cross-camera ReID MUST NOT be scored'
