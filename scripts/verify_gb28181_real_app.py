@@ -11,6 +11,7 @@ import json
 import os
 import secrets
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -219,6 +220,51 @@ def main():
                 result["live_open_decoder_real_face_boxes"] = (
                     first_batch["face_detections"] + second_batch["face_detections"])
                 result["live_decoder_proves_unique_people"] = False
+
+                # The feature acceptance must drive the REAL background worker,
+                # not only instantiate its decoder class in a unit scenario.
+                enabled = expect(client.post(
+                    f"/api/capture/jobs/{source_id}/start",
+                    headers=headers), "start GB continuous capture via API")
+                assert enabled["desired_enabled"] is True
+                last_job = None
+                try:
+                    deadline = time.monotonic() + 75
+                    while time.monotonic() < deadline:
+                        state = expect(client.get(
+                            "/api/capture/jobs", headers=headers),
+                            "read continuous capture worker status")
+                        job = next((j for j in state["jobs"]
+                                    if j["source_id"] == source_id), None)
+                        assert job is not None
+                        last_job = job
+                        if job["successful_batches"] >= 2:
+                            break
+                        time.sleep(0.5)
+                    assert last_job and last_job["successful_batches"] >= 2, (
+                        "real continuous worker did not complete two GB batches: " +
+                        str(last_job["last_error_code"] if last_job else "missing"))
+                    assert last_job["sampled_frames"] >= 8
+                    result["real_gb_capture_worker_batches"] = last_job["successful_batches"]
+                    result["real_gb_capture_worker_new_samples"] = last_job["sampled_frames"]
+                    result["real_gb_capture_worker_retry_errors"] = last_job["failure_count"]
+                finally:
+                    expect(client.post(
+                        f"/api/capture/jobs/{source_id}/stop",
+                        headers=headers), "stop continuous GB worker")
+                    deadline = time.monotonic() + 25
+                    while time.monotonic() < deadline:
+                        current = expect(client.get(
+                            "/api/capture/jobs", headers=headers),
+                            "worker stop state")["jobs"]
+                        capture_job = next(
+                            (j for j in current if j["source_id"] == source_id), None)
+                        if capture_job and capture_job["state"] == "stopped":
+                            break
+                        time.sleep(0.5)
+                    assert capture_job and capture_job["state"] == "stopped", (
+                        "continuous GB worker has not released ownership")
+                result["real_gb_capture_worker_stopped"] = True
 
             finally:
                 if session_id is not None:
