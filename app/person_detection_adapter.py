@@ -1,0 +1,130 @@
+"""Existing YOLO11 person detector -> existing Roboflow ByteTrack on REAL CAVIAR frames.
+
+Optional research-only dependency: Ultralytics YOLO11n (AGPL-3.0 or
+commercial license) + Roboflow trackers. No custom detector/tracker, biometric
+identity, automatically inferred cross-camera pairing, or P### roster feed.
+
+Unlike the published-CVML-to-ByteTrack upper-bound benchmark, detections
+here come entirely from pretrained YOLO, *not* official manual boxes. Manual
+CVML boxes are retained as independent evaluation evidence only.
+"""
+from __future__ import annotations
+
+from functools import lru_cache
+from hashlib import sha256
+from pathlib import Path
+from threading import Lock
+
+import cv2
+from fastapi import HTTPException
+
+from app import tracker_adapters
+
+MODEL = "yolo11n.pt"
+MODEL_LICENSE = "Ultralytics YOLO11n: AGPL-3.0 / Enterprise (review before commercial use)"
+_lock = Lock()
+
+
+@lru_cache(maxsize=1)
+def _model():
+    try:
+        from ultralytics import YOLO
+    except ImportError as exc:
+        raise HTTPException(503,
+            "未安装现成的 Ultralytics YOLO11n；请安装 requirements-person-detection.txt") from exc
+    return YOLO(MODEL)
+
+
+def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
+                             sample_every:int=1,confidence:float=.25):
+    if not 1<=max_frames<=64 or not 1<=sample_every<=4 or not .1<=confidence<=.9:
+        raise ValueError("bounded detection parameters required")
+    record=c.execute("""SELECT i.video_sha256,i.frames_available,i.camera_view,
+            i.scenario,s.uri,s.place_id FROM public_cctv_imports i
+            JOIN sources s ON s.id=i.source_id WHERE i.source_id=?""",
+            (source_id,)).fetchone()
+    if not record:
+        raise HTTPException(404,"该场所没有已导入的CAVIAR实视频")
+    file=Path(record["uri"])
+    if not file.is_file() or sha256(file.read_bytes()).hexdigest()!=record["video_sha256"]:
+        raise HTTPException(409,"视频文件缺失或内容SHA256不匹配；不产生虚假的检测结果")
+    sv,trackers,np=tracker_adapters._dependencies()
+    model=_model()
+    tracker=trackers.ByteTrackTracker(
+        minimum_consecutive_frames=1,track_activation_threshold=.5,
+        high_conf_det_threshold=.5)
+    stop=min(max_frames,int(record["frames_available"]))
+    gt_counts=dict(c.execute("""SELECT frame_number,COUNT(*) FROM public_cctv_track_boxes
+        WHERE source_id=? AND frame_number<=? GROUP BY frame_number""",
+        (source_id,stop)).fetchall())
+    cap=cv2.VideoCapture(str(file))
+    if not cap.isOpened():
+        raise HTTPException(409,"官方CAVIAR实视频无法打开")
+    decoded=0
+    sampled=0
+    predicted=0
+    tracked=0
+    ids=set()
+    frame_summaries=[]
+    try:
+        with _lock:
+            for frame_num in range(1,stop+1):
+                ok,frame=cap.read()
+                if not ok:
+                    raise HTTPException(409,"CAVIAR实际解码帧不足，不能宣称模型运行成功")
+                decoded+=1
+                if (frame_num-1)%sample_every:
+                    continue
+                # Only class 0 in COCO is person; no face identification.
+                raw=model.predict(source=frame,classes=[0],
+                                  conf=confidence,imgsz=640,device="cpu",
+                                  verbose=False)[0]
+                boxes=raw.boxes
+                coords=boxes.xyxy.cpu().numpy().astype(np.float32)
+                scores=boxes.conf.cpu().numpy().astype(np.float32)
+                detector_input=sv.Detections(
+                    xyxy=coords.reshape((-1,4)),
+                    confidence=scores,
+                    class_id=np.zeros(len(scores),dtype=np.int32))
+                result=tracker.update(detector_input)
+                local_ids=result.tracker_id
+                actual_ids=[] if local_ids is None else [
+                    int(x) for x in local_ids if int(x)>=0]
+                sampled+=1
+                predicted+=len(scores)
+                tracked+=len(actual_ids)
+                ids.update(actual_ids)
+                frame_summaries.append({
+                    "frame_number":frame_num,
+                    "automatically_detected_person_boxes":len(scores),
+                    "existing_tracker_assigned_boxes":len(actual_ids),
+                    "official_manual_boxes_for_reference":gt_counts.get(frame_num,0),
+                })
+    finally:
+        cap.release()
+    return {
+        "mode":"real_pretrained_person_detection_plus_existing_tracking",
+        "source_id":source_id,"camera_view":record["camera_view"],
+        "place_id":record["place_id"],"scenario":record["scenario"],
+        "video_sha256":record["video_sha256"],"model":MODEL,
+        "model_license":MODEL_LICENSE,"tracker":"roboflow_trackers_bytetrack",
+        "frames_decoded":decoded,"frames_inferred":sampled,
+        "sampling_step":sample_every,
+        "predicted_person_boxes":predicted,
+        "tracker_assigned_boxes":tracked,
+        "camera_local_tracker_ids":len(ids),
+        "published_gt_boxes_on_inferred_frames":sum(
+            gt_counts.get(x["frame_number"],0) for x in frame_summaries),
+        "frame_summaries":frame_summaries,
+        "detector_received_ground_truth_boxes":False,
+        "real_pretrained_person_detector_ran":True,
+        "existing_automatic_tracker_ran":True,
+        "cross_camera_identity_matching_ran":False,
+        "identity_accuracy_measured":False,
+        "qualified_for_real_roster_or_alerts":False,
+        "counted_unique_people":False,
+        "clock_basis":"archival_video_frame_index",
+        "limitation":"这是现成YOLO11n在官方CAVIAR MPEG解码帧上的人员检测＋现成ByteTrack本机跟踪；"
+                     "抽样步长会改变跟踪的帧间时间，官方框只作独立参考。"
+                     "没进行跨镜头同人识别、身份核验、精确率/召回率标定；模型适用性与AGPL授权需单独核验。",
+    }
