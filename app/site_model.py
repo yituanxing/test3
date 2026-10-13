@@ -124,6 +124,11 @@ def set_frigate_binding(c,camera,place_id,*,at=None):
             WHERE camera=? AND valid_until IS NULL""",(camera,)).fetchone()
     original=c.execute('SELECT place_id FROM frigate_camera_bindings WHERE camera=?',
                        (camera,)).fetchone()
+    if original is None:
+        # Satisfy the history table's FK in the same pending transaction.
+        # This is a brand-new explicit registration, NOT a legacy backfill.
+        c.execute('INSERT INTO frigate_camera_bindings(camera,place_id) VALUES(?,?)',
+                  (camera,place_id))
     if not current and original is not None:
         record_frigate_initial(c,camera,original['place_id'],
                                provenance='legacy_backfill',at=stamp)
