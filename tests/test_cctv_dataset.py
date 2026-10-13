@@ -206,3 +206,39 @@ def test_actual_roboflow_bytetrack_tracks_camera_local_ground_truth_when_install
     with main.db() as c:
         assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
         assert c.execute('SELECT COUNT(*) FROM research_occurrence_links').fetchone()[0]==0
+
+
+def test_dual_camera_existing_tracker_baseline_is_not_global_identity(context,monkeypatch):
+    pytest.importorskip('trackers')
+    pytest.importorskip('supervision')
+    main,mod,client,place,root,county=context
+    clip=(Path(__file__).resolve().parents[1]/'samples'/'astronaut-face-test.mp4').read_bytes()
+    monkeypatch.setattr(mod,'_fetch_allowlisted',
+                        lambda url,max_bytes: xml() if url.endswith('.xml') else clip)
+    a=client.post('/api/cctv/datasets/import',headers=root,
+                  json={'place_id':place,'view':'corridor'})
+    assert a.status_code==201,a.text
+    sid=a.json()['source_id']
+    endpoint=f'/api/cctv/sources/{sid}/pair-tracking-baseline?max_frames=8'
+    assert client.get(endpoint,headers=county).status_code==409
+    b=client.post('/api/cctv/datasets/import',headers=root,
+                  json={'place_id':place,'view':'front'})
+    assert b.status_code==201,b.text
+    result=client.get(endpoint,headers=county)
+    assert result.status_code==200,result.text
+    data=result.json()
+    assert data['camera_count']==2
+    assert {x['camera_view'] for x in data['cameras']}=={'corridor','front'}
+    assert all(len(x['algorithms'])==2 for x in data['cameras'])
+    for cam in data['cameras']:
+        assert {m['algorithm'] for m in cam['algorithms']}=={'bytetrack','ocsort'}
+        assert all(m['ground_truth_boxes']==4 and m['automatic_tracking_ran'] is True
+                   and m['automatic_person_detection_ran'] is False
+                   for m in cam['algorithms'])
+    assert data['automatic_person_detection_ran'] is False
+    assert data['cross_camera_identity_matching_ran'] is False
+    assert data['shared_global_identity_ground_truth'] is False
+    assert data['eligible_for_real_roster_or_alerts'] is False
+    with main.db() as c:
+        assert c.execute('SELECT COUNT(*) FROM research_occurrence_links').fetchone()[0]==0
+        assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
