@@ -12,7 +12,8 @@ import argparse
 import json
 from pathlib import Path
 
-from scripts.cartoon_video_recognize import ROOT
+# Pure stdlib scoring, deliberately independent of torch/transformers.
+ROOT = Path(__file__).resolve().parents[1]
 
 DIR = ROOT / "reports/cartoon-multiwindow-holdout"
 LABELS = ROOT / "tests/data/cartoon_multiwindow_visual_truth_v1.json"
