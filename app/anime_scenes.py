@@ -181,7 +181,7 @@ async def upload_local_clip(request:Request,place_id:int=Query(gt=0)):
             raise HTTPException(413,'本地Demo单个动画视频上限128MiB')
     _upload_dir.mkdir(parents=True,exist_ok=True)
     final=_upload_dir/(uuid.uuid4().hex+ext)
-    staged=final.with_suffix(final.suffix+'.part')
+    staged=final.with_name('pending-'+final.name)  # preserve video suffix for decoder
     count=0
     try:
         with staged.open('xb') as target:
