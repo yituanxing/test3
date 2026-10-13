@@ -11,6 +11,8 @@ CVML boxes are retained as independent evaluation evidence only.
 from __future__ import annotations
 
 from functools import lru_cache
+import json
+from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 from threading import Lock
@@ -66,6 +68,7 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
     tracked=0
     ids=set()
     frame_summaries=[]
+    local_boxes=[]
     try:
         with _lock:
             for frame_num in range(1,stop+1):
@@ -94,6 +97,22 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
                 predicted+=len(scores)
                 tracked+=len(actual_ids)
                 ids.update(actual_ids)
+                # Use the vendor's actual OUTPUT geometry rather than zipping
+                # IDs back to potentially reordered original detector boxes.
+                # The box is camera-local evidence only, never a person ID.
+                for index,tid in enumerate(local_ids if local_ids is not None else []):
+                    if int(tid)<0:continue
+                    xyxy=result.xyxy[index].tolist()
+                    x1,y1,x2,y2=[int(round(float(v))) for v in xyxy]
+                    if x2<=x1 or y2<=y1:continue
+                    conf_value=(float(result.confidence[index])
+                                if result.confidence is not None else 0.)
+                    local_boxes.append({
+                        "frame_number":frame_num,"local_track_id":str(int(tid)),
+                        "x":max(0,x1),"y":max(0,y1),
+                        "width":x2-x1,"height":y2-y1,
+                        "confidence":round(conf_value,6),
+                    })
                 frame_summaries.append({
                     "frame_number":frame_num,
                     "automatically_detected_person_boxes":len(scores),
@@ -116,6 +135,8 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
         "published_gt_boxes_on_inferred_frames":sum(
             gt_counts.get(x["frame_number"],0) for x in frame_summaries),
         "frame_summaries":frame_summaries,
+        "local_track_boxes":local_boxes,
+        "model_run_recorded":False,
         "detector_received_ground_truth_boxes":False,
         "real_pretrained_person_detector_ran":True,
         "existing_automatic_tracker_ran":True,
@@ -128,3 +149,57 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
                      "抽样步长会改变跟踪的帧间时间，官方框只作独立参考。"
                      "没进行跨镜头同人识别、身份核验、精确率/召回率标定；模型适用性与AGPL授权需单独核验。",
     }
+
+
+def persist_detection_run(c, result):
+    """Append real inference-derived LOCAL camera evidence, never GT or P###.
+
+    An identical pretrained model/source/sampling configuration is a stable
+    immutable version. Replays are idempotent; changed model/settings have a
+    distinct run key, and each run's local track IDs are independent.
+    """
+    payload={
+        "source_id":result["source_id"],"source_sha":result["video_sha256"],
+        "model":result["model"],"tracker":result["tracker"],
+        "frames_decoded":result["frames_decoded"],
+        "sampling_step":result["sampling_step"],
+    }
+    run_key=sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()[:32]
+    src=c.execute("""SELECT s.uri,s.place_id,i.video_sha256
+        FROM sources s JOIN public_cctv_imports i ON i.source_id=s.id
+        WHERE s.id=?""",(result["source_id"],)).fetchone()
+    if (src is None or src["place_id"]!=result["place_id"] or
+        src["video_sha256"]!=result["video_sha256"]):
+        raise HTTPException(409,"检测期间视频版本或场所发生变化，拒绝错误归属")
+    file=Path(src["uri"])
+    if not file.is_file() or sha256(file.read_bytes()).hexdigest()!=src["video_sha256"]:
+        raise HTTPException(409,"推理后原视频已被篡改，拒绝持久化局部目标")
+    c.execute("BEGIN IMMEDIATE")
+    prior=c.execute("SELECT run_key FROM model_track_runs WHERE run_key=?",
+                    (run_key,)).fetchone()
+    if prior:
+        stored=c.execute("SELECT COUNT(*) FROM model_track_boxes WHERE run_key=?",
+                         (run_key,)).fetchone()[0]
+        return {"run_key":run_key,"status":"existing","stored_local_boxes":stored}
+    c.execute("""INSERT INTO model_track_runs
+      (run_key,source_id,video_sha256,model_name,tracker_name,params_json,
+       frames_decoded,frames_inferred,created_at) VALUES (?,?,?,?,?,?,?,?,?)""",
+      (run_key,result["source_id"],result["video_sha256"],result["model"],
+       result["tracker"],json.dumps(payload,sort_keys=True),
+       result["frames_decoded"],result["frames_inferred"],
+       datetime.now(timezone.utc).isoformat(timespec="microseconds")))
+    seen=set()
+    rows=[]
+    for box in result["local_track_boxes"]:
+        tag=(box["frame_number"],box["local_track_id"])
+        if tag in seen:
+            raise HTTPException(409,"同一机位/帧的自动跟踪ID重复，拒绝污染证据")
+        seen.add(tag)
+        rows.append((run_key,box["frame_number"],box["local_track_id"],
+                     box["x"],box["y"],box["width"],box["height"],
+                     box["confidence"]))
+    c.executemany("""INSERT INTO model_track_boxes
+       (run_key,frame_number,local_track_id,x,y,width,height,confidence)
+       VALUES(?,?,?,?,?,?,?,?)""",rows)
+    return {"run_key":run_key,"status":"saved",
+            "stored_local_boxes":len(rows)}
