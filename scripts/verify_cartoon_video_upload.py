@@ -53,6 +53,20 @@ def main() -> None:
             raise AssertionError("UI did not produce a playable annotated preview")
         if result.get("preview_codec") != "h264_browser_compatible":
             raise AssertionError("Video browser preview was not encoded H.264")
+        consensus = result.get("two_pose_consensus")
+        if not isinstance(consensus, dict):
+            raise AssertionError("Actual Gradio upload did not evaluate two-pose consensus")
+        if consensus.get("rule") != "harmonic_mean_of_two_frozen_cosines":
+            raise AssertionError("Wrong multi-reference scoring mode")
+        if abs(float(consensus["cutoff_unchanged"]) - .42) > 1e-9:
+            raise AssertionError("Upload inference silently changed the frozen threshold")
+        if len(consensus["frames"]) != result["frames_decoded"]:
+            raise AssertionError("Consensus did not evaluate every sampled original video frame")
+        # Consensus cannot create a positive absent from the original
+        # MAX-of-two model because harmonic mean <= max for positive cosines.
+        if not set(consensus["consensus_match_timestamps"]).issubset(
+                set(consensus["raw_match_timestamps"])):
+            raise AssertionError("Consensus created unsupported identity claims")
         temporal = result.get("temporal_consistency")
         if not isinstance(temporal, dict):
             raise AssertionError("Upload UI did not compute real ByteTrack associations")
@@ -70,6 +84,11 @@ def main() -> None:
             "frames_decoded": result["frames_decoded"],
             "distinct_matching_timestamps": result["distinct_timestamps_with_buck"],
             "preview_codec": result["preview_codec"],
+            "consensus_algorithm": consensus["rule"],
+            "consensus_match_timestamps": consensus["consensus_match_timestamps"],
+            "original_max_match_timestamps": consensus["raw_match_timestamps"],
+            "raw_positive_rejected_by_two_pose":
+                consensus["original_positive_frames_rejected"],
             "gallery_items": len(gallery),
             "raw_matching_timestamps": sorted(raw_times),
             "temporally_supported_timestamps": sorted(supported_times),
