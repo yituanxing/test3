@@ -48,14 +48,14 @@
 
 | 级别 | 位置/证据 | 问题和下一步 |
 |---|---|---|
-| **P0 权限** | `app/insights.py:37-42,242-257` | 合成预警过滤只按 `place_ids` **有交集**，却原样返回整个预警（含辖区外 place_id、相关 observation_id、参与人员）；局部可见不意味着可以返回全域证据。已通过直接调用 `_filtered(analysis,place_ids={1})` 复现：包含 `[1,999]` 的预警仍返回完整 `[1,999]`。先按字段级/证据级范围修正并补低权限回归。 |
-| **P0 数据完整性** | `app/occurrences.py:44-95` | `LIMIT 1500` 在辖区过滤之前，随后按 provider 排序取前200；在 1520 条事件中旧20条属于合法辖区、新1500条属于其他辖区的精确复现实验中，合法账号看到 **0 条、truncated=false**。事件消失不是没有事件。须将授权过滤推入 SQL、稳定按时间/主键分页、计算合法域总数。 |
-| **P0 操作可达性** | `app/occurrence_reviews.py:62-72` | 质量审核先调用第一批 `MAX_PAGE=200` 的 occurrence，若某真实事件排在第201以后则直接404，永远无法审核。须按 `occurrence_key` 和权限直接查原始事件，不依赖首页分页。 |
-| **P1 单一事实来源** | `sources.place_id`、`frigate_camera_bindings.place_id`、`source_site_bindings`、`site_model.anonymous_events`、`occurrences.occurrences`、`monitoring.overview` | 多套场所绑定/匿名事件读法并存。虽然 source 绑定历史已实现，但当前 Frigate 摄像机及汇总链路未统一通过 **事件时间点的有效绑定** 获取位置，未形成完整一致性。须指定唯一场所绑定解析器、唯一 `OccurrenceReadModel`，旧 API 兼容转发。 |
-| **P1 计算口径** | `app/occurrence_reviews.py:162+`、`app/occurrences.py:113+` | 质量汇总最多200条且每条复算证据哈希+审核历史；出现大量局部目标时数据既可能部分统计又可能性能退化。需要索引/分页/明确 `partial` 状态；界面不应把首200当成全辖区总量。 |
+| **P0 权限 ✅ 修复** | `app/insights.py` + `tests/test_insights.py` | 跨辖区合成预警原先按场所交集返回完整证据。现只在 **全部参与场所属于权限范围** 时返回预警，否则整体隐藏；人员明细中范围外主归属 ID 也改为不返回。新增 `[10,999]`、隐藏证据 ID 与外县主归属的负向断言。该策略优先阻止泄露，而非部分展示。 |
+| **P0 数据完整性 ✅ 修复** | `app/occurrences.py` + `tests/test_site_model.py` | 数据查询已将 `WHERE place_id IN (authorized_places)` 放到 **SQL 层并在 LIMIT/OFFSET 之前执行**，同时提供稳定排序与 `next_offset`。回归插入其他县1500条+本县20条，当前本县账号正确看到20条，不再产生零结果。大规模跨页的 COUNT/更高效keyset分页可后续优化。 |
+| **P0 操作可达性 ✅ 修复** | `app/occurrence_reviews.py` + `tests/test_site_model.py` | 质量审核不再依赖列表首页前200条，而是在**已授权SQL查询**内遍历所有有权限的局部事件寻找 key；回归证明第221条事件可成功追加审核、另一辖区查不到。索引化 key 定位仍属于后续扩容优化。 |
+| **P1 单一事实来源 🟡 部分收敛** | `site_model.anonymous_events`、`occurrences.occurrences`、`sources`/`frigate_camera_bindings` | 旧 `/api/site/anonymous-events` 现由**同一套 canonical occurrence SQL 投影**转换字段，避免两套 LIMIT 与辖区语义；测试核对同辖区事件 key 完全一致。尚待统一 Frigate 摄像机完整历史绑定、视频会话时间点与现有 monitoring 聚合的场所归属，不能称全部统一。 |
+| **P1 计算口径 🟡 正确性修复，性能待优化** | `app/occurrence_reviews.py` + `app/occurrences.py` | QA 汇总现遍历**全部授权局部轨迹**（不再把前200条当全辖区总量），测试证明221条含首200条以外的已审核事件被完整统计；查询详情的哈希与历史仍逐事件计算，大规模时需基于审核/证据签名的缓存索引。 |
 | **P1 产品/交付** | `app/main.py` 约70KB、模块和交付文档持续堆叠 | 多个面板和专项 API 逐步增加，但 23 项整体闭环仍分裂为「真实匿名链」与「合成身份链」。保留已有成果，停止独立页面/新流派继续扩张；清理重复匿名API、将专项文档降为历史参考并统一口径。源码 ZIP 当前不是完全离线可安装包。 |
 
-上面前3项是**有具体代码路径和最小可复现实验的实际问题**，不能用已有 CI 130 passed 替代修复后的负向测试。P1 是体系一致性与容量风险，需按真实使用规模排优先级。
+以上 P0 三项已用对应的真实 SQLite/HTTP/业务负向测试修复验证：CI **[#38390944799](https://github.com/yituanxing/test3/actions/runs/38390944799)**，**133 passed, 1 skipped**，Chromium回归成功。P1 的真实 Frigate绑定时点一致性、真人身份证据与规模化性能仍未修复，不允许一并标绿。
 
 ### 0.4 接下来改变工作方法：架构冻结与变更门禁
 
@@ -66,7 +66,7 @@
 5. **未来新模块的准入标准**：必须标明服务哪个 Excel 条目、输入/输出契约、是否存在旧模块可复用、数据权限、原始证据真值、失败情形、必须跑的 CI Owner；缺一项，先不写代码。
 6. **提交时统一验收矩阵**：Excel每项用 `implemented/tested/mock_or_synthetic_only/missing` 四种语义标注；一个条目即使 UI 可点，只要核心真值或数据来源未通过就不能标全绿。距 2026-10-15 10:00 截止优先可复验交付，不再追求模块/文件/测试数量增加。
 
-**本轮结论：先审计并冻结设计，不宣称修复了上表代码问题，也不宣称完善了真人身份链接。**
+**现行实施结论：前述 P0 权限/辖区分页/审核可达性三项代码缺陷已修复且有负向回归；旧匿名 API 已转发到统一 occurrence 模型。真人跨摄像机身份关联、可信 Visit 与真实人员底库仍未实现；这不是通过增加测试数量就可以跳过的边界。**
 
 
 ## 一、实施约束与优先级
