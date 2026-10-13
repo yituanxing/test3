@@ -79,6 +79,20 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <div class="scroller"><table><thead><tr><th>审核记录ID</th><th>结论</th><th>依据</th><th>证据摘要</th></tr></thead>
 <tbody id="qaHistory"><tr><td colspan="4">选择一条实际匿名事件</td></tr></tbody></table></div>
 </section>
+<section class="panel" id="researchPanel" hidden>
+<h2>⑦ 研究样本匿名轨迹 · 人工关联与候选到访</h2>
+<p class="warning">仅最高级管理员的人工研究演示：首先为上方 <b>有UTC时钟和历史位置证据</b> 的 Frigate 局部目标审核“合理目标”，再把不同机位证据人工关联到匿名 D### 标签。<b>这不是机器识别同一真人</b>，不进入 P### 底库或真实预警。只有 CAVIAR 原片帧号的轨迹不能冒充具体时刻的到访。</p>
+<div class="row">
+<label>演示匿名标签<input id="researchAlias" value="D001" maxlength="4" pattern="D[0-9]{3}"></label>
+<label>人工确认依据<input id="researchReason" maxlength="500" style="min-width:320px" value="受控样本人工核对本机目标证据，仅用于研究分组"></label>
+<button class="secondary" id="researchAttach" onclick="saveResearchLink('attach')">关联上方选中的匿名事件</button>
+<button class="secondary" id="researchDetach" onclick="saveResearchLink('detach')">撤销该事件关联</button>
+<button class="secondary" onclick="refreshResearch()">重新核对候选到访</button>
+</div>
+<p class="small" id="researchStatus">尚未建立人工研究关联；不能当作真人到访或自动跨所识别。</p>
+<div class="scroller"><table><thead><tr><th>研究匿名标签</th><th>业务场所</th><th>开始时间 UTC</th><th>机位数</th><th>匿名事件</th><th>性质</th></tr></thead>
+<tbody id="researchRows"><tr><td colspan="6">尚无通过证据门槛的人工研究候选到访</td></tr></tbody></table></div>
+</section>
 <section class="panel"><h2>Excel 场所功能的真实边界</h2>
 <p>摄像机与场所关联、视频导入、实际帧、匿名框/本机局部轨迹可以采用真实数据。
 原 #3 人员底库、#6跨场所、#7同行、#17轨迹等需要跨摄像机身份关联时，先沿用明确标识的合成业务流程；
@@ -161,6 +175,36 @@ async function saveOccurrenceQuality(){
  finally{$('qaSave').disabled=false}
 }
 $('qaOccurrence').addEventListener('change',loadOccurrenceQuality);
+async function refreshResearch(){
+ if($('researchPanel').hidden)return;
+ try{
+ const [link,visits]=await Promise.all([
+     api('/api/research/links'),api('/api/research/visits')]);
+ $('researchRows').innerHTML=visits.visits.map(x=>
+   '<tr><td>'+esc(x.research_alias)+'</td><td>'+esc(x.place_name)+'</td>'+
+   '<td>'+esc(x.start_utc)+'</td><td>'+x.camera_count+'</td>'+
+   '<td>'+x.local_occurrence_count+'</td><td>人工声明 · 非实名</td></tr>'
+ ).join('')||'<tr><td colspan="6">没有可信位置、质检与人工证据同时通过的候选到访</td></tr>';
+ $('researchStatus').textContent='人工关联当前有效 '+link.active+' 条，'+
+   '其余关联可能已撤销、质检过期或来源缺失；候选场所会话 '+visits.visits.length+
+   ' 条。没有验证真人身份、没有进入七类真实预警。';
+ }catch(e){$('researchStatus').textContent='研究证据读取失败：'+e.message}
+}
+async function saveResearchLink(action){
+ const key=$('qaOccurrence').value;
+ if(!key){$('researchStatus').textContent='请先在上方选择实际 Frigate 局部目标';return}
+ const alias=$('researchAlias').value.trim();
+ const reason=$('researchReason').value.trim();
+ $('researchAttach').disabled=true;$('researchDetach').disabled=true;
+ try{
+  const done=await api('/api/research/links','POST',{
+    occurrence_key:key,alias,action,reason});
+  $('researchStatus').textContent='已记录不可覆盖的人工审核 #'+done.review_id+
+      '。该分组不是自动人脸识别或实名身份验证。';
+  await refreshResearch();
+ }catch(e){$('researchStatus').textContent='关联未通过证据门槛：'+e.message}
+ finally{$('researchAttach').disabled=false;$('researchDetach').disabled=false}
+}
 async function refreshOccurrences(){
  try{
    // Monitoring overview uses the SAME rolling UTC calendar-day window.
@@ -232,9 +276,11 @@ async function detect(){
 }
 async function start(){
  try{
- const [p]=await Promise.all([api('/api/places'),api('/api/cctv/datasets')]);
+ const [p,,actor]=await Promise.all([api('/api/places'),api('/api/cctv/datasets'),api('/api/auth/me')]);
+ $('researchPanel').hidden=actor.level!==1;
  $('place').innerHTML=p.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
- await refresh();setStatus('已读取：'+imported.length+' 路公开固定监控视频。');
+ await refresh();await refreshResearch();
+ setStatus('已读取：'+imported.length+' 路公开固定监控视频。');
  }catch(e){setStatus('无法加载：'+e.message,true)}
 }
 $('loadPair').onclick=loadPair;$('viewFrame').onclick=()=>viewFrame().catch(e=>$('frameNote').textContent=e.message);
