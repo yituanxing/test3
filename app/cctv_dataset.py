@@ -360,6 +360,23 @@ def tracking_baseline(source_id:int,request:Request,
         return run_caviar_tracking(c,source_id,max_frames=max_frames,algorithm=algorithm)
 
 
+@router.get('/api/cctv/sources/{source_id}/person-detector-baseline')
+def person_detector_baseline(source_id:int,request:Request,
+                             max_frames:int=Query(32,ge=1,le=64),
+                             sample_every:int=Query(1,ge=1,le=4),
+                             confidence:float=Query(.25,ge=.1,le=.9)):
+    """Real pretrained YOLO + mature ByteTrack, NOT GT-injected tracking.
+
+    Optional dependency; no user-defined model filename or arbitrary URL.
+    Source video must be the exact originally imported SHA256 source.
+    """
+    from app.person_detection_adapter import run_real_person_detector
+    with _db() as c:
+        access.check_source(c,request,source_id)
+        return run_real_person_detector(c,source_id,max_frames=max_frames,
+                 sample_every=sample_every,confidence=confidence)
+
+
 @router.get('/api/cctv/sources/{source_id}/pair-tracking-baseline')
 def compare_caviar_pair(source_id:int,request:Request,
                         max_frames:int=Query(400,ge=1,le=600)):
