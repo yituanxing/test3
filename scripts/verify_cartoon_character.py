@@ -38,6 +38,7 @@ CASES = [
     {"name": "ricky_negative", "file": "Big.Buck.Bunny.-.Ricky.png",
      "role": "candidate", "truth": "other", "crop": [0.0, 0.0, 1.0, 1.0]},
     {"name": "frank_negative", "file": "Big.Buck.Bunny.-.Frank.png",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/4/44/Big.Buck.Bunny.-.Frank.png",
      "role": "candidate", "truth": "other", "crop": [0.0, 0.0, 1.0, 1.0]},
 ]
 
@@ -46,7 +47,7 @@ def download_image(entry: dict, directory: Path, session: requests.Session) -> P
     dest = directory / entry["file"]
     if dest.is_file():
         return dest
-    url = COMMONS + requests.utils.quote(entry["file"], safe="")
+    url = entry.get("url", COMMONS + requests.utils.quote(entry["file"], safe=""))
     last_error = None
     for attempt in range(4):
         try:
