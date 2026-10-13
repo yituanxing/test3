@@ -3,8 +3,9 @@
 ## 已做和未做
 
 本模块 `app/continuous_capture.py` 复用现有
-`app.main.process_source(source_id, max_frames=90, sample_every=10)`
-真实 OpenCV 解码、人脸框推理、SQLite 入库的路径。后台线程连续处理有界批次，
+`app.main._process_source_impl(source_id, max_frames=90, sample_every=10)`
+真实 OpenCV 解码、人脸框推理、SQLite 入库的公共内部路径。后台线程连续处理有界批次，
+成功批次之间**不重开** RTSP 视频连接；仅发生读取/打开故障时才释放并重新建立，
 不引入虚构识别结果或人脸身份去重。
 
 本版**已实现（待 CI/现场验证）**：
@@ -50,8 +51,10 @@
 ## 验收门槛
 
 - 首先要求 `pytest -q tests/test_continuous_capture.py` 和全量单元测试通过。
+  专项测试应覆盖真实 MP4 持续两个批次只打开一次 decoder、帧索引持续递增、
+  以及公开 API 无法以 `worker_mode=true` 绕过重复任务检查。
   既有 GB28181 真实视频 E2E CI 仍独立保留，不能用模拟 worker 测试替代。
-- 再使用**实际含人脸视频流**持续采集不少于多批次，确认 SQLite samples
+- 再使用**实际 GB28181 → WVP → RTSP 的含人脸视频流**持续采集不少于两个批次，确认 SQLite samples
   和 face_boxes 产生新记录；计数继续标示为“抽样帧/检测框/窗口”，不是人数。
 - 人工重复点“开始”，并在相同通道创建第二个 live source 后尝试并行启动，
   预期得到单 worker 和 HTTP 409，不出现并发重复记录。
