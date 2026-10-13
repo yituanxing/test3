@@ -147,8 +147,32 @@ def test_relocated_camera_history_cannot_leak_across_counties(scenario):
     assert client.post('/api/frigate/cameras',headers=root,
                        json={'camera':name,'place_id':a}).status_code==200
     assert client.get('/api/site/frigate/privacy_gate/bindings',headers=county).status_code==200
+    time.sleep(0.015)
+    earlier=time.time()
+    time.sleep(0.015)
     assert client.post('/api/frigate/cameras',headers=root,
                        json={'camera':name,'place_id':remote}).status_code==200
+    time.sleep(0.015)
+    later=time.time()
+    upstream=Mock()
+    upstream.raise_for_status.return_value=None
+    upstream.json.return_value=[
+        person('seen_at_old_county',name,earlier),
+        person('seen_at_new_county',name,later)]
+    with patch('app.main.httpx.get',return_value=upstream):
+        synced=client.post('/api/frigate/sync',headers=root)
+    assert synced.status_code==200,synced.text
+    assert synced.json()['inserted']==2
+    assert {x['event_id'] for x in client.get('/api/frigate/events',headers=county).json()}=={
+        'seen_at_old_county'}
+    assert {x['event_id'] for x in client.get('/api/frigate/events',headers=other).json()}=={
+        'seen_at_new_county'}
+    assert {x['track_id'] for x in client.get('/api/site/occurrences',headers=county).json()['occurrences']}=={
+        'seen_at_old_county'}
+    assert {x['track_id'] for x in client.get('/api/site/occurrences',headers=other).json()['occurrences']}=={
+        'seen_at_new_county'}
+    assert client.get('/api/monitoring/overview',headers=county).json()['counts']['person_objects']==1
+    assert client.get('/api/monitoring/overview',headers=other).json()['counts']['person_objects']==1
     full=client.get('/api/site/frigate/privacy_gate/bindings',headers=root)
     assert full.status_code==200
     assert len(full.json()['epochs'])==2
