@@ -35,7 +35,10 @@ def _dependencies():
         ) from exc
 
 
-def run_caviar_tracking(c, source_id: int, max_frames: int = 400) -> dict:
+def run_caviar_tracking(c, source_id: int, max_frames: int = 400,
+                        algorithm: str = "bytetrack") -> dict:
+    if algorithm not in ("bytetrack","ocsort"):
+        raise ValueError("Only existing ByteTrack or OC-SORT is allowed")
     if max_frames < 1 or max_frames > 600:
         raise ValueError("max_frames must be in 1..600")
     row = c.execute("""SELECT i.scenario,i.camera_view,i.frames_available,
@@ -48,11 +51,15 @@ def run_caviar_tracking(c, source_id: int, max_frames: int = 400) -> dict:
     sv, trackers, np = _dependencies()
     # A NEW tracker instance for EVERY camera. Never share local ID state
     # between two views; a coincidentally equal integer is NOT a person ID.
-    tracker = trackers.ByteTrackTracker(
-        minimum_consecutive_frames=1,
-        track_activation_threshold=0.5,
-        high_conf_det_threshold=0.5,
-    )
+    if algorithm=="bytetrack":
+        tracker=trackers.ByteTrackTracker(
+            minimum_consecutive_frames=1,
+            track_activation_threshold=0.5,
+            high_conf_det_threshold=0.5)
+    else:
+        tracker=trackers.OCSORTTracker(
+            minimum_consecutive_frames=1,
+            high_conf_det_threshold=0.5)
     end = min(int(row["frames_available"]), max_frames)
     boxes = c.execute("""SELECT frame_number,camera_local_track_id,x,y,width,height
          FROM public_cctv_track_boxes
@@ -113,7 +120,9 @@ def run_caviar_tracking(c, source_id: int, max_frames: int = 400) -> dict:
         })
     return {
         "mode":"tracking_existing_library_against_manual_ground_truth",
-        "contract":CONTRACT,"tracker":PROVIDER,
+        "contract":CONTRACT,"tracker":(
+            PROVIDER if algorithm=="bytetrack" else "roboflow_trackers_ocsort"),
+        "algorithm":algorithm,
         "source_id":source_id,"place_id":row["place_id"],
         "scenario":row["scenario"],"camera_view":row["camera_view"],
         "video_sha256":row["video_sha256"],
