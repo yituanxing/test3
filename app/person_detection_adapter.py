@@ -52,6 +52,8 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
         raise HTTPException(409,"视频文件缺失或内容SHA256不匹配；不产生虚假的检测结果")
     sv,trackers,np=tracker_adapters._dependencies()
     model=_model()
+    weights=Path(getattr(model,"ckpt_path",MODEL) or MODEL)
+    weights_sha=sha256(weights.read_bytes()).hexdigest() if weights.is_file() else None
     tracker=trackers.ByteTrackTracker(
         minimum_consecutive_frames=1,track_activation_threshold=.5,
         high_conf_det_threshold=.5)
@@ -126,6 +128,8 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
         "source_id":source_id,"camera_view":record["camera_view"],
         "place_id":record["place_id"],"scenario":record["scenario"],
         "video_sha256":record["video_sha256"],"model":MODEL,
+        "model_weights_sha256":weights_sha,
+        "detector_confidence_threshold":confidence,
         "model_license":MODEL_LICENSE,"tracker":"roboflow_trackers_bytetrack",
         "frames_decoded":decoded,"frames_inferred":sampled,
         "sampling_step":sample_every,
@@ -161,6 +165,8 @@ def persist_detection_run(c, result):
     payload={
         "source_id":result["source_id"],"source_sha":result["video_sha256"],
         "model":result["model"],"tracker":result["tracker"],
+        "model_weights_sha256":result.get("model_weights_sha256"),
+        "detector_confidence_threshold":result.get("detector_confidence_threshold"),
         "frames_decoded":result["frames_decoded"],
         "sampling_step":result["sampling_step"],
     }
