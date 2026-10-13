@@ -19,6 +19,7 @@ FILES = (
     "REAL_CCTV_PIVOT_20261013.md",
     "SHARED_MULTI_SITE_PERSON_REGISTRY_ADR_V1.md",
     "ANONYMOUS_OCCURRENCES_V1.md",
+    "ANONYMOUS_QUALITY_GATE_V1.md",
     "INSIGHTS_V1.0.md", "UI_ACCEPTANCE_V1.4.md",
     "requirements.txt", "requirements-business.txt",
 )
