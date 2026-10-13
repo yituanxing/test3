@@ -155,8 +155,8 @@ jobs:
           python -m pip install pillow requests numpy
       - name: Install existing pretrained open-vocabulary video detector
         run: python -m pip install -r requirements-cartoon-video.txt
-      - name: Check frozen label ambiguity rule without network
-        run: python -m unittest -v tests.test_cartoon_label_guard
+      - name: Check frozen label ambiguity rule and multi-pose consensus without network
+        run: python -m unittest -v tests.test_cartoon_label_guard tests.test_cartoon_consensus
       - name: Ensure actual browser-compatible H.264 encoder is available
         run: |
           if ! command -v ffmpeg >/dev/null 2>&1; then
@@ -215,6 +215,26 @@ jobs:
             reports/cartoon-4m30-unseen-holdout/predictions/frames/*.jpg
             reports/cartoon-full-film-holdout/audited_metrics.json
             reports/cartoon-full-film-holdout/guarded_development.json
+          if-no-files-found: warn
+      - name: Compare new two-reference harmony on DEVELOPMENT 3m00 and 4m30 film scenes
+        run: |
+          python -m scripts.cartoon_consensus_match --input reports/cartoon-full-film-holdout/evaluation/result.json
+          python -m scripts.cartoon_consensus_match --input reports/cartoon-4m30-unseen-holdout/predictions/result.json
+      - name: First-use frozen two-reference consensus on untouched 5m30–5m55 Buck movie
+        run: python -m scripts.cartoon_consensus_holdout
+      - name: Publish untouched 5m30 real-video A/B BEFORE examining visual truth
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-harmonic-consensus-untouched-5m30
+          path: |
+            reports/cartoon-5m30-consensus-holdout/summary.json
+            reports/cartoon-5m30-consensus-holdout/consensus_result.json
+            reports/cartoon-5m30-consensus-holdout/raw/result.json
+            reports/cartoon-5m30-consensus-holdout/raw/frames/*.jpg
+            reports/cartoon-5m30-consensus-holdout/untuned_consensus_comparison.jpg
+            reports/cartoon-full-film-holdout/evaluation/consensus_result.json
+            reports/cartoon-4m30-unseen-holdout/predictions/consensus_result.json
           if-no-files-found: warn
       - name: Group detector-generated cartoon boxes with existing ByteTrack
         run: python -m scripts.cartoon_video_track_existing
