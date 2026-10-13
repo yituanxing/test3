@@ -240,6 +240,9 @@ def setup_db():
         cctv_dataset.initialize(c)
         site_model.initialize(c)
         occurrence_reviews.initialize(c)
+        if 'binding_epoch_id' not in {r['name'] for r in c.execute(
+                'PRAGMA table_info(frigate_object_events)')}:
+            c.execute('ALTER TABLE frigate_object_events ADD COLUMN binding_epoch_id INTEGER')
 
 
 setup_db()
@@ -848,11 +851,16 @@ def bind_frigate_camera(data: FrigateCameraBinding):
         admin._active_place(c,data.place_id)
         old=c.execute('SELECT place_id FROM frigate_camera_bindings WHERE camera=?',
                       (data.camera,)).fetchone()
+        # The inventory pointer and its effective-dated historic provenance
+        # are changed atomically. Never rewrite earlier event place_id.
+        c.execute('BEGIN IMMEDIATE')
+        epoch=site_model.set_frigate_binding(c,data.camera,data.place_id)
         c.execute('''INSERT INTO frigate_camera_bindings(camera,place_id) VALUES(?,?)
                    ON CONFLICT(camera) DO UPDATE SET place_id=excluded.place_id''',
                   (data.camera, data.place_id))
         admin.audit(c,'frigate_binding',f'camera:{data.camera}',
-                   {'place_id':old['place_id']} if old else None,data.model_dump())
+                   {'place_id':old['place_id']} if old else None,
+                   {**data.model_dump(),'binding_epoch_id':epoch['id']})
     return data.model_dump()
 
 
@@ -881,7 +889,7 @@ def sync_frigate(limit: int = Query(100, ge=1, le=500)):
         raise HTTPException(502, f'Frigate服务不可达或响应无效：{type(exc).__name__}') from exc
     if not isinstance(payload, list):
         raise HTTPException(502, 'Frigate events API 应返回列表')
-    inserted, updated, skipped = 0, 0, 0
+    inserted, updated, skipped, unlocated = 0, 0, 0, 0
     with db() as c:
         bindings = {r['camera']: r['place_id'] for r in c.execute('''
           SELECT b.camera,b.place_id FROM frigate_camera_bindings b
@@ -891,24 +899,34 @@ def sync_frigate(limit: int = Query(100, ge=1, le=500)):
             if event is None or event.camera not in bindings:
                 skipped += 1
                 continue
-            exists = c.execute('SELECT 1 FROM frigate_object_events WHERE camera=? AND event_id=?', (event.camera,event.event_id)).fetchone()
+            exists = c.execute('SELECT 1 FROM frigate_object_events WHERE camera=? AND event_id=?',
+                               (event.camera,event.event_id)).fetchone()
+            # Known old event IDs preserve the original place and start time.
+            # New events, especially LATE upstream deliveries, must use the
+            # actual event timestamp, not the camera's current place.
+            epoch=site_model.resolve_frigate_binding(c,event.camera,event.started_at) if not exists else None
+            if not exists and epoch is None:
+                skipped+=1
+                unlocated+=1
+                continue
+            place=epoch['place_id'] if epoch is not None else bindings[event.camera]
             c.execute('''INSERT INTO frigate_object_events
-              (event_id,camera,place_id,label,started_at,ended_at,score,has_snapshot,updated_at)
-              VALUES(?,?,?,?,?,?,?,?,?)
+              (event_id,camera,place_id,label,started_at,ended_at,score,has_snapshot,updated_at,binding_epoch_id)
+              VALUES(?,?,?,?,?,?,?,?,?,?)
               ON CONFLICT(camera,event_id) DO UPDATE SET
-                 -- Place and first observed timestamp belong to the ORIGINAL
-                 -- evidence fact. Reassigning a camera MUST NOT rewrite past
-                 -- site visits or historical monitoring totals.
+                 -- Never alter the original place, start timestamp or epoch ID.
                  ended_at=COALESCE(excluded.ended_at,frigate_object_events.ended_at),
                  score=COALESCE(excluded.score,frigate_object_events.score),
                  has_snapshot=MAX(excluded.has_snapshot,frigate_object_events.has_snapshot),
                  updated_at=excluded.updated_at''',
-              (event.event_id,event.camera,bindings[event.camera],event.label,event.started_at,
-               event.ended_at,event.score,int(event.has_snapshot),utcnow()))
+              (event.event_id,event.camera,place,event.label,event.started_at,
+               event.ended_at,event.score,int(event.has_snapshot),utcnow(),
+               epoch['id'] if epoch else None))
             updated += int(exists is not None)
             inserted += int(exists is None)
     return {'inserted': inserted, 'updated': updated, 'skipped': skipped,
-            'note': 'Frigate person 目标事件不是经身份去重的独立人数，也不是人脸身份识别。'}
+            'unlocated_before_known_binding':unlocated,
+            'note': '未记录的历史机位位置不推断；已知重绑前发生的延迟事件按事件时刻归属。Frigate person目标不是独立真人身份。'}
 
 
 @app.get('/api/frigate/events')
