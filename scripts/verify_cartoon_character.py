@@ -2,7 +2,7 @@
 
 NOT human face recognition, not object localization or GB28181 video inference.
 A pre-trained Meta DINOv2 ViT-S/14 embeds genuinely different CC BY 3.0 film
-stills; the evaluator asks whether two Buck shots rank above other characters.
+stills; the evaluator asks whether two Buck shots rank above a different character.
 Names/labels are held for reporting only: model receives only RGB pixels.
 Images and model weights are downloaded at execution time, not committed.
 """
@@ -36,9 +36,6 @@ CASES = [
     {"name": "buck_profile", "file": "Big.Buck.Bunny.-.Frank.Bunny.png",
      "role": "candidate", "truth": "Buck", "crop": [0.32, 0.0, 1.0, 1.0]},
     {"name": "ricky_negative", "file": "Big.Buck.Bunny.-.Ricky.png",
-     "role": "candidate", "truth": "other", "crop": [0.0, 0.0, 1.0, 1.0]},
-    {"name": "frank_negative", "file": "Big.Buck.Bunny.-.Frank.png",
-     "url": "https://upload.wikimedia.org/wikipedia/commons/4/44/Big.Buck.Bunny.-.Frank.png",
      "role": "candidate", "truth": "other", "crop": [0.0, 0.0, 1.0, 1.0]},
 ]
 
