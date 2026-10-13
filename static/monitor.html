@@ -48,7 +48,22 @@ window.addEventListener('load',async()=>{
 <section class="card"><div class="row"><h2>最近 7 天检测事件趋势</h2><select id="days" onchange="reload()"><option value="7">7天</option><option value="14">14天</option><option value="30">30天</option></select></div><p class="hint">仅 Frigate 真实导入的 person 目标事件。无上游数据时显示0，不填充假结果。</p><div id="bars" class="bars"></div><p class="legend">蓝色柱：person 目标事件 · 按 UTC 日期归档 · 不与合成身份混算</p></section>
 <section class="card wide"><div class="row"><div><h2>场所检测统计</h2><p class="hint">各场所独立汇总。采集窗口仅按同一视频源的有脸帧入库时间归并；不是人员唯一性去重。</p></div><span class="status">已按来源隔离</span></div><div class="scroll"><table><thead><tr><th>场所</th><th>绑定Frigate摄像机</th><th>person 事件</th><th>抽样帧</th><th>人脸检测框</th><th>有脸采集窗口</th></tr></thead><tbody id="places"></tbody></table></div></section>
 <section class="card"><h2>最新 Frigate 目标事件</h2><p class="hint">上游事件ID幂等写入；没有身份标识、照片或跨场所跟踪。</p><div class="scroll"><table><thead><tr><th>摄像机</th><th>场所</th><th>开始时间</th><th>置信度</th></tr></thead><tbody id="feed"></tbody></table></div></section>
-<section class="card"><h2>真实视频帧 · 人脸框与质量诊断（不存图片）</h2><p class="hint">由 OpenCV Haar 或选装 YuNet 真实推理产生。每条记录有视频源、帧号和框坐标；清晰度是未校准启发式指标，不表示识别准确率，也不用于跨镜头身份归并。</p><div class="stage"><div id="faceQualityTotals" class="stnote">加载全辖区质量统计中……</div></div><div class="scroll"><table><thead><tr><th>视频源</th><th>帧号</th><th>视频时间偏移</th><th>框坐标 (x,y,w,h)</th><th>清晰度诊断</th><th>人工复核</th><th>脱敏来源帧</th></tr></thead><tbody id="faceEvidence"></tbody></table></div><div id="previewEvidence" class="stage">选择“看示意帧”后显示真实文件视频帧经过强像素化、遮挡面部后叠加的检测框；不提供原始人脸照片。</div></section>
+<section class="card"><h2>真实视频帧 · 人脸框与质量诊断（不存图片）</h2><p class="hint">由 OpenCV Haar 或选装 YuNet 真实推理产生。每条记录有视频源、帧号和框坐标；清晰度是未校准启发式指标，不表示识别准确率，也不用于跨镜头身份归并。</p><div class="stage"><div id="faceQualityTotals" class="stnote">加载全辖区质量统计中……</div></div>
+<div class="inline" id="evidenceSearchControls" style="margin:12px 0;flex-wrap:wrap">
+ <label>场所 <select id="evidencePlace"><option value="">本辖区全部场所</option></select></label>
+ <label>视频源 <select id="evidenceSource"><option value="">全部来源</option></select></label>
+ <label>审核 <select id="evidenceDecision"><option value="">全部状态</option>
+   <option value="unreviewed">未审核/恢复待审</option>
+   <option value="plausible">人工可能人脸</option>
+   <option value="false_positive">人工判为误检</option></select></label>
+ <label>从（本地时间） <input id="evidenceFrom" type="datetime-local"></label>
+ <label>到（本地时间，不含） <input id="evidenceUntil" type="datetime-local"></label>
+ <label><input id="evidenceWithBoxes" type="checkbox"> 仅有检测框</label>
+ <button id="evidenceSearchButton" class="subtle" onclick="searchEvidence()">检索证据</button>
+ <button id="evidencePrev" class="subtle" onclick="pageEvidence(-1)" disabled>上一页</button>
+ <button id="evidenceNext" class="subtle" onclick="pageEvidence(1)" disabled>下一页</button>
+ <span id="evidencePageInfo" class="legend">按实际视频帧分页，不是独立人员检索。</span>
+</div><div class="scroll"><table><thead><tr><th>视频源</th><th>帧号</th><th>视频时间偏移</th><th>框坐标 (x,y,w,h)</th><th>清晰度诊断</th><th>人工复核</th><th>脱敏来源帧</th></tr></thead><tbody id="faceEvidence"></tbody></table></div><div id="previewEvidence" class="stage">选择“看示意帧”后显示真实文件视频帧经过强像素化、遮挡面部后叠加的检测框；不提供原始人脸照片。</div></section>
 <section class="card wide" id="activityPanel"><div class="row"><h2>有脸采集窗口明细 · 非人员去重</h2><span class="status">按来源/时间分组</span></div><p class="hint">仅显示最近50个窗口，汇总统计仍覆盖完整时间范围。每个窗口是同一视频源在同一UTC日内、相邻有脸抽样时间间隔不超过20秒的记录。多人可能共享窗口，同一人也可能跨窗口。时间是数据入库时间，不是人员到访时刻。</p><div class="scroll"><table><thead><tr><th>场所</th><th>视频源</th><th>起始入库</th><th>最后有脸</th><th>有脸抽样帧</th><th>检测框</th></tr></thead><tbody id="activityRows"></tbody></table></div><p id="activityTotal" class="legend">—</p></section>
 <section class="card wide" id="gbPanel">
 <div class="row"><h2>GB28181 国标视频接入 · 复用 WVP-PRO + ZLMediaKit</h2><button class="subtle" onclick="gbRefresh()">刷新国标状态</button></div>
@@ -91,14 +106,48 @@ const $=id=>document.getElementById(id);const esc=x=>String(x??'').replace(/[&<>
 const t=x=>x?new Date(x).toLocaleString('zh-CN',{hour12:false}):'—';
 async function api(path,method='GET',body){let r=await fetch(path,{method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});let x=await r.json();if(!r.ok)throw Error(x.detail||r.status);return x}
 function toast(s,err=false){let a=$('toast');a.textContent=s;a.className=err?'err':'';a.style.display='block';clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>a.style.display='none',6000)}
+let evidenceOffset=0, evidenceNextOffset=null, evidencePageSize=40;
+function evidenceQuery(region){
+ const p=new URLSearchParams({limit:String(evidencePageSize),offset:String(evidenceOffset)});
+ if(region)p.set('region_id',region);
+ for(const [input,key] of [['evidencePlace','place_id'],['evidenceSource','source_id'],
+                           ['evidenceDecision','review_decision']]){
+  const value=$(input).value;if(value)p.set(key,value);
+ }
+ for(const [input,key] of [['evidenceFrom','from_utc'],['evidenceUntil','until_utc']]){
+  const value=$(input).value;if(value)p.set(key,new Date(value).toISOString());
+ }
+ if($('evidenceWithBoxes').checked)p.set('only_with_boxes','true');
+ return '/api/video/observations?'+p.toString();
+}
+async function searchEvidence(){evidenceOffset=0;await reload()}
+async function pageEvidence(delta){
+ if(delta>0){if(evidenceNextOffset===null)return;evidenceOffset=evidenceNextOffset}
+ else evidenceOffset=Math.max(0,evidenceOffset-evidencePageSize);
+ await reload();
+}
 async function reload(){try{
 let scope=$('scopeRegion'), chosen=scope.value;
-let [r,o,f,h,obs,actor,activityDetail]=await Promise.all([api('/api/regions'),
+let [r,o,f,h,obs,actor,activityDetail,places,sources]=await Promise.all([api('/api/regions'),
   api('/api/monitoring/overview?days='+$('days').value+(chosen?'&region_id='+encodeURIComponent(chosen):'')),
   api('/api/frigate/events?limit=30'+(chosen?'&region_id='+encodeURIComponent(chosen):'')),api('/api/frigate/status'),
-  api('/api/video/observations?limit=40'+(chosen?'&region_id='+encodeURIComponent(chosen):'')),api('/api/auth/me'),api('/api/monitoring/face-activity?limit=50&days='+$('days').value+(chosen?'&region_id='+encodeURIComponent(chosen):''))]);
+  api(evidenceQuery(chosen)),api('/api/auth/me'),api('/api/monitoring/face-activity?limit=50&days='+$('days').value+(chosen?'&region_id='+encodeURIComponent(chosen):'')),api('/api/places'),api('/api/sources')]);
 scope.innerHTML='<option value="">全部区域</option>'+r.map(x=>`<option value="${x.id}">${esc(x.path)}</option>`).join('');
-if ([...scope.options].some(x=>x.value===chosen))scope.value=chosen;$('sampled').textContent=o.counts.sampled_frames;$('faces').textContent=o.counts.face_detections;$('activity').textContent=o.face_activity.windows;$('objects').textContent=o.counts.person_objects;$('cameraCount').textContent=o.places.reduce((n,x)=>n+x.cameras.length,0);let last=o.timeline.slice(-7),max=Math.max(1,...last.map(x=>x.person_objects));$('bars').innerHTML=last.map(x=>`<div class="bar-wrap"><span class="legend">${x.person_objects}</span><div class="bar" style="height:${Math.max(3,Math.round(x.person_objects/max*115))}px"></div><span class="bdate">${esc(x.day.slice(5))}</span></div>`).join('');$('places').innerHTML=o.places.map(p=>`<tr><td>${esc(p.place_name)}</td><td class="code">${esc(p.cameras.join(', ')||'—')}</td><td>${p.person_objects}</td><td>${p.sampled_frames}</td><td>${p.face_detections}</td><td>${p.face_activity_windows}</td></tr>`).join('')||'<tr><td colspan="6">没有场所</td></tr>';$('feed').innerHTML=f.map(v=>`<tr><td>${esc(v.camera)}</td><td>${esc(v.place_name)}</td><td>${esc(t(v.started_at))}</td><td>${v.score==null?'—':Number(v.score).toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="4">尚无 Frigate 目标事件</td></tr>';
+if ([...scope.options].some(x=>x.value===chosen))scope.value=chosen;
+for(const [input,items,label] of [
+   ['evidencePlace',places,x=>x.name],
+   ['evidenceSource',sources.filter(x=>x.kind==='file'||x.kind==='rtsp'),x=>x.name+' (#'+x.id+')']]){
+ const el=$(input),current=el.value;
+ el.innerHTML='<option value="">'+(input==='evidencePlace'?'本辖区全部场所':'全部来源')+'</option>'+
+  items.map(x=>'<option value="'+x.id+'">'+esc(label(x))+'</option>').join('');
+ if([...el.options].some(x=>x.value===current))el.value=current;
+}
+evidenceNextOffset=obs.next_offset;
+$('evidencePrev').disabled=evidenceOffset===0;
+$('evidenceNext').disabled=evidenceNextOffset===null;
+$('evidencePageInfo').textContent='匹配 '+obs.matched_total+' 帧；当前显示 '+obs.observations.length+
+  ' 帧（偏移 '+evidenceOffset+'）；只按实际入库UTC时间过滤，不代表录像发生日期或独立人数。';
+$('sampled').textContent=o.counts.sampled_frames;$('faces').textContent=o.counts.face_detections;$('activity').textContent=o.face_activity.windows;$('objects').textContent=o.counts.person_objects;$('cameraCount').textContent=o.places.reduce((n,x)=>n+x.cameras.length,0);let last=o.timeline.slice(-7),max=Math.max(1,...last.map(x=>x.person_objects));$('bars').innerHTML=last.map(x=>`<div class="bar-wrap"><span class="legend">${x.person_objects}</span><div class="bar" style="height:${Math.max(3,Math.round(x.person_objects/max*115))}px"></div><span class="bdate">${esc(x.day.slice(5))}</span></div>`).join('');$('places').innerHTML=o.places.map(p=>`<tr><td>${esc(p.place_name)}</td><td class="code">${esc(p.cameras.join(', ')||'—')}</td><td>${p.person_objects}</td><td>${p.sampled_frames}</td><td>${p.face_detections}</td><td>${p.face_activity_windows}</td></tr>`).join('')||'<tr><td colspan="6">没有场所</td></tr>';$('feed').innerHTML=f.map(v=>`<tr><td>${esc(v.camera)}</td><td>${esc(v.place_name)}</td><td>${esc(t(v.started_at))}</td><td>${v.score==null?'—':Number(v.score).toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="4">尚无 Frigate 目标事件</td></tr>';
 $('activityTotal').textContent='本时间范围合计 '+activityDetail.total_windows+' 个采集窗口；显示最近 '+activityDetail.windows.length+' 个（未推断唯一人员）。';
 $('activityRows').innerHTML=activityDetail.windows.map(w=>'<tr><td>'+esc(w.place_name)+'</td><td>'+esc(w.source_name)+'</td><td>'+esc(t(w.started_utc))+'</td><td>'+esc(t(w.last_positive_utc))+'</td><td>'+w.positive_sampled_frames+'</td><td>'+w.effective_face_detections+'</td></tr>').join('')||'<tr><td colspan="6">当前时间范围没有有脸采集窗口</td></tr>';
 $('faceQualityTotals').textContent='全部历史范围：抽样记录 '+obs.quality_totals.sampled_frame_records+
@@ -110,7 +159,8 @@ $('faceQualityTotals').textContent='全部历史范围：抽样记录 '+obs.qual
 ' 个；人工标记误检 '+obs.quality_totals.manual_false_positive_boxes+
 ' 个，尚未排除 '+obs.quality_totals.not_rejected_boxes+
 ' 个（其中未复核 '+obs.quality_totals.unreviewed_boxes+
-' 个）。下表仅显示最近 '+obs.observations.length+' 条记录（上限40）；尚未排除不等于真正确认人脸。';
+' 个）。上述质量总数覆盖授权源全部历史；下表只显示当前筛选匹配的 '+obs.observations.length+
+' 条视频帧。框审核筛选选中的是帧，仍可查看该帧其他框。尚未排除不等于真正确认人脸。';
 $('faceEvidence').innerHTML=obs.observations.flatMap(s=>s.boxes.map(b=>`<tr><td>${esc(s.source_name)}</td><td>${s.frame_index}</td><td>${s.video_offset_ms==null?'直播时间未知':s.video_offset_ms+'ms'}</td><td>${b.x},${b.y},${b.w},${b.h}</td><td>${esc(b.quality_state)} · Laplacian ${b.sharpness}</td><td>${esc(({false_positive:'误检（人工）',plausible:'可能人脸（人工）',unreviewed:'待复核'})[b.review_decision]||'待复核')} ${reviewButtons(s.id,b.id,actor.level===1)}</td><td><button class="subtle" onclick="previewFrame(${s.id})">看示意帧</button></td></tr>`)).slice(0,30).join('')||'<tr><td colspan="7">没有已保存的人脸框；抽样视频可能不包含人脸。不会伪造“识别成功”。</td></tr>';
 let stage=[['本地业务数据库','数据读取成功',true],['视频检测数据','已抽样帧 '+o.counts.sampled_frames+' 条（非身份识别）',o.counts.sampled_frames>0],['Frigate HTTP 接口',h.connected?'连接成功：'+h.upstream_version:'暂不可达',h.connected],['Frigate 真实推理','仅HTTP连通不能验证检测结果',false]];
 $('stages').innerHTML=stage.map((x,i)=>`<div class="stage"><div><div class="stname">${esc(x[0])}</div><div class="stnote">${esc(x[1])}</div></div><span class="status ${x[2]?'good':'warn'}">${x[2]?'已就绪':'需验证'}</span></div>`).join('');}catch(e){toast('状态读取失败：'+e.message,true)}}
