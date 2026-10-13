@@ -21,7 +21,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview, face_activity_details
-from app import admin, base_registry, insights, access, gb28181, continuous_capture
+from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances
 import httpx
 from pydantic import BaseModel, Field
 
@@ -231,6 +231,7 @@ def setup_db():
                           (place_id, '内置测试视频（无真人）', 'file', str(bundled_video)))
         admin.initialize(c)
         base_registry.initialize(c)
+        rule_instances.initialize(c)
         access.initialize(c)
         gb28181.initialize(c)
         continuous_capture.initialize(c)
@@ -253,6 +254,7 @@ app = FastAPI(title='ZD Business Pipeline Demo', version='1.1.0', lifespan=app_l
 admin.register(app,db)
 base_registry.register(app,db)
 access.register(app,db)
+rule_instances.register(app,db)
 gb28181.register(app,db)
 
 
@@ -941,6 +943,10 @@ from hashlib import sha256
 def _hit_signature(hit, cfg):
     payload = {'type':hit['type'], 'key':hit['key'], 'evidence':hit['observation_ids'],
                'people':hit['people'], 'places':hit['place_ids'], 'config':cfg}
+    if hit.get('rule_instance_id') is not None:
+        payload['rule_instance'] = {'id':hit['rule_instance_id'],
+                                    'version':hit['rule_instance_version'],
+                                    'parameters':hit['rule_instance_parameters']}
     return sha256(json.dumps(payload,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
 
@@ -1011,6 +1017,7 @@ def _analyze_synthetic(c):
         scenario_now = datetime.now(timezone.utc)
     home, roster_status = base_registry.active_assignments(c)
     result = analyze(observations, cfg, now=scenario_now, affiliation_overrides=home)
+    result = rule_instances.apply_instances(c,result,cfg,observations,scenario_now,home)
     result['registry_status'] = roster_status
     result['simulation_time_utc'] = scenario_now.isoformat(timespec='seconds')
     statuses = {r['alert_key']:dict(r) for r in c.execute('''
