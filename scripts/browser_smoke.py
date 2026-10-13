@@ -270,6 +270,15 @@ def run():
                         # decoded file and accept one candidate manually.
                         page.goto(base+"/anime-scenes")
                         expect(page.get_by_role("heading",name="动画场景 · 时间轴 · 示意图")).to_be_visible()
+                        # Actual browser file upload (not a fake API or a mock
+                        # path): verify the raw bytes are registered as a source.
+                        page.locator("#uploadFile").set_input_files(
+                            str(ROOT/"samples"/"astronaut-face-test.mp4"))
+                        page.locator("#upload").click()
+                        expect(page.locator("#status")).to_contain_text(
+                            "视频上传成功",timeout=20000)
+                        expect(page.locator("#source")).to_contain_text("上传动画")
+                        checks.append("actual_browser_video_upload_to_real_decoder")
                         page.locator("#source").select_option(str(face_source_id))
                         page.locator("#seconds").fill("2")
                         page.locator("#suggest").click()
