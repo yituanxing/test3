@@ -768,10 +768,10 @@ def video_observations(request:Request, limit:int=Query(60,ge=1,le=250),
             search_sql+=' AND s.place_id=?'
             search_args.append(place_id)
         if start is not None:
-            search_sql+=' AND s.ingested_at>=?'
+            search_sql+=' AND julianday(s.ingested_at)>=julianday(?)'
             search_args.append(start)
         if end is not None:
-            search_sql+=' AND s.ingested_at<?'
+            search_sql+=' AND julianday(s.ingested_at)<julianday(?)'
             search_args.append(end)
         if only_with_boxes or review_decision is not None:
             predicate='''EXISTS(SELECT 1 FROM face_boxes eb
