@@ -1,0 +1,136 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ZD · 真实固定监控验收</title>
+<style>
+:root{--nav:#112846;--ink:#183355;--bg:#f4f7fb;--line:#dae4ef;--accent:#285fc4}*{box-sizing:border-box}
+body{font:14px/1.5 system-ui,"Microsoft YaHei",sans-serif;background:var(--bg);margin:0;color:var(--ink)}
+header{background:var(--nav);color:white;padding:21px max(3%,calc((100% - 1220px)/2))}
+h1{margin:0;font-size:24px}header p{color:#b8cce4;margin:6px 0 14px}nav{display:flex;gap:18px;flex-wrap:wrap}
+nav a{color:#dbe9fb;text-decoration:none}
+main{max-width:1240px;padding:17px 16px 65px;margin:auto}h2{font-size:19px;margin:4px 0 9px}
+.panel{background:white;border:1px solid var(--line);border-radius:13px;margin:15px 0;padding:20px}
+.notice{background:#eaf4ff;border-color:#c9ddf7}.warning{color:#77531b;background:#fff5e1;padding:12px;border-radius:8px}
+.small{font-size:12px;color:#64758c}.row{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin:12px 0}
+label{display:grid;gap:5px;font-size:12px;font-weight:bold}
+select,input{padding:10px;border:1px solid #cad5e3;border-radius:7px;font:inherit;background:#fff}
+button{border:0;border-radius:7px;padding:10px 14px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5}button.secondary{background:#e9f1ff;color:var(--accent)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.viewport{background:#101e30;min-height:260px;display:grid;place-items:center;border-radius:9px;overflow:hidden}
+.viewport img{width:100%;height:auto;image-rendering:auto;max-height:420px;object-fit:contain}
+table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;border-bottom:1px solid #e7ecf3}th{background:#f4f7fc}
+.scroller{overflow:auto}.scroller table{min-width:560px}.badge{display:inline-block;background:#e5f5ee;color:#12805d;padding:3px 10px;border-radius:20px}
+.badge.yellow{background:#fff0d9;color:#95620e}
+@media(max-width:780px){.grid{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>真实监控视频 · 固定摄像机验收</h1><p>原 Excel 场所模型优先：同一场所绑定多路固定摄像机，真实视频帧与公开标注分开展示</p>
+<nav><a href="/portal">综合工作台</a><a href="/monitor">视频运行</a><a href="/insights">统计分析</a><a href="/business">合成业务规则</a><a href="/admin">摄像机/场所管理</a><a href="/anime-scenes">旧动画场景实验</a></nav></header>
+<main><section class="panel notice">
+<b>此页使用爱丁堡大学 CAVIAR 的公开研究视频，不是模拟画面。</b>
+两台固定摄像机拍摄的是<b>同一条商场走廊</b>，因此应绑定同一个场所。CAVIAR 的 XML 是人工标注的人体框和<b>各机位局部轨迹 ID</b>；
+此页不会将两个摄像机局部 ID 自动识别为同一自然人，也不能据此声称跨场所身份匹配或人脸识别成功。
+<p class="small">素材：EC Funded CAVIAR project / IST 2001 37540；CC BY-SA。官方下载并保存在本地 data 目录，不进 Git 和演示源码包。需要联网下载。</p>
+</section>
+<section class="panel"><h2>① 绑定场所、导入两路真实监控</h2>
+<p>先选择一个 Excel 意义上的业务场所。走廊和正向视角是<b>两路摄像机</b>，不是“场所A/场所B”。演示默认固定场所归属，无需动漫镜头分场景。</p>
+<div class="row"><label>真实视频所属于哪一个管理场所<select id="place"></select></label>
+<button id="loadPair">导入同一场所的两路 CAVIAR 视频</button>
+<span id="status" role="status" class="small">正在读取场所…</span></div>
+<div class="warning">下载两段真实 MPEG 视频及随附的逐帧 CVML XML，文件体积小；网络失败会明确报错，不会假装导入成功。只有管理员可以导入。</div>
+</section>
+<section class="panel"><h2>② 固定机位与公开人工轨迹真值</h2>
+<div class="scroller"><table><thead><tr><th>机位</th><th>所属场所</th><th>视频帧数</th><th>人工框记录</th><th>机位内局部轨迹</th><th>查看</th></tr></thead><tbody id="sources"><tr><td colspan="6">尚未导入公开视频</td></tr></tbody></table></div>
+<p class="small">局部轨迹数量是标注对象数；两台摄像机可能拍到同一批人，因此局部轨迹数量不能简单相加成为全场去重人数。这里没有直接生成 P### 模拟身份。</p>
+</section>
+<section class="grid">
+<div class="panel"><h2>③ 实际 MPEG 帧与原始标注框</h2><div class="row"><label>当前机位<select id="source"></select></label>
+<label>视频帧<input type="number" min="1" value="1" id="frame" style="max-width:135px"></label>
+<button id="viewFrame" class="secondary">解码并显示帧</button></div>
+<div class="viewport"><img id="photo" alt="未选择真实监控文件"></div>
+<p id="frameNote" class="small">绿色方框：官方 CAVIAR 人工标注，并不是模型检测结果。</p>
+</div>
+<div class="panel"><h2>④ 实际视频解码与人员检测分开验收</h2>
+<p>第一条链路：从官方素材读取视频帧。第二条链路：CAVIAR 官方人体框帮助验证目标出现。第三条链路：我们自己的模型检测与跟踪必须单独评估。</p>
+<div class="row"><button id="process" class="secondary">运行已有匿名人脸检测</button></div>
+<p class="small">目前项目已有 OpenCV 的人脸候选检测；监控分辨率仅384×288，可能检测到0张脸。这不等于没有人员！后续的人体检测必须单独实测。</p>
+<pre id="detection" class="small" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+<h3 style="margin-top:22px">当前机位内的人工轨迹</h3>
+<div id="tracks" class="small">选择视频源后加载</div>
+</div>
+</section>
+<section class="panel"><h2>Excel 场所功能的真实边界</h2>
+<p>摄像机与场所关联、视频导入、实际帧、匿名框/本机局部轨迹可以采用真实数据。
+原 #3 人员底库、#6跨场所、#7同行、#17轨迹等需要跨摄像机身份关联时，先沿用明确标识的合成业务流程；
+<b>公开标注的单机位轨迹不能冒充已经识别的真实跨场所人员。</b></p>
+</section>
+</main>
+<script>
+const token=sessionStorage.getItem('zd_access_token');if(!token)location.replace('/login');
+const $=id=>document.getElementById(id);
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let imported=[],lastImage=null;
+async function api(path,method='GET',body){const r=await fetch(path,{method,
+ headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+ body:body===undefined?undefined:JSON.stringify(body)});
+ if(r.status===401){sessionStorage.removeItem('zd_access_token');location.replace('/login');throw Error('登录失效')}
+ const v=await r.json();if(!r.ok)throw Error(typeof v.detail==='string'?v.detail:JSON.stringify(v));return v}
+const setStatus=(v,isError=false)=>{$('status').textContent=v;$('status').style.color=isError?'#a6402b':'#4a6985'};
+const current=()=>Number($('source').value);
+async function refresh(){const d=await api('/api/cctv/sources');imported=d.sources;
+ const original=current();
+ $('sources').innerHTML=imported.map(s=>`<tr><td><span class="badge">CAVIAR /${esc(s.camera_view)}</span></td>
+ <td>${esc(s.place_name)}</td><td>${s.frames_available}</td><td>${s.annotation_boxes}</td>
+ <td>${s.local_track_count}</td><td><button class="secondary" onclick="choose(${s.source_id})">查看真实视频</button></td></tr>`).join('')||
+ '<tr><td colspan="6">尚无研究监控视频；先在上方点击导入。</td></tr>';
+ $('source').innerHTML=imported.map(x=>`<option value="${x.source_id}">${esc(x.camera_view)} / ${esc(x.place_name)}</option>`).join('');
+ if(imported.some(x=>x.source_id===original))$('source').value=String(original);
+ if(imported.length)await loadTracks();
+}
+function choose(id){$('source').value=String(id);$('frame').value='1';loadTracks();viewFrame()}
+async function loadPair(){
+ const b=$('loadPair');b.disabled=true;
+ try{const place_id=Number($('place').value);
+   for(const view of ['corridor','front']){
+     setStatus('下载并校验 '+view+' 固定监控 MPEG 和人工 XML 标注…');
+     const d=await api('/api/cctv/datasets/import','POST',{
+       place_id,scenario:'enter_exit_crossing_paths_1',view});
+     setStatus(view+': '+d.status+'，摄像机源 #'+d.source_id);
+     await refresh();
+   }
+   setStatus('两路真实固定摄像机已归于同一个场所；可以解码和查看。');
+ }catch(e){setStatus('导入未完成：'+e.message,true);await refresh().catch(()=>{})}
+ finally{b.disabled=false}
+}
+async function viewFrame(){
+ const id=current();if(!id)return;
+ const n=Number($('frame').value)||1;
+ const r=await fetch('/api/cctv/sources/'+id+'/frame?frame='+n,{headers:{Authorization:'Bearer '+token}});
+ if(!r.ok){const err=await r.json();$('frameNote').textContent=err.detail||'帧读取失败';return}
+ const blob=await r.blob();if(lastImage)URL.revokeObjectURL(lastImage);
+ lastImage=URL.createObjectURL(blob);$('photo').src=lastImage;
+ $('frameNote').textContent='当前视频源 #'+id+'、实际第 '+n+' 帧；绿色框为CAVIAR官方人工标注，非自动识别。';
+}
+async function loadTracks(){
+ const id=current();if(!id)return;
+ try{const d=await api('/api/cctv/sources/'+id+'/activity');
+ $('tracks').innerHTML=d.local_tracks.slice(0,18).map(t=>
+ `<span class="badge yellow">本机轨迹#${esc(t.camera_local_track_id)}：
+ ${t.annotated_frames}帧（${t.first_frame}—${t.last_frame}）</span> `).join('')||
+ '本机位无人工轨迹标注';
+ }catch(e){$('tracks').textContent=e.message}
+}
+async function detect(){
+ const id=current();if(!id)return;
+ $('process').disabled=true;$('detection').textContent='正在实际解码，并运行原有人脸候选检测…';
+ try{const d=await api('/api/sources/'+id+'/process?max_frames=80&sample_every=8','POST');
+ $('detection').textContent=JSON.stringify(d,null,2);
+ }catch(e){$('detection').textContent='实际检测未成功：'+e.message}
+ finally{$('process').disabled=false}
+}
+async function start(){
+ try{
+ const [p]=await Promise.all([api('/api/places'),api('/api/cctv/datasets')]);
+ $('place').innerHTML=p.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+ await refresh();setStatus('已读取：'+imported.length+' 路公开固定监控视频。');
+ }catch(e){setStatus('无法加载：'+e.message,true)}
+}
+$('loadPair').onclick=loadPair;$('viewFrame').onclick=()=>viewFrame().catch(e=>$('frameNote').textContent=e.message);
+$('process').onclick=detect;$('source').onchange=loadTracks;start();
+</script></body></html>
