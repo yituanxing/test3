@@ -233,9 +233,19 @@ def _run(source_id):
         if session is not None:
             session.close()
         _release(source_id, token)
+        # Start/stop/start can race at the very end of a worker: start() may
+        # see the old thread still alive and decline to spawn a replacement.
+        # Reconcile the *persisted desired state* after removing ourselves.
+        rearm = False
         with _guard:
             if _workers.get(source_id) is threading.current_thread():
                 _workers.pop(source_id, None)
+                if not _shutdown.is_set():
+                    with _db() as c:
+                        current = _row(c, source_id)
+                        rearm = bool(current and current["desired_enabled"])
+        if rearm:
+            _spawn(source_id)
 
 
 @router.get("/jobs")
