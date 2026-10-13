@@ -38,7 +38,10 @@ def _filtered(analysis: dict, *, days: int, place_ids: set[int]) -> dict:
     first, last = _window(analysis, days)
     visits = [v for v in analysis['visits'] if v['place_id'] in place_ids
               and first <= stamp(v['started_at']).date() <= last]
-    alerts = [a for a in analysis['alerts'] if place_ids.intersection(a['place_ids'])]
+    # An alert holds cross-site participants and observation IDs. Do NOT expose
+    # its full payload to a user allowed to see only one site in the alert.
+    alerts = [a for a in analysis['alerts']
+              if a['place_ids'] and set(a['place_ids']).issubset(place_ids)]
     return {'first': first, 'last': last, 'visits': visits, 'alerts': alerts}
 
 
@@ -164,7 +167,7 @@ def overview(analysis: dict, places: list[dict], *, days: int = 7) -> dict:
         'rule_counts':[{**r, 'count':sum(a['type']==r['type'] for a in alerts)} for r in analysis['rule_counts']],
         'notes':{'visits':'按合成观测聚合的到访会话；不是人脸识别结果',
                  'unique_synthetic_people_in_window':'仅指生成的 P### 虚构标识去重',
-                 'rule_hits':'对模拟规则结果进行场所交集过滤；属于场景全量规则结果，不是本时间范围内的告警数',
+                 'rule_hits':'仅包含所有关联场所均处于当前权限范围的模拟规则结果；属于场景全量规则结果，不是本时间范围内的告警数',
                  'comparison':'与紧邻的等长上一区间比较；基期=0时不计算变化百分比',
                  'movement':'按模拟唯一归属对合成到访会话分组；不表示真人跨场所轨迹'},
     }
@@ -223,7 +226,7 @@ def people_search(analysis: dict, places: list[dict], *, days: int = 7,
             continue
         entry = counters.setdefault(person, {'person':person,'synthetic_visits':0,
                     'seen_places':set(), 'last_seen_utc':v['ended_at'],
-                    'affiliation_place_id':homes.get(person)})
+                    'affiliation_place_id':(homes.get(person) if homes.get(person) in allowed else None)})
         entry['synthetic_visits'] += 1
         entry['seen_places'].add(v['place_id'])
         if stamp(v['ended_at']) > stamp(entry['last_seen_utc']):
@@ -251,7 +254,7 @@ def person_detail(analysis: dict, places: list[dict], person: str, *, days:int=3
     alerts = [a for a in data['alerts'] if person in a['people']]
     homes = {r['person']:r['place_id'] for r in analysis['affiliation']}
     edges=relationships(analysis,place_ids=allowed,days=days,person=person)['edges']
-    return {'mode':'synthetic_only','person':person,'affiliation_place_id':homes.get(person),
+    return {'mode':'synthetic_only','person':person,'affiliation_place_id':(homes.get(person) if homes.get(person) in allowed else None),
             'affiliation_place_name':names.get(homes.get(person)),
             'total_visits':len(visits),'seen_places':len({v['place_id'] for v in visits}),
             'visits':visits,'alerts':alerts[:100],'co_presence':edges[:100],
