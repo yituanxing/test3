@@ -86,6 +86,26 @@ def run():
                         page.locator('a[data-tab="overview"]').click()
                         expect(page.locator("h2.lead")).to_contain_text("辖区重点场所运行概览")
                         checks.append("home_navigation")
+                        # Excel #20/#23: the admin screen MUST actually attach
+                        # Bearer auth, list real inventory, register an RTSP
+                        # source and create a scope-bound login through its UI.
+                        page.goto(base + "/admin")
+                        expect(page.locator("#regionCount")).not_to_have_text("—")
+                        expect(page.locator("#accountPanel")).to_be_visible()
+                        expect(page.locator("#placesBody")).to_contain_text("测试场所 A")
+                        page.locator("#newSourceName").fill("browser-added-RTSP")
+                        page.locator("#newSourceUri").fill("rtsp://127.0.0.1:1/new-offline")
+                        page.get_by_role("button", name="新增 RTSP").click()
+                        expect(page.locator("#sourcesBody")).to_contain_text("browser-added-RTSP")
+                        checks.append("authenticated_admin_rtsp_creation")
+                        page.locator("#accountName").fill("smokecommunity")
+                        page.locator("#accountPassword").fill("browser-account-strong-password")
+                        page.locator("#accountNewRegion").select_option(
+                            label="演示州 / 演示县市 / 演示街道 / 演示社区")
+                        page.get_by_role("button", name="新建账号").click()
+                        expect(page.locator("#accountsBody")).to_contain_text("smokecommunity")
+                        checks.append("admin_four_tier_account_creation")
+
                         # Business-critical browser acceptance: actual server DB
                         # recomputes the truth case; this is not a UI mock.
                         page.goto(base+"/base")
