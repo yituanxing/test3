@@ -1,0 +1,128 @@
+{
+  "schema_version": "cartoon_multiwindow_visual_truth_v1",
+  "annotation_blinded": false,
+  "labels_created_after_first_model_predictions": true,
+  "source_run": "https://github.com/yituanxing/test3/actions/runs/38359510467",
+  "source_artifact": "cartoon-frozen-multiwindow-2m-7m-untouched",
+  "note": "Human visual audit AFTER frozen first-run A/B predictions and without threshold tuning; 2:00 and 7:00 of same Big Buck Bunny film, not independent animated films.",
+  "windows": {
+    "original_2m00": {
+      "sha256": "03ec85de9fb8b8709eb9419130195004f7d01a550915d317186492879483c272",
+      "original_movie_window": [
+        120,
+        145
+      ],
+      "labels": [
+        {
+          "second": 0.5,
+          "buck": "present",
+          "note": "Large white Buck in front view, butterfly nearby."
+        },
+        {
+          "second": 3,
+          "buck": "present",
+          "note": "Large white Buck face clearly visible."
+        },
+        {
+          "second": 5.5,
+          "buck": "present",
+          "note": "Buck front face and long ears visible in meadow."
+        },
+        {
+          "second": 8,
+          "buck": "present",
+          "note": "Buck seen from behind in clear large white-rabbit body shot, different from reference poses."
+        },
+        {
+          "second": 10.5,
+          "buck": "present",
+          "note": "Buck from behind at left/background; dark squirrel in foreground."
+        },
+        {
+          "second": 13,
+          "buck": "absent",
+          "note": "Three small colored squirrels in frame; Buck absent."
+        },
+        {
+          "second": 15.5,
+          "buck": "present",
+          "note": "Buck from behind by tree, head and ears clearly present. Baseline A accepts, B rejects."
+        },
+        {
+          "second": 18,
+          "buck": "absent",
+          "note": "Close-up of tree bark and ground, no Buck."
+        },
+        {
+          "second": 20.5,
+          "buck": "absent",
+          "note": "Squirrel partially visible behind tree; no Buck."
+        },
+        {
+          "second": 23,
+          "buck": "present",
+          "note": "Buck sitting in meadow front view, butterfly above head."
+        }
+      ]
+    },
+    "original_7m00": {
+      "sha256": "db436c68f5238d738c282db8e6b176a0ebe2d733cd3cc408cd356345fa618cc8",
+      "original_movie_window": [
+        420,
+        445
+      ],
+      "labels": [
+        {
+          "second": 0.5,
+          "buck": "present",
+          "note": "Buck frontal close view with ears; obvious rabbit."
+        },
+        {
+          "second": 3,
+          "buck": "absent",
+          "note": "Brown squirrel flying, no Buck."
+        },
+        {
+          "second": 5.5,
+          "buck": "absent",
+          "note": "Brown squirrel crouched on tree branch, no Buck."
+        },
+        {
+          "second": 8,
+          "buck": "absent",
+          "note": "Branch, tree trunk, squirrel and apple, no Buck."
+        },
+        {
+          "second": 10.5,
+          "buck": "absent",
+          "note": "Tree limb close-up and distant small animal, no Buck."
+        },
+        {
+          "second": 13,
+          "buck": "absent",
+          "note": "Only apple and forest clearing, no Buck."
+        },
+        {
+          "second": 15.5,
+          "buck": "absent",
+          "note": "Apple suspended over broken wooden stakes, no Buck."
+        },
+        {
+          "second": 18,
+          "buck": "absent",
+          "note": "Empty woodland clearing with tree stumps, no Buck."
+        },
+        {
+          "second": 20.5,
+          "buck": "absent",
+          "note": "Brown squirrel gliding against the sky, no Buck."
+        },
+        {
+          "second": 23,
+          "buck": "present",
+          "note": "Buck front in tall grass with face and long ears visible."
+        }
+      ]
+    }
+  }
+}
