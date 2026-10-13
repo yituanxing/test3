@@ -19,6 +19,9 @@ def eventually(predicate, timeout=3):
 @pytest.fixture
 def context(tmp_path, monkeypatch):
     from app import main, continuous_capture as jobs
+    # Scheduler behavioral fixtures replace its inference callback with a tiny
+    # deterministic stub; independent video test below exercises REAL decoder.
+    monkeypatch.setattr(jobs, "_make_session", None)
     jobs.shutdown()
     # Previous test workers must be closed before swapping the database.
     with jobs._guard:
@@ -166,6 +169,7 @@ def test_gb_same_binding_can_enable_only_one_source_and_stops_with_session(conte
                   (binding,second,main.utcnow()))
     assert client.post(f"/api/capture/jobs/{first_source}/start").status_code == 200
     assert client.post(f"/api/sources/{first_source}/process?max_frames=1").status_code == 409
+    assert client.post(f"/api/sources/{first_source}/process?max_frames=1&worker_mode=true").status_code == 409
     blocked = client.post(f"/api/capture/jobs/{second}/start")
     assert blocked.status_code == 409
     stopped = client.post(f"/api/gb28181/sessions/{session_a}/stop")
@@ -175,3 +179,34 @@ def test_gb_same_binding_can_enable_only_one_source_and_stops_with_session(conte
                         (first_source,)).fetchone()
         assert row["desired_enabled"] == 0
     assert client.post(f"/api/capture/jobs/{second}/start").status_code == 200
+
+
+def test_live_capture_reuses_actual_decoder_across_sqlite_batches(context, monkeypatch):
+    """Real bundled frames, one VideoCapture open, monotonic source frame indices."""
+    client, main, jobs, src, _ = context
+    from pathlib import Path
+    footage = main.ROOT / "samples" / "test-pattern.mp4"
+    assert footage.is_file()
+    real_open = main.cv2.VideoCapture
+    calls = []
+
+    def redirect_rtsp_to_licensed_file(uri):
+        calls.append(uri)
+        assert uri == "rtsp://127.0.0.1:8554/test"
+        return real_open(str(footage))
+
+    monkeypatch.setattr(main.cv2, "VideoCapture", redirect_rtsp_to_licensed_file)
+    session = main.LiveCaptureSession(src, batch_frames=20, sample_every=10)
+    try:
+        first = session.next_batch()
+        second = session.next_batch()
+        assert first["frames_decoded"] == second["frames_decoded"] == 20
+        assert first["new_samples"] == second["new_samples"] == 2
+        assert len(calls) == 1, "RTSP must remain open between successful batches"
+        with main.db() as c:
+            positions = [r[0] for r in c.execute(
+                "SELECT frame_index FROM samples WHERE source_id=? ORDER BY id",
+                (src,)).fetchall()]
+        assert positions == [1, 11, 21, 31]
+    finally:
+        session.close()
