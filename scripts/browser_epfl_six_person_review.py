@@ -170,6 +170,9 @@ def run():
                         assert facts['sampled_video_instants']==scored_instants
                         assert 0 < scored_instants <= 41
                         assert facts['anonymous_activity_fragments']>0
+                        assert facts['cross_time_temporal_linkage_verified'] is True, (
+                            'Actual EPFL ground-truth scoring did not qualify time linkage')
+                        assert facts['multi_instant_fragments']>=2, facts
                         assert facts['confirmed_natural_person_identity'] is False
                         assert facts['verified_unique_people'] is None
                         assert facts['real_cross_site_visits'] is None
@@ -179,6 +182,22 @@ def run():
                         assert all(x['camera_count']==2 for x in facts['activities'])
                         assert sum(x['synchronized_pair_observations']
                                    for x in facts['activities']) == reference_total
+                        demo=page.evaluate("""async () => {
+                           const r=await fetch('/api/real/demo-alerts',{headers:{
+                             Authorization:'Bearer '+sessionStorage.getItem('zd_access_token')}});
+                           return {status:r.status,data:await r.json()};
+                        }""")
+                        assert demo['status']==200,demo
+                        alert_facts=demo['data']
+                        assert alert_facts['rule_is_demo'] is True
+                        assert alert_facts['real_world_risk_confirmed'] is False
+                        assert len(alert_facts['alerts'])==facts['multi_instant_fragments']
+                        assert all(not a['alert_is_real_incident']
+                                   and a['source_evidence_is_real_video']
+                                   and len(a['supporting_candidate_keys'])>=2
+                                   for a in alert_facts['alerts'])
+                        expect(page.locator("#demoAlertRows")).to_contain_text(
+                            "EPFL-DEMO",timeout=15000)
                         page.screenshot(
                             path=str(OUT/"ui-epfl-real-research-activity.png"),
                             full_page=True)
@@ -215,6 +234,7 @@ def run():
                 "human_research_revisions_saved":reviews,
                 "activity_fragments": facts['anonymous_activity_fragments'],
                 "cross_time_fragments":facts['multi_instant_fragments'],
+                "real_source_derived_demo_alerts":len(alert_facts['alerts']),
                 "real_video_fps":facts['video_fps'],
                 "admin_audit_entries":audit,
                 "identity_confirmed":False,
