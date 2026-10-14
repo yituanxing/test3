@@ -171,6 +171,27 @@ def main():
                                               "screenshot":"ui-shipped-"+label+".png"}
                             page.screenshot(path=str(OUT/("ui-shipped-"+label+".png")),full_page=True)
                         assert page.locator("body").is_visible()
+                        # Check the first screen reports both independent data sources.
+                        page.goto(base+"/portal")
+                        expect(page.locator(".zd-demo-strip")).to_be_visible()
+                        expect(page.locator("#overviewResearchPairs")).to_have_text("119",timeout=25000)
+                        expect(page.locator(".zd-demo-strip")).to_contain_text(
+                            str(overview["synthetic"]["cards"]["synthetic_visits"]))
+                        page.screenshot(path=str(OUT/"ui-shipped-business-first-screen-after-seed.png"),full_page=True)
+                        # A warning must actually lead to a person timeline, not only a placeholder.
+                        from urllib.parse import quote
+                        sample=next(a for a in overview["synthetic"]["recent_alerts"] if a.get("people"))
+                        page.goto(base+"/portal?alert="+quote(sample["key"],safe=""))
+                        person=sample["people"][0]
+                        personLink=page.locator('a[href="/insights?person='+person+'"]')
+                        expect(personLink).to_be_visible()
+                        personLink.click()
+                        expect(page).to_have_url(base+"/insights?person="+person,timeout=15000)
+                        expect(page.locator("#personQuery")).to_have_value(person)
+                        expect(page.locator("#detailBox")).to_have_class(
+                            __import__("re").compile(r".*show.*"),timeout=18000)
+                        expect(page.locator("#personContent")).to_contain_text("模拟时间线",timeout=18000)
+                        page.screenshot(path=str(OUT/"ui-shipped-alert-to-person-timeline.png"),full_page=True)
                         # Drill into actual records: list -> details -> evidence -> review.
                         page.goto(base+"/portal?tab=places")
                         first_place=page.locator('a[href^="/portal?place="]').first
