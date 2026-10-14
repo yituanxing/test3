@@ -244,7 +244,7 @@ def run():
                         expect(page.locator("#sceneHeatGrid > button")).to_have_count(
                             64,timeout=15000)
                         expect(page.locator("#sceneEventRows")).to_contain_text(
-                            "仅演示",timeout=15000)
+                            "（演示）",timeout=15000)
                         scene=page.evaluate("""async () => {
                           const r=await fetch('/api/real/scene-aggregate',{headers:{
                             Authorization:'Bearer '+sessionStorage.getItem('zd_access_token')}});
