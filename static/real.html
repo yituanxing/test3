@@ -1,0 +1,96 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>ZD · 真实数据工作台</title>
+<style>
+:root{--ink:#142c47;--muted:#627b96;--line:#dce7f2;--blue:#2865ab}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:#f2f6fb;color:var(--ink);font:14px/1.6 system-ui,'Microsoft YaHei'}
+header{background:#112d4e;color:#fff;padding:18px max(20px,calc((100vw - 1200px)/2));display:flex;gap:22px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+header a{color:#dbeafb;margin:0 7px;text-decoration:none}
+main{max-width:1200px;margin:auto;padding:25px 20px 50px}
+h1{font-size:25px;margin:0 0 5px}h2{font-size:17px;margin:0 0 9px}
+.box{background:white;border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:17px;box-shadow:0 6px 20px #1c38530b}
+.caveat{background:#eaf3ff;border-left:4px solid #2865ab;padding:15px 17px;border-radius:7px}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.card{background:white;border-radius:11px;padding:20px;border:1px solid var(--line)}
+.card strong{display:block;font-size:28px;line-height:1.6}
+.small{font-size:12px;color:var(--muted)}label{margin-right:15px}
+select,button{font:inherit;padding:9px 13px;border-radius:7px;border:1px solid #adc8e7}
+button{background:var(--blue);color:white;cursor:pointer}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
+.scroll{overflow:auto}th{white-space:nowrap;color:#57718d}
+#message{color:#557395;font-size:12px}
+@media(max-width:800px){.cards{grid-template-columns:repeat(2,1fr)}main{padding:16px}header{padding:15px}}
+</style></head><body>
+<header><b>ZD · 真实数据工作台</b><nav>
+<a href="/portal">综合首页</a><a href="/cctv">真实视频与匿名轨迹</a>
+<a href="/monitor">采集状态</a><a href="/admin">授权源配置</a>
+<a href="#" id="logout">退出</a></nav></header>
+<main><h1>仅真实视频 · 事件与证据</h1>
+<p class="small">真正由视频采集、Frigate 和真实录制素材支撑的数据；没有 P### 虚构到访，没有模拟预警。</p>
+<div class="caveat"><b>验收模式：不补造数据。</b>
+只有接入、解码、检测并保存真实事件后才会出现数值。
+摄像机内匿名目标事件不等于不同人数，同一人可能重复计数；两摄像机出现的目标不能自动合并为同一个人。
+公开 CAVIAR 研究片段采用帧号时钟，不能计入当日实况。
+</div>
+<div class="box"><label>实况窗口（UTC）<select id="days"><option value="1">近1天</option>
+<option value="7" selected>近7天</option><option value="30">近30天</option></select></label>
+<button id="refresh">刷新真实证据</button> <span id="message">尚未加载</span></div>
+<div class="cards" style="margin-top:16px">
+<div class="card"><span class="small">实际 Frigate person 事件</span><strong id="realEvents">—</strong><span class="small">事件数，不是人数</span></div>
+<div class="card"><span class="small">实际视频抽样帧</span><strong id="frames">—</strong><span class="small">不含模拟观测</span></div>
+<div class="card"><span class="small">实际检测到的人脸框</span><strong id="faces">—</strong><span class="small">不代表身份识别</span></div>
+<div class="card"><span class="small">可信跨机身份</span><strong>未验证</strong><span class="small">不编造全球Person ID</span></div>
+</div>
+<section class="box"><h2>真实视频 · 按场所的证据统计</h2>
+<p class="small">仅返回当前账号授权辖区；无接入则显示0而不造事件。</p>
+<div class="scroll"><table><thead><tr><th>场所</th><th>真实目标事件</th><th>视频抽样帧</th><th>人脸候选框</th><th>已绑定Frigate摄像机</th></tr></thead><tbody id="places"><tr><td colspan="5">加载中</td></tr></tbody></table></div></section>
+<section class="box"><h2>可追溯的实际 Frigate 目标事件</h2>
+<p class="small">包含真实发生时间、摄像机、上游事件ID、检测评分。无真实事件不展示模拟记录。</p>
+<div class="scroll"><table><thead><tr><th>发生时间（UTC）</th><th>场所</th><th>摄像机</th><th>上游事件ID</th><th>检测置信度</th><th>结束时间</th></tr></thead>
+<tbody id="events"><tr><td colspan="6">加载中</td></tr></tbody></table></div><p id="tail" class="small"></p></section>
+<section class="box"><h2>真实研究视频的独立证据</h2>
+<div id="research">加载中</div><p class="small">这里展示官方公开片段的相机内轨迹标注，不代表已经自动完成跨机同人识别，也不是实时监控数据。</p>
+<a href="/cctv">核对原片帧、人体框和关联研究 →</a></section>
+<section class="box"><h2>真实业务仍需解决的条件</h2>
+<p>多场所真实身份关联必须依赖经过验证的 ReID 或人工核实；目前不会将相机A与B的匿名轨迹自动合并为同一个人。</p>
+<p>没有可信身份时，可展示匿名目标事件、检测质量、来源摄像机和时间；不能生成“此人跨场所”“某人异常”的身份级结论。</p>
+<a href="/monitor">查看实际视频接入、RTSP/GB28181/Frigate运行状态 →</a></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const token=sessionStorage.getItem('zd_access_token');
+if(!token)location.replace('/login');
+const esc=x=>String(x??'').replace(/[&<>"']/g,k=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[k]));
+async function api(url,method='GET'){
+ const r=await fetch(url,{method,headers:{Authorization:'Bearer '+token}});
+ if(r.status===401){sessionStorage.removeItem('zd_access_token');location.replace('/login');throw Error('登录状态失效')}
+ const d=await r.json();if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:r.status);
+ return d;
+}
+async function reload(){
+ $('message').textContent='从服务器读取实际记录…';$('refresh').disabled=true;
+ try{
+ const d=await api('/api/real/evidence?days='+$('days').value);
+ $('realEvents').textContent=d.real_event_counts.person_objects;
+ $('frames').textContent=d.real_event_counts.sampled_frames;
+ $('faces').textContent=d.real_event_counts.face_detections;
+ $('places').innerHTML=d.by_place.map(p=>'<tr><td>'+esc(p.place_name)+'</td><td>'+p.person_objects+
+  '</td><td>'+p.sampled_frames+'</td><td>'+p.face_detections+'</td><td>'+esc((p.cameras||[]).join(', ')||'未绑定')+'</td></tr>').join('')||
+  '<tr><td colspan="5">本辖区尚无场所</td></tr>';
+ $('events').innerHTML=d.recent_frigate_events.map(e=>'<tr><td>'+esc(e.started_at)+'</td><td>'+esc(e.place_name)+
+  '</td><td>'+esc(e.camera)+'</td><td>'+esc(e.event_id)+'</td><td>'+
+  (e.confidence===null?'—':Number(e.confidence).toFixed(3))+'</td><td>'+esc(e.ended_at||'进行中 / 未收到结束时间')+'</td></tr>').join('')||
+  '<tr><td colspan="6">此UTC时间窗口尚无实际 Frigate person 目标事件。没有用虚构P###填充。</td></tr>';
+ $('tail').textContent=d.recent_events_truncated?'仅显示最近80条真实事件；完整事件仍保存在源数据中。':'显示已授权范围内最近记录（最多80条）';
+ const v=d.decoded_media_evidence;
+ $('research').textContent='公开CAVIAR原片（仅研究证据）：'+v.fixed_camera_sources+' 个固定视频源，'+
+  v.camera_local_tracks+' 段相机内标注轨迹，'+v.manual_person_boxes+' 个人工标注框。它们不计入今日实况。';
+ $('message').textContent='加载完成，未使用任何合成人员或预警';
+ }catch(e){$('message').textContent='获取真实证据失败：'+e.message}
+ finally{$('refresh').disabled=false;}
+}
+$('days').onchange=reload;$('refresh').onclick=reload;
+$('logout').onclick=async ev=>{ev.preventDefault();await api('/api/auth/logout','POST').catch(()=>{});sessionStorage.removeItem('zd_access_token');location.replace('/login')};
+reload();
+</script></body></html>

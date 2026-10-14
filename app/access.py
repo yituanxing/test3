@@ -135,7 +135,7 @@ def permitted(actor: dict, method: str, path: str) -> bool:
                  '/api/frigate/cameras', '/api/frigate/summary',
                  '/api/insights/overview', '/api/insights/people',
                  '/api/insights/relationships', '/api/video/observations',
-                  '/api/geo/places','/api/geo/track'}
+                  '/api/geo/places','/api/geo/track','/api/real/evidence'}
         or re.fullmatch(r'/api/video/observations/\d+/preview',path)
         or re.fullmatch(r'/api/insights/people/P[0-9]{3}',path)
         or re.fullmatch(r'/api/anime/scenes/sources/\d+/(suggest|graph)',path)

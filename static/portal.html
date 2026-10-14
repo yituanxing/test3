@@ -67,11 +67,12 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
   <nav id="navigation">
     <a data-tab="overview" href="/portal">◉ &nbsp;综合态势</a>
     <a data-tab="places" href="/portal?tab=places">▦ &nbsp;场所监测</a>
-    <a data-tab="alerts" href="/portal?tab=alerts">◇ &nbsp;预警中心</a>
+    <a data-tab="alerts" href="/portal?tab=alerts">◇ &nbsp;模拟预警中心</a>
     <a class="state-only" data-tab="acceptance" href="/portal?tab=acceptance">✓ &nbsp;Excel 23项验收</a>
+    <a href="/real">◆ &nbsp;真实数据（不含模拟）</a>
     <a href="/monitor">◷ &nbsp;视频监测</a>
     <a href="/cctv#epflResearchPanel">◉ &nbsp;人体关联审核</a>
-    <a href="/insights">↗ &nbsp;智能分析</a>
+    <a href="/insights">↗ &nbsp;合成身份分析</a>
     <a href="/geo">⌖ &nbsp;地图·模拟轨迹</a>
     <a class="state-only" href="/face-lab">▧ &nbsp;授权照片实验</a>
     <a class="state-only" href="/base">▤ &nbsp;模拟人员底库</a>
@@ -127,15 +128,27 @@ function trend(arr){
 }
 function summary(){
  const syn=synthetic(),real=video(),c=syn.cards;
- const rank=syn.ranking.slice(0,6).map(p=>'<a class="item" href="'+placeLink(p)+'"><div><b>'+esc(p.place_name)+'</b><small>合成到访 '+p.visits+' · 模拟命中 '+p.alerts+'</small></div><span class="arrow">查看 →</span></a>').join('');
+ const rank=real.places.slice(0,6).map(p=>'<a class="item" href="'+placeLink(p.place_id)+'"><div><b>'+esc(p.place_name)+'</b><small>Frigate实际目标事件 '+p.person_objects+' · 抽样视频帧 '+p.sampled_frames+'</small></div><span class="arrow">查看 →</span></a>').join('');
  const hits=syn.recent_alerts.slice(0,7).map(a=>'<a class="item" href="'+alertLink(a)+'"><div><b>'+esc(a.type_name)+'</b><small>'+esc((a.place_names||[]).join('、'))+' · '+esc(a.status||'待复核')+'</small></div><span class="pill demo">合成</span></a>').join('');
- return title('OVERVIEW · 综合态势','辖区重点场所运行概览')+'<p class="sub">从辖区总览进入场所、证据和预警复核。所有统计按真实数据与合成场景分区展示。</p>'+notice()+
- '<div class="cards">'+stat('辖区场所',c.place_count,'当前账号授权范围')+stat('登记视频源',state.sources.length,'登记不代表实时在线')+stat('匿名目标事件（近7天）',real.counts.person_objects,'真实 Frigate 目标事件，非独立人数')+stat('模拟规则命中',c.rule_hits,'合成数据，不是实际风险')+'</div>'+
- '<div class="grid"><section class="panel"><div class="row"><h2>场所监测入口</h2><a class="arrow" href="'+route({tab:'places'})+'">全部场所 →</a></div><p class="smallnote">按辖区归属查看；尚未录入场所经纬度，不伪造地图坐标。</p><div class="items">'+(rank||'<div class="empty">没有场所或合成活动记录</div>')+'</div></section>'+
- '<section class="panel"><div class="row"><h2>近期规则命中</h2><a class="arrow" href="'+route({tab:'alerts'})+'">预警中心 →</a></div><p class="smallnote">以下为合成规则候选，待人工核实。</p><div class="items">'+(hits||'<div class="empty">尚无模拟规则命中</div>')+'</div></section></div>'+
- '<div class="grid"><section class="panel"><h2>合成场景 · 到访趋势</h2>'+trend(syn.trend)+'</section>'+
- '<section class="panel"><h2>真实视频 · 检测数据</h2><div class="statline"><span>Frigate person 事件</span><b>'+real.counts.person_objects+'</b></div><div class="statline"><span>OpenCV 抽样帧</span><b>'+real.counts.sampled_frames+'</b></div><div class="statline"><span>人脸检测框</span><b>'+real.counts.face_detections+'</b></div><p class="smallnote">不能据此计算不同人数或人脸识别准确率。</p><a class="arrow" href="/monitor">前往视频运行监测 →</a></section></div>'+
- (state.user.level===1?'<div class="toolbar"><button id="seed">初始化合成业务场景（不会写入视频数据）</button><a href="/base">生成模拟底库</a><a href="/business">配置规则和复核</a></div>':'');
+ return title('OVERVIEW · 实况证据优先','辖区重点场所运行概览')+
+ '<p class="sub">默认只统计实际监控数据。没有设备或没有目标事件就显示0，不使用合成P###、虚构到访或模拟规则补数。</p>'+
+ '<div class="banner"><strong>真实输入边界：</strong>实际Frigate目标事件、OpenCV视频抽帧和检测框不等于独立人数或确认身份。跨摄像机真人关联尚未可靠验收；研究视频与实况独立。</div>'+
+ '<div class="cards">'+stat('辖区场所',real.places.length,'辖区授权范围')+
+ stat('登记视频源',state.sources.length,'登记不代表真实在线')+
+ stat('真实 person 事件（近7天）',real.counts.person_objects,'Frigate事件数，不是去重人数')+
+ stat('实际解码视频帧',real.counts.sampled_frames,'OpenCV抽帧，非身份到访')+'</div>'+
+ '<div class="grid"><section class="panel"><div class="row"><h2>按场所查看真实证据</h2><a class="arrow" href="/real">仅真实数据工作台 →</a></div>'+
+ '<p class="smallnote">实际目标事件和视频抽帧；无数据则保留0，不会用模拟人员填充。</p><div class="items">'+
+ (rank||'<div class="empty">当前没有场所或实际视频事件，请先连接授权设备</div>')+'</div></section>'+
+ '<section class="panel"><h2>原始视频证据</h2>'+
+ '<div class="statline"><span>Frigate person 事件</span><b>'+real.counts.person_objects+'</b></div>'+
+ '<div class="statline"><span>视频帧（OpenCV）</span><b>'+real.counts.sampled_frames+'</b></div>'+
+ '<div class="statline"><span>人脸候选框</span><b>'+real.counts.face_detections+'</b></div>'+
+ '<p class="smallnote">这三项均来自媒体实际处理，不是合成人员或身份匹配成功率。</p>'+
+ '<a class="arrow" href="/real">检查证据和UTC时间 →</a></section></div>'+
+ (state.user.level===1?'<section class="panel"><div class="row"><h2>单独的合成算法验证区（非真实业务结果）</h2><a href="/portal?tab=acceptance">查看真实/合成验收对照 →</a></div>'+
+ '<p class="smallnote">原有P###模拟底库和七类规则仅用于软件逻辑回归。不会写入真实人体库，不计入真实事件、预警或身份分析。</p>'+
+ '<div class="toolbar"><a href="/base">模拟底库</a><a href="/business">模拟规则</a><a href="/insights">合成统计</a></div></section>':'');
 }
 
 function acceptancePage(){
