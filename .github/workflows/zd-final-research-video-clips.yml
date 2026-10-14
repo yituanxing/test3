@@ -16,6 +16,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - name: Install ffmpeg and ffprobe explicitly (runner images differ)
         run: |
           sudo apt-get update -qq
@@ -90,6 +94,19 @@ jobs:
           Public redistribution and commercial display require appropriate rights.
           EOF
           sha256sum dist-research/*.mp4 > dist-research/rendered-video-sha256.txt
+      - name: Verify the actual EPFL clip decodes inside the delivered web player
+        shell: bash
+        env:
+          ZD_LEGACY_MODE: '0'
+        run: |
+          set -euo pipefail
+          python -m pip install -r requirements.txt -r requirements-business.txt
+          python -m pip install 'playwright>=1.55,<2'
+          python -m playwright install --with-deps chromium
+          ZD_REAL_EPFL_CLIP_FILE="$PWD/dist-research/真实原片连续双机画面_38秒.mp4" \
+            python -m scripts.browser_real_smoke
+          test -s reports/ui-actual-epfl-clip-frame.png
+          cp reports/ui-actual-epfl-clip-frame.png dist-research/已真实解码_网页播放器截图.png
       - name: Save research-only limited video excerpts as downloadable CI artifact
         uses: actions/upload-artifact@v4
         with:
