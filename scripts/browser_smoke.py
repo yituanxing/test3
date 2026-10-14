@@ -232,12 +232,13 @@ def run():
                         page.route('https://demotiles.maplibre.org/**',lambda route:route.abort())
                         page.goto(base+'/geo',wait_until='domcontentloaded')
                         expect(page.get_by_role('heading',name='场所地图与合成轨迹回放')).to_be_visible()
-                        page.once('dialog',lambda dialog:dialog.accept())
+                        # The persistent dialog listener above handles confirmations.
+                        # A second once-listener double-accepts the same dialog.
                         page.locator('#seedGeo').click()
                         expect(page.locator('#notice')).to_contain_text('已配坐标',timeout=12000)
                         expect(page.locator('#mapFallback svg')).to_be_visible(timeout=12000)
                         expect(page.locator('#trackSummary')).to_contain_text('合成到访',timeout=12000)
-                        assert page.locator('#events .event').count()>0
+                        expect(page.locator('#events .event').first).to_be_visible(timeout=12000)
                         assert page.locator('#placeRows tr').count()>=3
                         page.screenshot(path=str(OUT/'ui-geo-fictional-track.png'),full_page=True)
                         checks.append('offline_geographic_map_real_browser_synthetic_visits_and_coordinates')
