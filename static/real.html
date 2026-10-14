@@ -66,6 +66,14 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <div class="scroll"><table><thead><tr><th>演示告警ID</th><th>规则</th><th>录像时间</th><th>来源</th><th>证据</th><th>性质</th></tr></thead>
 <tbody id="demoAlertRows"><tr><td colspan="6">暂无由真实视频活动触发的演示告警</td></tr></tbody></table></div>
 </section>
+<section class="box" id="excelRuleShowcase">
+<h2>Excel #6–12 · 七类预警规则验收（纯模拟业务）</h2>
+<p class="small"><b>注意：此区的人员 P###、到访和场所全部是明确虚构的规则样本。</b>它调用项目已实现的七种规则算法，
+不是硬编码警情，不读取或改写 EPFL 视频数据，不能把命中称为真实人员预警。</p>
+<button id="reloadExcelRules">核验七种原Excel规则</button> <span class="small" id="excelRuleStatus">未读取</span>
+<div class="scroll"><table><thead><tr><th>Excel条目</th><th>预警类型</th><th>模拟命中</th><th>示例命中与原始模拟观测</th></tr></thead>
+<tbody id="excelRuleRows"><tr><td colspan="4">点击核验，不展示无来源的警情</td></tr></tbody></table></div>
+</section>
 <section class="box"><h2>真实研究视频的独立证据</h2>
 <div id="research">加载中</div><p class="small">这里展示官方公开片段的相机内轨迹标注，不代表已经自动完成跨机同人识别，也不是实时监控数据。</p>
 <a href="/cctv">核对原片帧、人体框和关联研究 →</a></section>
@@ -154,6 +162,25 @@ async function loadDemoAlerts(){
   ).join('')||'<tr><td colspan="6">无经过视频证据支持的预警。不会制造假人员或假到访。</td></tr>';
  }catch(e){$('demoAlertState').textContent='演示告警查询失败：'+e.message}
 }
+async function loadExcelRules(){
+ const status=$('excelRuleStatus');
+ try{
+  const data=await api('/api/real/excel-rule-demo');
+  const kinds=['cross_place','companion','interaction','gathering','absence','appearance','headcount'];
+  const counts=new Map(data.rule_counts.map(x=>[x.type,x]));
+  $('excelRuleRows').innerHTML=kinds.map((key,i)=>{
+    const info=counts.get(key)||{count:0,name:key};
+    const hits=data.alerts.filter(a=>a.type===key);
+    const sample=hits[0];
+    return '<tr><td>#'+(i+6)+'</td><td>'+esc(info.name)+'</td><td>'+info.count+
+      '</td><td>'+(sample?esc(sample.title)+'（模拟观测 '+sample.observation_ids.length+' 条）':
+      '当前模拟样本未触发')+'</td></tr>';
+  }).join('');
+  status.textContent='7种规则全部执行；'+data.alerts.length+'条模拟命中，0条真实风险，来源与真实视频隔离。';
+ }catch(e){status.textContent='规则计算异常：'+e.message}
+}
+$('reloadExcelRules').onclick=loadExcelRules;
+loadExcelRules();
 $('loadActivity').onclick=loadActivity;
 loadActivity();
 $('days').onchange=reload;$('refresh').onclick=reload;
