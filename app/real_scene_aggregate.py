@@ -6,7 +6,10 @@ GPS are unavailable. Research-admin-only output has source-frame evidence.
 from __future__ import annotations
 from collections import Counter, defaultdict
 from math import isfinite
-from fastapi import APIRouter, Query, Request
+from pathlib import Path
+from fastapi import APIRouter, Query, Request, HTTPException
+from fastapi.responses import FileResponse
+from app import epfl_review
 from app.real_activity import real_activity
 
 router=APIRouter()
@@ -180,6 +183,40 @@ def summarize_scene(activity, *, minimum_observations=3,
     result["total_observations"]=sum(frame_counts.values())
     result["observations_outside_coarse_grid"]=out_of_grid
     return result
+
+
+# The clip is never checked into the public source repository. It may be
+# included only in a separately attributed RESEARCH-USE local presentation ZIP.
+# The final user-facing page fails visibly when the clip isn't installed.
+SHOWCASE_VIDEO = Path(__file__).resolve().parents[1] / "samples" / "demo-media" / "epfl-dual-60-98.mp4"
+
+
+@router.get("/api/real/showcase-media/status")
+def research_showcase_media_status(request: Request):
+    epfl_review._admin(request)
+    is_ready = SHOWCASE_VIDEO.is_file() and SHOWCASE_VIDEO.stat().st_size > 100_000
+    return {
+        "ready": is_ready,
+        "kind": "actual_continuous_epfl_two_camera_original_video_excerpt" if is_ready else None,
+        "duration_seconds": 38 if is_ready else None,
+        "clip_starts_at_original_second": 60 if is_ready else None,
+        "research_use_only": True,
+        "two_cameras_same_physical_lab": True,
+        "source_original_video_copyright": "CVLab-EPFL",
+        "not_live_camera": True,
+        "note": "视频文件不随公开源码发布。离线研究演示包可包含授权条件下的38秒节选。" if not is_ready
+                else "两台摄像机的真实连续同期原片节选；本机播放的是历史研究数据，而不是监控直播。"
+    }
+
+
+@router.get("/api/real/showcase-media/video")
+def research_showcase_media_video(request: Request):
+    epfl_review._admin(request)
+    if not SHOWCASE_VIDEO.is_file() or SHOWCASE_VIDEO.stat().st_size < 100_000:
+        raise HTTPException(404,"研究视频尚未安装；可从最终研究展示包解压到samples/demo-media/")
+    return FileResponse(SHOWCASE_VIDEO,media_type="video/mp4",
+                        headers={"Cache-Control":"private, max-age=0",
+                                 "X-Content-Type-Options":"nosniff"})
 
 
 @router.get("/api/real/scene-aggregate")
