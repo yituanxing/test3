@@ -92,6 +92,7 @@ jobs:
             reports/caviar-*-yolo.jpg
             reports/verify-epfl-alternative-cameras.json
             reports/verify-epfl-six-person-cross-camera.json
+            reports/epfl6p-paired-frame-*.jpg
             reports/epfl-lab-camera*-yolo-contact.jpg
             reports/epfl-lab-camera*-bytetrack-contiguous.jpg
           if-no-files-found: warn
