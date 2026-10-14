@@ -270,6 +270,57 @@ def _import(raw: dict, request: Request, origin: str):
             "feeds_roster":False,"feeds_real_alerts":False,"note":NOT_VERIFIED}
 
 
+@router.get("/api/research/epfl/summary")
+def research_pair_summary(request: Request):
+    """Operational per-candidate REVIEW COUNTS, not people/headcount/alerts.
+
+    Latest report only; one candidate can be reviewed repeatedly but its
+    current state is the last append-only review entry. Never use the
+    EPFL official GT human IDs at runtime.
+    """
+    _admin(request)
+    with _db() as c:
+        latest = c.execute("""SELECT report_digest, candidate_count, origin,
+                                    imported_at FROM epfl_candidate_reports
+          ORDER BY imported_at DESC, rowid DESC LIMIT 1""").fetchone()
+        if latest is None:
+            return {
+                "has_report": False, "candidate_count": 0,
+                "reviewed_count": 0, "pending_count": 0,
+                "plausible_count": 0, "false_match_count": 0,
+                "needs_review_count": 0,
+                "verified_unique_real_people": False,
+                "feeds_roster": False, "feeds_real_alerts": False,
+                "note": NOT_VERIFIED}
+        rows = c.execute("""
+          SELECT COALESCE(r.verdict,'not_reviewed') AS verdict, COUNT(*) AS n
+          FROM epfl_pair_candidates p
+          LEFT JOIN epfl_pair_reviews r ON r.id = (
+            SELECT MAX(id) FROM epfl_pair_reviews
+            WHERE candidate_key = p.candidate_key)
+          WHERE p.report_digest=?
+          GROUP BY COALESCE(r.verdict,'not_reviewed')
+        """, (latest["report_digest"],)).fetchall()
+        by = {x["verdict"]:x["n"] for x in rows}
+        count = latest["candidate_count"]
+        if sum(by.values()) != count:
+            raise HTTPException(503, "研究报告候选计数不一致")
+        pending = by.get("not_reviewed", 0)
+        return {
+            "has_report": True,
+            "report_digest":latest["report_digest"],
+            "origin": latest["origin"],
+            "imported_at":latest["imported_at"],
+            "candidate_count":count, "pending_count":pending,
+            "reviewed_count":count-pending,
+            "plausible_count":by.get("plausible_same_target",0),
+            "false_match_count":by.get("false_match",0),
+            "needs_review_count":by.get("needs_review",0),
+            "verified_unique_real_people": False,
+            "feeds_roster": False, "feeds_real_alerts": False,
+            "note": NOT_VERIFIED}
+
+
 @router.get("/api/research/epfl/candidates")
 def candidates(request: Request,
                report_digest: str | None = Query(None, pattern=r"^[0-9a-f]{64}$"),

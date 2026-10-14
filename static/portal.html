@@ -57,6 +57,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
     <a data-tab="overview" href="/portal">◉ &nbsp;综合态势</a>
     <a data-tab="places" href="/portal?tab=places">▦ &nbsp;场所监测</a>
     <a data-tab="alerts" href="/portal?tab=alerts">◇ &nbsp;预警中心</a>
+    <a class="state-only" data-tab="acceptance" href="/portal?tab=acceptance">✓ &nbsp;Excel 23项验收</a>
     <a href="/monitor">◷ &nbsp;视频监测</a>
     <a href="/cctv">◉ &nbsp;真实监控样本</a>
     <a href="/insights">↗ &nbsp;智能分析</a>
@@ -82,7 +83,8 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\u0027':'&#39;'}[c]));
 const route=o=>'/portal?'+new URLSearchParams(o).toString();
 const dt=s=>s?new Date(s).toLocaleString('zh-CN',{hour12:false}):'—';
-let state={user:null,places:[],sources:[],dash:null,monitor:null,events:[]};
+let state={user:null,places:[],sources:[],dash:null,monitor:null,events:[],
+           excel:null,epflAudit:null,acceptanceError:null};
 async function api(url,opts){
   const o=Object.assign({},opts||{});o.headers=Object.assign({},h,o.headers||{});
   const r=await fetch(url,o);
@@ -121,6 +123,68 @@ function summary(){
  '<section class="panel"><h2>真实视频 · 检测数据</h2><div class="statline"><span>Frigate person 事件</span><b>'+real.counts.person_objects+'</b></div><div class="statline"><span>OpenCV 抽样帧</span><b>'+real.counts.sampled_frames+'</b></div><div class="statline"><span>人脸检测框</span><b>'+real.counts.face_detections+'</b></div><p class="smallnote">不能据此计算不同人数或人脸识别准确率。</p><a class="arrow" href="/monitor">前往视频运行监测 →</a></section></div>'+
  (state.user.level===1?'<div class="toolbar"><button id="seed">初始化合成业务场景（不会写入视频数据）</button><a href="/base">生成模拟底库</a><a href="/business">配置规则和复核</a></div>':'');
 }
+
+function acceptancePage(){
+ if(state.user.level!==1)
+  return '<div class="err">此功能仅供州级演示管理员核验交付声明。</div>';
+ if(state.acceptanceError)
+  return title('ACCEPTANCE · 项目交付','Excel 23项严格验收')+
+   '<div class="err">无法取得实际验收数据：'+esc(state.acceptanceError)+
+   '，不得把缺少报告视为全部通过。</div>';
+ if(!state.excel || !state.epflAudit)
+  return title('ACCEPTANCE · 项目交付','Excel 23项严格验收')+
+   '<div class="empty">正在读取原Excel需求及真实研究数据…</div>';
+ const a=state.excel, review=state.epflAudit,
+  names={verified_real:'已验证管理功能',synthetic_only:'仅合成人员业务',
+         partial:'部分实现',missing:'缺失'}, labels={verified_real:'real',
+         synthetic_only:'demo',partial:'demo',missing:'demo'};
+ const cards='<div class="cards">'+Object.keys(names).map(k=>
+    stat(names[k],a.counts[k],k==='verified_real'?
+      '真实管理/授权接口':'不能宣称真实身份能力')).join('')+'</div>';
+ const research=review.has_report?
+   '<div class="statline"><span>已导入的真实研究视频匿名跨机候选</span><b>'+
+    review.candidate_count+'条配对</b></div>'+
+   '<div class="statline"><span>已人工复核 / 待复核</span><b>'+
+    review.reviewed_count+' / '+review.pending_count+'</b></div>'+
+   '<div class="statline"><span>当前认为合理 / 误配 / 仍需复核</span><b>'+
+    review.plausible_count+' / '+review.false_match_count+' / '+
+    review.needs_review_count+'</b></div>'+
+   '<p class="smallnote">这不是独立人数；审核结论不能验证自然人身份。报告来源：'+
+    esc(review.origin||'未知')+'。</p>':
+   '<div class="empty">尚未导入研究人体关联候选。由州级管理员从 /cctv 一键载入CI内置报告。</div>';
+ const body=a.requirements.map(x=>'<tr><td>#'+x.id+'</td><td><b>'+
+    esc(x.title)+'</b></td><td><span class="pill '+labels[x.status]+'">'+
+    esc(names[x.status])+'</span></td><td><div>'+
+    esc(x.verified_scope)+'</div><p class="smallnote">未完成：'+
+    esc(x.remaining_gap)+'</p></td><td><a class="arrow" href="'+
+    esc(x.demo_url)+'">打开原有功能 →</a></td></tr>').join('');
+ return title('EXCEL · DELIVERY','原Excel 23项逐项核对')+
+  '<p class="sub">唯一来源：'+esc(a.source_file)+'，工作表“'+
+   esc(a.source_worksheet)+'”。每一项对应现有页面与可核查缺口，不为验收造新身份数据。</p>'+
+  '<div class="banner"><strong>验收边界：</strong>'+esc(a.warning)+'</div>'+
+  cards+
+  '<section class="panel"><div class="row"><h2>真实双机人体关联 · 独立研究轨道</h2>'+
+  '<a class="arrow" href="/cctv#epflResearchPanel">查看并审核候选 →</a></div>'+
+  research+'<div class="toolbar"><a href="/monitor">查看真实检测帧 →</a>'+
+  '<a href="/base">打开合成P###底库 →</a><a href="/business">查看七类规则 →</a>'+
+  '<a href="/insights">统计与检索 →</a><a href="/admin">场所与账号 →</a></div></section>'+
+  '<section class="panel"><h2>原始23项：状态、已实证能力与待补缺口</h2>'+
+  '<div class="scroller"><table><thead><tr><th>编号</th><th>需求名称</th>'+
+  '<th>严格状态</th><th>实际能力与缺口</th><th>演示入口</th>'+
+  '</tr></thead><tbody>'+body+'</tbody></table></div></section>';
+}
+async function loadAcceptance(){
+ if(!state.user || state.user.level!==1)return;
+ try{
+  const [excel,epflAudit]=await Promise.all([
+    api('/api/demo/excel-acceptance'),api('/api/research/epfl/summary')]);
+  if(excel.requirements.length!==23||
+     Object.values(excel.counts).reduce((a,b)=>a+b,0)!==23)
+    throw Error('原Excel验收记录不完整');
+  state.excel=excel;state.epflAudit=epflAudit;state.acceptanceError=null;
+ }catch(e){state.acceptanceError=e.message;}
+}
+
 function listPlaces(){
  return title('PLACES · 场所监测','辖区场所列表')+'<p class="sub">选择一个场所，查看设备登记、真实匿名事件、合成业务概况。</p>'+notice()+
  '<section class="panel"><div class="scroller"><table><thead><tr><th>场所名称</th><th>所属辖区</th><th>状态</th><th>登记源</th><th>匿名事件（7天）</th><th>详情</th></tr></thead><tbody>'+
@@ -180,6 +244,7 @@ function render(){
  else if(q.has('alert'))page=showAlert(q.get('alert'));
  else if(tab==='places')page=listPlaces();
  else if(tab==='alerts')page=listAlerts();
+ else if(tab==='acceptance')page=acceptancePage();
  else page=summary();
  $('view').innerHTML=page;
  const seed=$('seed');if(seed)seed.onclick=async()=>{
@@ -207,7 +272,9 @@ $('logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST'}).catc
   $('who').textContent=state.user.username+' · '+state.user.region_name;
   $('scope').textContent='当前授权辖区：'+state.user.region_name+' · '+['','州级','县市级','街道级','社区级'][state.user.level];
   if(state.user.level!==1)document.querySelectorAll('.state-only').forEach(x=>x.remove());
-  await loadData();render();
+  await loadData();
+  if(state.user.level===1)await loadAcceptance();
+  render();
  }catch(e){$('view').innerHTML='<div class="err">加载失败：'+esc(e.message)+'。检查服务、会话和数据权限。<br><button id="retry">重新加载</button></div>';const retry=$('retry');if(retry)retry.onclick=()=>location.reload();}
 })();
 })();

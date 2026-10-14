@@ -387,6 +387,49 @@ def get_face_activity_details(request:Request, days:int=Query(7,ge=1,le=31),
                    allowed_region_ids=admin.subtree_ids(c,region_id))
 
 
+# One read-only source of truth for the original Excel 23-item demonstration.
+# Never infer an item is fulfilled just because a route/test happens to exist.
+EXCEL_DEMO_ROUTES = {
+  1: '/cctv#epflResearchPanel', 2: '/admin', 3: '/base',
+  4: '/insights', 5: '/insights', 6: '/business', 7: '/business',
+  8: '/business', 9: '/business', 10: '/business', 11: '/business',
+  12: '/business', 13: '/cctv', 14: '/insights', 15: '/insights',
+  16: '/monitor', 17: '/insights', 18: '/insights', 19: '/insights',
+  20: '/admin', 21: '/base', 22: '/business', 23: '/admin'
+}
+
+
+@app.get('/api/demo/excel-acceptance')
+def excel_acceptance(request: Request):
+    actor = access.principal(request)
+    if not actor or actor['level'] != 1:
+        raise HTTPException(403, '仅州级管理员可审阅交付验收全表')
+    # Read exactly the *same* manifest as tests/test_excel_acceptance_contract.py.
+    manifest = json.loads((ROOT / 'config/excel_acceptance_v1.json').read_text(
+        encoding='utf-8'))
+    req = manifest['requirements']
+    if [x['id'] for x in req] != list(range(1,24)):
+        raise HTTPException(503, 'Excel验收清单不完整')
+    items = [{
+        'id': x['id'],
+        'title': x['title'],
+        'status': x['status'],
+        'verified_scope': x['verified_scope'],
+        'remaining_gap': x['remaining_gap'],
+        'demo_url': EXCEL_DEMO_ROUTES[x['id']],
+        'evidence_files': x['evidence_files'],
+    } for x in req]
+    counts = {k:sum(x['status']==k for x in items) for k in
+              ('verified_real','synthetic_only','partial','missing')}
+    return {
+        'source_file': manifest['source_file'],
+        'source_worksheet': manifest['source_worksheet'],
+        'requirements': items, 'counts': counts,
+        'all_23_verified_real': False,
+        'warning': '这是严格的原Excel需求追踪，不代表23项真实功能全部完成；P###预警仍是合成身份业务。'
+    }
+
+
 @app.get('/api/health')
 def health():
     return {'status': 'ok', 'opencv': cv2.__version__, 'detector': detector_info(), 'db': str(DB)}

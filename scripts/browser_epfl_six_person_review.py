@@ -113,6 +113,27 @@ def run():
                         page.reload()
                         expect(page.locator("#epflReviewRows")).to_contain_text(
                             "needs_review",timeout=15000)
+                        # Same actual SQLite database, not hardcoded UI
+                        # statistics: 119 per-frame BODY candidate links,
+                        # one human research review, zero real-person claims.
+                        page.goto(base+"/portal?tab=acceptance")
+                        expect(page.get_by_role(
+                            "heading",name="原Excel 23项逐项核对")
+                        ).to_be_visible(timeout=15000)
+                        expect(page.locator("#view")).to_contain_text(
+                            "119条配对",timeout=15000)
+                        expect(page.locator("#view")).to_contain_text(
+                            "已人工复核 / 待复核")
+                        expect(page.locator("#view")).to_contain_text(
+                            "1 / 118")
+                        assert page.locator("#view tbody tr").count()==23
+                        expect(page.locator("#view")).to_contain_text(
+                            "人脸检索")
+                        expect(page.locator("#view")).to_contain_text(
+                            "缺失")
+                        page.screenshot(
+                            path=str(OUT/"ui-excel-23-live-acceptance.png"),
+                            full_page=True)
                         if js_errors:
                             raise AssertionError("Browser JavaScript error: "+repr(js_errors))
                     finally:
