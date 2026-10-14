@@ -239,6 +239,34 @@ def run():
                         page.screenshot(
                             path=str(OUT/"ui-excel-23-live-acceptance.png"),
                             full_page=True)
+                        # Real VIDEO-DERIVED aggregated scene rules, not
+                        # pre-filled fictional people, WGS84 points or maps.
+                        expect(page.locator("#sceneHeatGrid > div")).to_have_count(
+                            64,timeout=15000)
+                        expect(page.locator("#sceneEventRows")).to_contain_text(
+                            "仅演示",timeout=15000)
+                        scene=page.evaluate("""async () => {
+                          const r=await fetch('/api/real/scene-aggregate',{headers:{
+                            Authorization:'Bearer '+sessionStorage.getItem('zd_access_token')}});
+                          return {status:r.status,data:await r.json()};
+                        }""")
+                        assert scene['status']==200,scene
+                        spatial=scene['data']
+                        assert spatial['ready'] is True
+                        assert spatial['total_observations']==reference_total
+                        assert spatial['wgs84_available'] is False
+                        assert spatial['real_cross_location_identity_available'] is False
+                        assert spatial['geographic_trajectory_available'] is False
+                        assert spatial['warning_is_confirmed_risk'] is False
+                        # 23 real sampled instants have >=3 actual synchronized
+                        # camera-paired detections. This is a FRAME count, NOT
+                        # 23 identified persons or real emergency alerts.
+                        assert len(spatial['demo_scene_events'])==23, spatial
+                        assert all(x['paired_detection_count']>=3
+                                   for x in spatial['demo_scene_events'])
+                        assert sum(x['paired_detection_count']
+                                   for x in spatial['heat_cells'])==reference_total
+                        assert not any('person_id' in k for k in spatial)
                         page.screenshot(
                             path=str(OUT/"ui-epfl-real-research-activity.png"),
                             full_page=True)
@@ -276,6 +304,9 @@ def run():
                 "activity_fragments": facts['anonymous_activity_fragments'],
                 "cross_time_fragments":facts['multi_instant_fragments'],
                 "real_source_derived_demo_alerts":len(alert_facts['alerts']),
+                "real_aggregate_video_threshold_events":len(spatial['demo_scene_events']),
+                "anonymous_indoor_heatmap_cells":len(spatial['heat_cells']),
+                "gps_or_real_cross_place_tracking_claimed":False,
                 "synthetic_excel_rule_types_verified_in_browser":7,
                 "original_excel_requirements_visible_in_browser":23,
                 "excel_acceptance_status_counts":accepted["status_counts"],
