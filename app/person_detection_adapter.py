@@ -54,9 +54,16 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
     model=_model()
     weights=Path(getattr(model,"ckpt_path",MODEL) or MODEL)
     weights_sha=sha256(weights.read_bytes()).hexdigest() if weights.is_file() else None
+    # Use the SAME minimum confidence contract as YOLO's public detector:
+    # the previous .50/.50 tracker gates discarded 19 of 20 actual YOLO
+    # detections on the 2nd CAVIAR camera in the real-media CI. ByteTrack is
+    # still the existing vendor implementation; lower-confidence outputs
+    # remain unverified camera-local candidates requiring QA, never IDs.
+    activation_threshold=confidence
     tracker=trackers.ByteTrackTracker(
-        minimum_consecutive_frames=1,track_activation_threshold=.5,
-        high_conf_det_threshold=.5)
+        minimum_consecutive_frames=1,
+        track_activation_threshold=activation_threshold,
+        high_conf_det_threshold=activation_threshold)
     stop=min(max_frames,int(record["frames_available"]))
     gt_counts=dict(c.execute("""SELECT frame_number,COUNT(*) FROM public_cctv_track_boxes
         WHERE source_id=? AND frame_number<=? GROUP BY frame_number""",
@@ -130,6 +137,9 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
         "video_sha256":record["video_sha256"],"model":MODEL,
         "model_weights_sha256":weights_sha,
         "detector_confidence_threshold":confidence,
+        "tracker_activation_threshold":activation_threshold,
+        "tracker_assignment_coverage_of_yolo_detections":(
+            round(tracked/predicted,4) if predicted else None),
         "model_license":MODEL_LICENSE,"tracker":"roboflow_trackers_bytetrack",
         "frames_decoded":decoded,"frames_inferred":sampled,
         "sampling_step":sample_every,
