@@ -21,7 +21,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview, face_activity_details
-from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology, cctv_dataset, site_model, occurrences, occurrence_reviews, research_linkage
+from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology, cctv_dataset, site_model, occurrences, occurrence_reviews, research_linkage, epfl_review
 import httpx
 from pydantic import BaseModel, Field
 
@@ -241,6 +241,7 @@ def setup_db():
         site_model.initialize(c)
         occurrence_reviews.initialize(c)
         research_linkage.initialize(c)
+        epfl_review.initialize(c)
         if 'binding_epoch_id' not in {r['name'] for r in c.execute(
                 'PRAGMA table_info(frigate_object_events)')}:
             c.execute('ALTER TABLE frigate_object_events ADD COLUMN binding_epoch_id INTEGER')
@@ -271,6 +272,7 @@ site_model.register(app,db)
 occurrences.register(app,db)
 occurrence_reviews.register(app,db)
 research_linkage.register(app,db)
+epfl_review.register(app,db)
 gb28181.register(app,db)
 
 

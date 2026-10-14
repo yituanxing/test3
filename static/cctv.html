@@ -95,11 +95,21 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <div class="row"><label>本地打开 CI 中的六人研究报告 JSON（不会上传服务器）
 <input type="file" id="epflReportInput" accept=".json,application/json"></label>
 <button type="button" class="secondary" id="epflClearReport">清空研究报告</button>
+<button type="button" id="epflImportReport" hidden>导入当前候选到已有审核库（研究专用）</button>
+<button type="button" class="secondary" id="epflRefreshCandidates" hidden>刷新已保存的候选</button>
 <a class="small" href="https://github.com/yituanxing/test3/actions/workflows/zd-frigate-real-person.yml" target="_blank" rel="noopener noreferrer">查看已有 CI 工件来源</a></div>
 <p class="small" id="epflReportStatus">请选择 CI 工件内 verify-epfl-six-person-cross-camera.json。只读、浏览器本地核对，文件本身不能代替 GitHub CI 与媒体 SHA256 的可信来源验证。配对截图在同一 CI 工件中。</p>
 <div class="row" id="epflSummary"></div>
 <div class="scroller"><table><thead><tr><th>时间帧（从0开始）</th><th>测试集</th><th>模型框（0 / 1）</th><th>自动配对</th><th>官方真值同人</th><th>错配 / 无法核验</th></tr></thead>
 <tbody id="epflAuditRows"><tr><td colspan="6">尚未导入研究报告；默认不把匿名检测结果解释为真实人员身份。</td></tr></tbody></table></div>
+<div id="epflReviewPanel" hidden>
+<p class="small">下面是持久化到同一个SQLite的匿名配对候选，具有管理员权限、追加式人工复核和审计。<b>导入者提交的研究JSON并非服务器自动认证的官方结果；禁止直接晋升到真实身份、底库或预警。</b></p>
+<div class="row"><label>人工复核理由<input id="epflReviewReason" maxlength="500" style="min-width:340px" value="对照原始同步研究视频及配对证据进行匿名目标审核"></label>
+<span id="epflReviewStatus" class="small">尚无候选审核记录</span></div>
+<div class="scroller"><table><thead><tr><th>研究帧</th><th>测试集</th><th>摄像机0/1检测框序号</th><th>投影距离</th><th>当前审核</th><th>操作（不认证真人身份）</th></tr></thead>
+<tbody id="epflReviewRows"><tr><td colspan="6">需要州级管理员导入报告</td></tr></tbody></table></div>
+<div class="row"><button type="button" class="secondary" id="epflLoadMore" hidden>下一页候选</button></div>
+</div>
 <p class="small">每行是<b>一个同步帧时刻</b>，同一人可在多个时间点被重复计入。百分比是“两个机位均检测并且可用官方标注核验”的条件关联指标，不是个人识别准确率。选择报告仅更新这个浏览器视图，不保存关系、不提交审核、更不修改 P### 底库。</p>
 </section>
 <section class="panel" id="researchPanel" hidden>
@@ -128,6 +138,7 @@ const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let imported=[],lastImage=null,qaOffset=0,qaNextOffset=null,qaPageSize=200;
 let qaPageRecords=new Map(),qaModelBlobUrl=null;
+let epflPendingReport=null,epflCurrentReportDigest=null,epflCandidateOffset=0;
 async function api(path,method='GET',body){const r=await fetch(path,{method,
  headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
  body:body===undefined?undefined:JSON.stringify(body)});
@@ -405,6 +416,10 @@ async function start(){
  try{
  const [p,,actor]=await Promise.all([api('/api/places'),api('/api/cctv/datasets'),api('/api/auth/me')]);
  $('researchPanel').hidden=actor.level!==1;
+ $('epflImportReport').hidden=actor.level!==1;
+ $('epflRefreshCandidates').hidden=actor.level!==1;
+ $('epflReviewPanel').hidden=actor.level!==1;
+ if(actor.level===1)await loadEpflCandidates();
  $('place').innerHTML=p.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
  await refresh();await refreshResearch();
  setStatus('已读取：'+imported.length+' 路公开固定监控视频。');
@@ -412,6 +427,7 @@ async function start(){
 }
 
 function clearEpflResearchReport(){
+ epflPendingReport=null;
  $('epflReportStatus').textContent='未加载研究文件；没有自动确认人员身份。';
  $('epflSummary').textContent='';
  $('epflAuditRows').innerHTML='<tr><td colspan="6">尚未加载研究报告</td></tr>';
@@ -463,6 +479,27 @@ async function openEpflResearchReport(event){
        x.verified_same_gt_person_matches+'</td><td>'+
        x.verified_different_gt_person_matches+' / '+x.unscorable_pairs_no_two_sided_gt+
        '</td></tr>').join('');
+  epflPendingReport={
+    dataset:report.dataset,model:report.model,
+    matching_algorithm:report.matching_algorithm,
+    matching_gt_is_never_input:report.matching_gt_is_never_input,
+    production_real_roster_or_alerts:report.production_real_roster_or_alerts,
+    selected_cameras:report.selected_cameras,
+    per_camera:{'0':{sha256:report.per_camera['0'].sha256},
+                '1':{sha256:report.per_camera['1'].sha256}},
+    frame_audits:report.frame_audits.map(x=>({
+     frame_0_based:x.frame_0_based,cross_camera_candidates:x.cross_camera_candidates,
+     candidate_evidence:x.candidate_evidence.map(c=>({
+       cam0_model_box_index:c.cam0_model_box_index,
+       cam1_model_box_index:c.cam1_model_box_index,
+       calibration_distance:c.calibration_distance}))})),
+    holdout_frame_audits:report.holdout_frame_audits.map(x=>({
+     frame_0_based:x.frame_0_based,cross_camera_candidates:x.cross_camera_candidates,
+     candidate_evidence:x.candidate_evidence.map(c=>({
+       cam0_model_box_index:c.cam0_model_box_index,
+       cam1_model_box_index:c.cam1_model_box_index,
+       calibration_distance:c.calibration_distance}))}))
+   };
   $('epflReportStatus').textContent='本地研究文件：'+file.name+
    '。官方6人标签只用于审计。视频摘要：cam0 '+
    report.per_camera['0'].sha256.slice(0,16)+'… / cam1 '+
@@ -474,6 +511,61 @@ async function openEpflResearchReport(event){
   $('epflReportStatus').textContent='不能读取该研究报告：'+e.message;
  }
 }
+async function importEpflResearchCandidates(){
+ if(!epflPendingReport){$('epflReviewStatus').textContent='先选择真实CI研究报告JSON';return}
+ $('epflImportReport').disabled=true;
+ try{
+   const receipt=await api('/api/research/epfl/import','POST',epflPendingReport);
+   epflCurrentReportDigest=receipt.report_digest;epflCandidateOffset=0;
+   $('epflReviewStatus').textContent='导入 '+receipt.candidate_count+
+     ' 条研究匿名候选；真实身份仍未验证。'+(receipt.already_present?'（已有持久记录）':'');
+   await loadEpflCandidates();
+ }catch(e){$('epflReviewStatus').textContent='研究导入失败：'+e.message}
+ finally{$('epflImportReport').disabled=false}
+}
+async function loadEpflCandidates(next=false){
+ try{
+   if(next)epflCandidateOffset+=40;
+   const query='?limit=40&offset='+epflCandidateOffset+
+       (epflCurrentReportDigest?'&report_digest='+encodeURIComponent(epflCurrentReportDigest):'');
+   const result=await api('/api/research/epfl/candidates'+query);
+   epflCurrentReportDigest=result.report_digest;
+   $('epflReviewPanel').hidden=false;
+   $('epflReviewRows').innerHTML=result.candidates.map(x=>
+    '<tr><td>'+x.frame_0_based+'</td><td>'+esc(x.eval_split)+'</td><td>'+
+    x.cam0_box_index+' / '+x.cam1_box_index+'</td><td>'+
+    Number(x.ground_distance).toFixed(2)+'</td><td>'+
+    esc(x.verdict||'待复核')+'</td><td>'+
+    '<button type="button" class="secondary" data-epfl-key="'+esc(x.candidate_key)+
+    '" data-epfl-verdict="plausible_same_target">认为合理</button> '+
+    '<button type="button" class="secondary" data-epfl-key="'+esc(x.candidate_key)+
+    '" data-epfl-verdict="false_match">误配</button> '+
+    '<button type="button" class="secondary" data-epfl-key="'+esc(x.candidate_key)+
+    '" data-epfl-verdict="needs_review">待复核</button></td></tr>'
+   ).join('')||'<tr><td colspan="6">该报告没有本页候选，未产生任何身份</td></tr>';
+   $('epflReviewStatus').textContent='研究候选 '+result.candidate_count+
+     '，已人工复核 '+result.reviewed_count+'；当前页偏移 '+epflCandidateOffset+
+     '。JSON来源仍需核验，不进入人员底库及真实预警。';
+   $('epflLoadMore').hidden=result.next_offset===null;
+ }catch(e){$('epflReviewStatus').textContent='无法读取研究候选：'+e.message}
+}
+async function saveEpflReview(key,verdict){
+ const reason=$('epflReviewReason').value.trim();
+ try{
+  const saved=await api('/api/research/epfl/reviews','POST',{
+    candidate_key:key,verdict,reason});
+  $('epflReviewStatus').textContent='追加审核 #'+saved.review_id+
+    '。只是匿名研究候选判断，未认证自然人身份。';
+  await loadEpflCandidates();
+ }catch(e){$('epflReviewStatus').textContent='无法保存审核：'+e.message}
+}
+$('epflReviewRows').addEventListener('click',e=>{
+ const b=e.target.closest('button[data-epfl-key]');
+ if(b)saveEpflReview(b.dataset.epflKey,b.dataset.epflVerdict);
+});
+$('epflImportReport').addEventListener('click',importEpflResearchCandidates);
+$('epflRefreshCandidates').addEventListener('click',()=>{epflCandidateOffset=0;loadEpflCandidates()});
+$('epflLoadMore').addEventListener('click',()=>loadEpflCandidates(true));
 $('epflReportInput').addEventListener('change',openEpflResearchReport);
 $('epflClearReport').addEventListener('click',clearEpflResearchReport);
 
