@@ -63,6 +63,11 @@ def main():
                         expect(page.locator("#overviewKpis")).to_contain_text("14",timeout=25000)
                         expect(page.locator("#overviewVideoState")).to_contain_text(
                             "已加载真实连续双机录像",timeout=25000)
+                        expect(page.locator("#overviewVideo")).to_have_attribute("poster",__import__("re").compile(r"^blob:.*"),timeout=25000)
+                        actual_poster=page.request.get(base+"/api/real/showcase-media/poster",
+                              headers={"Authorization":"Bearer "+page.evaluate("sessionStorage.getItem('zd_access_token')")})
+                        assert actual_poster.ok and actual_poster.headers["content-type"].startswith("image/jpeg")
+                        assert len(actual_poster.body())>10000
                         page.wait_for_function("""() => {
                           const v=document.querySelector('#overviewVideo');
                           return v.readyState>=1 && v.duration>37 && v.videoWidth>=1200
