@@ -57,6 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           run_full=false
+          epfl_only=false
           # The merge-base diff includes ALL historical PR changes, forcing
           # repeated downloads forever. Compare only the latest PR head
           # commit instead. The final [cctv-full] run rechecks everything.
@@ -72,7 +73,14 @@ jobs:
             fi
           fi
           git log -1 --format=%s 'HEAD^2' | grep -q '\[cctv-full\]' && run_full=true || true
+          if git log -1 --format=%s 'HEAD^2' | grep -q '\[epfl-only\]'; then
+            # The existing CAVIAR owner has already passed on this PR; retest
+            # the EPFL activity owner alone, without downloading CAVIAR again.
+            epfl_only=true
+            run_full=true
+          fi
           echo "run=$run_full" >> "$GITHUB_OUTPUT"
+          echo "epfl_only=$epfl_only" >> "$GITHUB_OUTPUT"
           if [ -f /tmp/zd_changed_files ] && grep -Eq '^(app/face_photo_lab\.py|scripts/(install_sface|verify_face_photo_lab_local)\.py|static/face-lab\.html|tests/test_face_photo_lab\.py)' /tmp/zd_changed_files; then
             echo "face=true" >> "$GITHUB_OUTPUT"
           else
@@ -142,7 +150,7 @@ jobs:
         if: steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         run: python -m pip install -r requirements-person-detection.txt
       - name: Validate real public CAVIAR two-camera media and existing ByteTrack
-        if: steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
+        if: steps.media_scope.outputs.run == 'true' && steps.media_scope.outputs.epfl_only != 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         run: |
           python -m pytest -q tests/test_cctv_dataset.py
           # SciPy exists only after optional tracking dependencies are installed.
