@@ -1,9 +1,7 @@
-"""Anonymized 8x8 indoor scene display computed from genuine EPFL video.
+"""Real EPFL scene counts plus bounded, audited anonymous short tracklets.
 
-This is an intentionally COARSE demonstration grid, not surveyed floorplan,
-GPS, or anyone's position/route. Each sampled time contains aggregate detector
-PAIR counts; it cannot identify or track a person between times. Zone events
-are illustrative business RULES applied to actual video-derived observations.
+Long-gap identity, real-person biographical identity, geographic travel and
+GPS are unavailable. Research-admin-only output has source-frame evidence.
 """
 from __future__ import annotations
 from collections import Counter, defaultdict
@@ -37,6 +35,9 @@ def summarize_scene(activity, *, minimum_observations=3,
         "wgs84_available":False,"geographic_trajectory_available":False,
         "real_cross_location_identity_available":False,
         "individual_trajectory_available":False,
+        "short_anonymous_tracklets_verified":False,
+        "short_anonymous_tracklets":[],
+        "short_tracklets_excluded_from_map":0,
         "short_time_linkage_separately_qualified":bool(
             activity.get("cross_time_temporal_linkage_verified")),
         "source_video_is_real":bool(activity.get("ready")),
@@ -100,6 +101,54 @@ def summarize_scene(activity, *, minimum_observations=3,
         for frame in sorted(frame_counts)
         if any(count and x in zone_xs and y in zone_ys
                for (x,y),count in frame_cells[frame].items())]
+    # Linkable, BOUNDED anonymous two-camera motion is a distinct class of
+    # evidence from aggregated heat counts. Only the original untouched
+    # GT-scored 25-frame graph may be used. No invented geolocation, no
+    # inference through an unobserved gap, no named person or cross-site trip.
+    if activity.get("cross_time_temporal_linkage_verified") is True:
+        eligible=[]
+        for fragment in activity.get("activities",[]):
+            if not fragment.get("cross_frame_linked"):
+                continue
+            samples=sorted(fragment.get("samples",[]),
+                           key=lambda p:p["frame_0_based"])
+            if len(samples)<2:
+                continue
+            if any(b["frame_0_based"]-a["frame_0_based"]!=25
+                   for a,b in zip(samples,samples[1:])):
+                continue
+            points=[]
+            for sample in samples:
+                xy=sample.get("common_ground_xy")
+                if (not isinstance(xy,(list,tuple)) or len(xy)!=2
+                    or not all(isinstance(v,(int,float)) and isfinite(v)
+                               for v in xy)):
+                    points=[]
+                    break
+                points.append({
+                    "video_frame":int(sample["frame_0_based"]),
+                    "video_second":sample.get("video_second"),
+                    "x":float(xy[0]),"y":float(xy[1]),
+                    "candidate_key":sample["candidate_key"],
+                    "cam0_box_index":sample["cam0_box_index"],
+                    "cam1_box_index":sample["cam1_box_index"],
+                })
+            if points:
+                eligible.append({
+                    "fragment_id":fragment["activity_id"],
+                    "camera_pair":["6p-c0.avi","6p-c1.avi"],
+                    "site_kind":"same_real_laboratory_two_views",
+                    "short_association_only":True,
+                    "identity_verified":False,
+                    "real_geographic_journey":False,
+                    "points":points,
+                })
+        result["short_anonymous_tracklets"]=eligible
+        result["short_anonymous_tracklets_verified"]=True
+        result["short_tracklets_excluded_from_map"]=sum(
+            any(p["x"]<0 or p["x"]>=320 or p["y"]<0 or p["y"]>=320
+                for p in line["points"])
+            for line in eligible)
     result["total_observations"]=sum(frame_counts.values())
     result["observations_outside_coarse_grid"]=out_of_grid
     return result
