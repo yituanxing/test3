@@ -80,7 +80,7 @@ def run():
                         page.locator('button[type="submit"]').click()
                         # Login POST and sessionStorage access-token commit are
                         # asynchronous. A premature navigation loses the login.
-                        expect(page).to_have_url(base+"/portal",timeout=15000)
+                        expect(page).to_have_url(base+"/real",timeout=15000)
                         page.goto(base+"/cctv")
                         expect(page.locator("#epflImportReport")).to_be_visible()
                         # Same owner job has just generated a GT-free manifest
@@ -123,56 +123,36 @@ def run():
                         page.reload()
                         expect(page.locator("#epflReviewRows")).to_contain_text(
                             "needs_review",timeout=15000)
-                        # Same actual SQLite database, not hardcoded UI
-                        # statistics: 119 per-frame BODY candidate links,
-                        # one human research review, zero real-person claims.
-                        page.goto(base+"/portal?tab=acceptance")
-                        expect(page.get_by_role(
-                            "heading",name="原Excel 23项逐项核对")
-                        ).to_be_visible(timeout=15000)
-                        expect(page.locator("#view")).to_contain_text(
-                            "119条配对",timeout=15000)
-                        expect(page.locator("#view")).to_contain_text(
-                            "已人工复核 / 待复核")
-                        expect(page.locator("#view")).to_contain_text(
-                            "1 / 118")
-                        assert page.locator("#acceptanceRows tr").count()==23
-                        page.locator("#acceptStatusFilter").select_option("missing")
-                        expect(page.locator("#acceptVisibleCount")).to_have_text(
-                            "显示 2 / 23 项")
-                        assert page.locator("#acceptanceRows tr:visible").count()==2
-                        assert page.locator(
-                            '#acceptanceRows tr[data-acceptance-status="missing"] a'
-                        ).count()==0, "Do not link a missing feature as implemented"
-                        page.locator("#acceptStatusFilter").select_option("all")
-                        page.locator("#acceptSearch").fill("轨迹")
-                        expect(page.locator("#acceptVisibleCount")).to_have_text(
-                            "显示 1 / 23 项")
-                        page.locator("#acceptSearch").fill("")
-                        expect(page.locator("#acceptVisibleCount")).to_have_text(
-                            "显示 23 / 23 项")
-                        expect(page.locator("#view")).to_contain_text(
-                            "人脸检索")
-                        expect(page.locator("#view")).to_contain_text(
-                            "缺失")
-                        # Inspect the SAME one-row evidence/gap contract users
-                        # see: now, demo substitute, why, NOT equivalent,
-                        # later engineering, independent acceptance gate.
-                        first = page.locator("#acceptanceRows tr").first
-                        first.locator("summary").click()
-                        for phrase in ("实际已做：","当前替代：",
-                                       "为什么可用于演示：","不等同于：",
-                                       "后续实施：","正式验收证据："):
-                            expect(first).to_contain_text(phrase)
-                        assert first.locator("details").get_attribute("open") is not None
-                        page.locator(
-                            '#acceptanceRows tr[data-acceptance-status="missing"]'
-                        ).first.locator("summary").click()
-                        expect(page.locator(
-                            '#acceptanceRows tr[data-acceptance-status="missing"]'
-                        ).first).to_contain_text("没有有效替代")
+                        # Source-derived anonymous activity is now a FIRST-CLASS
+                        # read model, rather than 119 candidates trapped inside
+                        # the research QA page or synthetic P### business.
+                        page.goto(base+"/real")
+                        expect(page.locator("#activityStats")).to_contain_text(
+                            "119", timeout=15000)
+                        expect(page.locator("#activityTable tr").first).to_contain_text(
+                            "V001",timeout=15000)
+                        activity=page.evaluate("""async () => {
+                          const r=await fetch('/api/real/activity',{headers:{
+                            Authorization:'Bearer '+sessionStorage.getItem('zd_access_token')}});
+                          return {status:r.status,data:await r.json()};
+                        }""")
+                        assert activity['status']==200,activity
+                        facts=activity['data']
+                        assert facts['ready'] is True
+                        assert facts['matched_pair_observations']==reference_total
+                        assert facts['sampled_video_instants']==41
+                        assert facts['anonymous_activity_fragments']>0
+                        assert facts['confirmed_natural_person_identity'] is False
+                        assert facts['verified_unique_people'] is None
+                        assert facts['real_cross_site_visits'] is None
+                        assert facts['real_identity_alerts']==[]
+                        assert facts['camera_sha256'] == [
+                           proof['per_camera'][str(i)]['sha256'] for i in (0,1)]
+                        assert all(x['camera_count']==2 for x in facts['activities'])
+                        assert sum(x['synchronized_pair_observations']
+                                   for x in facts['activities']) == reference_total
                         page.screenshot(
-                            path=str(OUT/"ui-excel-23-live-acceptance.png"),
+                            path=str(OUT/"ui-epfl-real-research-activity.png"),
                             full_page=True)
                         if js_errors:
                             raise AssertionError("Browser JavaScript error: "+repr(js_errors))
@@ -205,11 +185,14 @@ def run():
                 "genuine_model_and_calibration_input":True,
                 "anonymous_candidate_pairs_persisted":pairs,
                 "human_research_revisions_saved":reviews,
+                "activity_fragments": facts['anonymous_activity_fragments'],
+                "cross_time_fragments":facts['multi_instant_fragments'],
+                "real_video_fps":facts['video_fps'],
                 "admin_audit_entries":audit,
                 "identity_confirmed":False,
                 "real_risk_alerts_generated":0,
                 "synthetic_roster_rows_generated":0,
-                "browser_screenshot":"reports/ui-epfl-real-research-review.png",
+                "browser_screenshot":"reports/ui-epfl-real-research-activity.png",
             }
             (OUT/"epfl6p-review-integration.json").write_text(
                 json.dumps(outcome,ensure_ascii=False,indent=2),
