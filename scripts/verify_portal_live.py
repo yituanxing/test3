@@ -114,6 +114,43 @@ def run(args):
             assert by_place[place['id']]['person_objects'] >= len(actual_ids)
             report['checks']['place_detail_event_count'] = 'PASS'
 
+            # The user-facing /real workbench must show the SAME objects
+            # observed by actual Frigate inference from the licensed RTSP
+            # clip. A fixture-only empty-state browser test cannot prove this.
+            real_page = client.get(args.backend + '/real')
+            real_page.raise_for_status()
+            assert '仅真实视频 · 事件与证据' in real_page.text
+            report['checks']['real_workbench_page_served'] = 'PASS'
+
+            real = request(client, 'GET', args.backend + '/api/real/evidence',
+                           params={'days': 7, 'limit': 200}, headers=headers)
+            assert real['mode'] == 'real_evidence_only'
+            assert real['contains_synthetic_identity'] is False
+            assert real['contains_synthetic_alerts'] is False
+            assert real['counts_unique_people'] is False
+            assert real['counts_real_site_visits'] is False
+            assert real['confirmed_cross_camera_identity'] is False
+            actual_workbench = {
+                (row['camera'], row['event_id']): row
+                for row in real['recent_frigate_events']
+            }
+            missing = actual_ids - {
+                event_id for camera, event_id in actual_workbench if camera == args.camera
+            }
+            assert not missing, (
+                'Actual Frigate objects missing from /real: ' + str(sorted(missing)[:5]))
+            for event_id in actual_ids:
+                row = actual_workbench[(args.camera, event_id)]
+                assert row['source'] == 'frigate_actual_upstream_event'
+                assert row['place_id'] == place['id']
+                assert row['subject_id'] is None
+                assert row['identity_confirmed'] is False
+            assert real['real_event_counts']['person_objects'] >= len(actual_ids)
+            real_places = {row['place_id']: row for row in real['by_place']}
+            assert real_places[place['id']]['person_objects'] >= len(actual_ids)
+            report['real_workbench_matched_upstream_objects'] = len(actual_ids)
+            report['checks']['real_workbench_actual_frigate_provenance'] = 'PASS'
+
             quality = request(client, 'GET', args.backend + '/api/frigate/quality',
                               headers=headers)
             assert quality['identity_recognition_verified'] is False
