@@ -395,3 +395,17 @@ def test_real_detector_runs_enter_canonical_anonymous_occurrences_and_qa_with_ve
         assert c.execute('SELECT COUNT(*) FROM public_cctv_track_boxes').fetchone()[0]==4
         assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
         assert c.execute('SELECT COUNT(*) FROM research_occurrence_links').fetchone()[0]==0
+
+
+def test_yolo_vs_published_boxes_iou50_is_one_to_one_and_not_identity():
+    from app.person_detection_adapter import count_iou50_matches
+    gt=[[0,0,100,100],[200,0,300,100]]
+    assert count_iou50_matches(gt,gt)=={'tp':2,'fp':0,'fn':0}
+    assert count_iou50_matches([gt[0]],gt)=={'tp':1,'fp':0,'fn':1}
+    # Two identical model boxes must never count as two separate GT people.
+    assert count_iou50_matches([gt[0],gt[0]],gt)=={'tp':1,'fp':1,'fn':1}
+    assert count_iou50_matches([],gt)=={'tp':0,'fp':0,'fn':2}
+    assert count_iou50_matches(gt,[])=={'tp':0,'fp':2,'fn':0}
+    assert count_iou50_matches([],[])=={'tp':0,'fp':0,'fn':0}
+    assert count_iou50_matches([[0,0,10,10]],[[50,50,60,60]])=={
+        'tp':0,'fp':1,'fn':1}
