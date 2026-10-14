@@ -69,7 +69,10 @@ def _model():
 
 
 def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
-                             sample_every:int=1,confidence:float=.25):
+                             sample_every:int=1,confidence:float=.25,
+                             image_size:int=640):
+    if image_size not in (640,960):
+        raise ValueError("only bounded 640 or 960 research inputs supported")
     if not 1<=max_frames<=64 or not 1<=sample_every<=4 or not .1<=confidence<=.9:
         raise ValueError("bounded detection parameters required")
     record=c.execute("""SELECT i.video_sha256,i.frames_available,i.camera_view,
@@ -127,7 +130,7 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
                     continue
                 # Only class 0 in COCO is person; no face identification.
                 raw=model.predict(source=frame,classes=[0],
-                                  conf=confidence,imgsz=640,device="cpu",
+                                  conf=confidence,imgsz=image_size,device="cpu",
                                   verbose=False)[0]
                 boxes=raw.boxes
                 coords=boxes.xyxy.cpu().numpy().astype(np.float32)
@@ -185,6 +188,7 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
         "video_sha256":record["video_sha256"],"model":MODEL,
         "model_weights_sha256":weights_sha,
         "detector_confidence_threshold":confidence,
+        "detector_image_size":image_size,
         "tracker_activation_threshold":activation_threshold,
         "tracker_assignment_coverage_of_yolo_detections":(
             round(tracked/predicted,4) if predicted else None),
@@ -239,11 +243,12 @@ def persist_detection_run(c, result):
         "model":result["model"],"tracker":result["tracker"],
         "model_weights_sha256":result.get("model_weights_sha256"),
         "detector_confidence_threshold":result.get("detector_confidence_threshold"),
+        "detector_image_size":result.get("detector_image_size",640),
         # Tracker config IS part of provenance: changing activation
         # thresholds can change trajectories even for identical MPEG/model.
         "tracker_activation_threshold":result.get("tracker_activation_threshold"),
         "tracker_minimum_consecutive_frames":1,
-        "pipeline_version":"yolo11n_bytetrack_gt_independent_v2",
+        "pipeline_version":"yolo11n_bytetrack_gt_independent_v3_input_size",
         "frames_decoded":result["frames_decoded"],
         "sampling_step":result["sampling_step"],
     }
