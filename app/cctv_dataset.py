@@ -488,60 +488,7 @@ def compare_caviar_pair(source_id:int,request:Request,
 
 @router.get('/api/cctv/sources/{source_id}/model-frame')
 def model_detection_frame(source_id:int,request:Request,
-                          run_key:str=Query(pattern=r'^[0-9a-f]{32}
-def annotated_frame(source_id:int,request:Request,
-                    frame:int=Query(1,ge=1,le=25000)):
-    """Actual decoded MPEG picture plus ORIGINAL manual CVML boxes.
-
-    Labels are camera-local tracking IDs. No HOG/YOLO/face recognition
-    is claimed here; manual bounding boxes are original published truth.
-    """
-    with _db() as c:
-        access.check_source(c,request,source_id)
-        row=c.execute('''SELECT i.frames_available,s.uri FROM public_cctv_imports i
-          JOIN sources s ON s.id=i.source_id WHERE i.source_id=?''',
-          (source_id,)).fetchone()
-        if not row:
-            raise HTTPException(404,'该源不存在公开CAVIAR视频版本')
-        if frame>row['frames_available']:
-            raise HTTPException(422,'帧号超出该视频标注范围')
-        boxes=[dict(x) for x in c.execute('''SELECT camera_local_track_id,x,y,width,height
-            FROM public_cctv_track_boxes WHERE source_id=? AND frame_number=?
-            ORDER BY camera_local_track_id''',(source_id,frame))]
-    capture=cv2.VideoCapture(row['uri'])
-    try:
-        if not capture.isOpened():
-            raise HTTPException(409,'已登记CAVIAR视频文件目前不可读')
-        # MPEG2 random-access frame indexes may be unreliable, too.
-        # On the bounded tiny proof clip, decoding sequentially is exact.
-        picture=None
-        for index in range(frame):
-            ok,picture=capture.read()
-            if not ok:
-                raise HTTPException(409,'指定的监控帧目前无法解码')
-        if picture is None:
-            raise HTTPException(409,'指定的监控帧目前无法解码')
-        for box in boxes:
-            x,y,w,h=box['x'],box['y'],box['width'],box['height']
-            cv2.rectangle(picture,(x,y),(x+w,y+h),(40,235,100),2)
-            cv2.putText(picture,'local#'+box['camera_local_track_id'],
-                        (x,max(11,y-4)),cv2.FONT_HERSHEY_SIMPLEX,
-                        0.35,(30,235,100),1,cv2.LINE_AA)
-        # This watermark is in the output and cannot be mistaken for an
-        # inference result or a named physical-world identity.
-        cv2.rectangle(picture,(0,0),(picture.shape[1],24),(22,22,22),-1)
-        cv2.putText(picture,'CAVIAR GT annotated / camera-local IDs',
-                    (3,16),cv2.FONT_HERSHEY_SIMPLEX,0.37,(255,255,255),1)
-        ok,jpg=cv2.imencode('.jpg',picture,[cv2.IMWRITE_JPEG_QUALITY,82])
-        if not ok:
-            raise HTTPException(500,'当前监控帧 JPEG 编码失败')
-        return Response(content=jpg.tobytes(),media_type='image/jpeg',
-                headers={'Cache-Control':'no-store',
-                    'X-Annotations':'CAVIAR manual ground truth',
-                    'X-Camera-Local-Boxes':str(len(boxes))})
-    finally:
-        capture.release()
-),
+                          run_key:str=Query(pattern=r'^[0-9a-f]{32}$'),
                           frame:int=Query(1,ge=1,le=600)):
     """Actual licensed MPEG image with STORED YOLO+ByteTrack predictions.
 
