@@ -15,6 +15,7 @@ name: ZD Frigate Real Person CI
       - "scripts/verify_gb28181_real_app.py"
       - "scripts/package_local_demo.py"
       - "scripts/verify_caviar_public_footage.py"
+      - "scripts/assess_real_person_readiness.py"
       - "requirements-tracking.txt"
       - "requirements-person-detection.txt"
       - ".github/workflows/zd-frigate-real-person.yml"
@@ -71,6 +72,7 @@ jobs:
         run: |
           python -m pytest -q tests/test_cctv_dataset.py
           python -m scripts.verify_caviar_public_footage
+          python -m scripts.assess_real_person_readiness --input reports/verify-caviar-fixed-cctv.json --output reports/real-person-identity-readiness.json
       - name: Preserve real public CCTV evidence (no raw licensed videos)
         if: always() && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         uses: actions/upload-artifact@v4
@@ -78,6 +80,7 @@ jobs:
           name: public-caviar-actual-video-proof
           path: |
             reports/verify-caviar-fixed-cctv.json
+            reports/real-person-identity-readiness.json
             reports/caviar-*-gt.jpg
             reports/caviar-*-yolo.jpg
           if-no-files-found: warn
