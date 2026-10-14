@@ -24,7 +24,7 @@ def test_unambiguous_temporal_fragments_and_no_overcount_of_people():
     rows = [_row("a",500,10,10,12,10), _row("b",625,11,10,13,10),
             _row("c",500,200,100,202,100),
             _row("d",625,201,100,203,100)]
-    result = real_activity.activity_summary(rows,25.)
+    result = real_activity.activity_summary(rows,25.,temporal_verified=True)
     assert result["matched_pair_observations"] == 4
     assert result["sampled_video_instants"] == 2
     assert result["anonymous_activity_fragments"] == 2
@@ -106,8 +106,9 @@ def test_admin_must_import_real_video_provenance_and_never_use_GT(auth, monkeypa
     assert d["ready"] is True
     assert d["matched_pair_observations"]==2
     assert d["sampled_video_instants"]==2
-    assert d["anonymous_activity_fragments"]==1
-    assert d["multi_instant_fragments"]==1
+    assert d["anonymous_activity_fragments"]==2
+    assert d["multi_instant_fragments"]==0
+    assert d["cross_time_temporal_linkage_verified"] is False
     assert d["activities"][0]["camera_count"]==2
     assert d["activities"][0]["first_video_second"]==20.
     assert d["confirmed_natural_person_identity"] is False
