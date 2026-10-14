@@ -120,6 +120,15 @@ function showPanel(name,writeHash){
  if(writeHash)history.replaceState(null,"","#"+id);
  if(id!=="overview")byId("overviewVideo").pause();
  if(id!=="video")byId("videoClip").pause();
+ if(id==="video"){
+  const clip=byId("videoClip");
+  // Decode an actual video frame on panel entry; a gray player is not a proof.
+  if(clip && clip.src && clip.readyState>=1){
+   if(clip.currentTime<1)clip.currentTime=12;
+   clip.muted=true;
+   clip.play().then(()=>setTimeout(()=>clip.pause(),450)).catch(()=>{});
+  }
+ }
  scrollTo({top:0,behavior:"instant"});
 }
 window.zdShowPanel=showPanel;
