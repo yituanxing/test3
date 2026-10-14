@@ -355,6 +355,9 @@ def test_very_short_cross_camera_tracklets_are_video_grounded_and_never_gps():
     assert [p["candidate_key"] for p in track["points"]]==["first","second"]
     assert track["identity_verified"] is False
     assert track["real_geographic_journey"] is False
+    assert scene["virtual_zone_division"]["true_different_sites"] is False
+    assert scene["short_virtual_zone_crossing_count"]==0
+    assert scene["short_virtual_zone_crossings"]==[]
     assert scene["wgs84_available"] is False
     assert scene["individual_trajectory_available"] is False
     assert scene["real_cross_location_identity_available"] is False
@@ -363,5 +366,6 @@ def test_very_short_cross_camera_tracklets_are_video_grounded_and_never_gps():
         **{**verified,"cross_time_temporal_linkage_verified":False}})
     assert downgraded["short_anonymous_tracklets_verified"] is False
     assert downgraded["short_anonymous_tracklets"]==[]
+    assert downgraded["short_virtual_zone_crossings"]==[]
     assert downgraded["total_observations"]==2
 
