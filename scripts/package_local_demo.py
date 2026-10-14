@@ -29,7 +29,7 @@ FILES = (
     "requirements.txt", "requirements-business.txt", "requirements-tracking.txt",
     "requirements-person-detection.txt",
 )
-EXTENSIONS = {".py", ".html", ".js", ".sh", ".yml", ".yaml", ".md", ".txt", ".json", ".mp4"}
+EXTENSIONS = {".py", ".html", ".js", ".sh", ".yml", ".yaml", ".md", ".txt", ".json", ".mp4", ".bat", ".ps1"}
 BANNED = {".git", ".venv", "data", "__pycache__", ".ci-data", "reports", "dist", "node_modules"}
 files = []
 for folder in FOLDERS:
