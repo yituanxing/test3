@@ -74,6 +74,15 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <div class="scroll"><table><thead><tr><th>Excel条目</th><th>预警类型</th><th>模拟命中</th><th>示例命中与原始模拟观测</th></tr></thead>
 <tbody id="excelRuleRows"><tr><td colspan="4">点击核验，不展示无来源的警情</td></tr></tbody></table></div>
 </section>
+<section class="box" id="excelAcceptance">
+<h2>原 Excel 23 项 · 严格验收与缺口</h2>
+<p class="small">按原始需求逐项核对，已实现、模拟业务、部分实现、缺失严格区分。可跳转的页面是<strong>演示入口，不代表原需求通过</strong>。</p>
+<div id="excelAcceptanceStats" class="cards"></div>
+<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">展开核验全部23项（含剩余缺口）</summary>
+<div class="scroll"><table><thead><tr><th>Excel项</th><th>原要求</th><th>严格状态</th><th>本版有的东西</th><th>仍缺什么</th><th>操作入口</th></tr></thead>
+<tbody id="excelAcceptanceRows"><tr><td colspan="6">正在读取真实验收矩阵</td></tr></tbody></table></div>
+</details><p id="excelAcceptanceNote" class="small"></p>
+</section>
 <section class="box"><h2>真实研究视频的独立证据</h2>
 <div id="research">加载中</div><p class="small">这里展示官方公开片段的相机内轨迹标注，不代表已经自动完成跨机同人识别，也不是实时监控数据。</p>
 <a href="/cctv">核对原片帧、人体框和关联研究 →</a></section>
@@ -181,6 +190,28 @@ async function loadExcelRules(){
 }
 $('reloadExcelRules').onclick=loadExcelRules;
 loadExcelRules();
+async function loadExcelAcceptance(){
+ try{
+  const data=await api('/api/real/excel-acceptance');
+  const statuses=[
+    ['verified_real','管理功能已验收'],
+    ['synthetic_only','仅模拟业务'],
+    ['partial','部分实现'],
+    ['missing','关键能力缺失']
+  ];
+  $('excelAcceptanceStats').innerHTML=statuses.map(([code,label])=>
+    '<div class="card"><span class="small">'+label+'</span><strong>'+
+    (data.status_counts[code]||0)+'</strong></div>').join('');
+  const labels=Object.fromEntries(statuses);
+  $('excelAcceptanceRows').innerHTML=data.requirements.map(row=>
+    '<tr><td>#'+row.id+'</td><td>'+esc(row.title)+'</td><td>'+esc(labels[row.status])+'</td><td>'+
+    esc(row.delivered_now)+'</td><td>'+esc(row.remaining_gap)+'</td><td><a href="'+
+    esc(row.demo_route)+'">查看（有限演示）</a></td></tr>').join('');
+  $('excelAcceptanceNote').textContent='来源：'+data.source_file+'｜'+data.source_worksheet+
+   '工作表 '+data.source_rows+'行；不是23项全部通过。';
+ }catch(e){$('excelAcceptanceNote').textContent='Excel核验读取失败：'+e.message}
+}
+loadExcelAcceptance();
 $('loadActivity').onclick=loadActivity;
 loadActivity();
 $('days').onchange=reload;$('refresh').onclick=reload;
