@@ -81,6 +81,7 @@ space.append(modules.space);
 alerts.append(modules.alerts);
 acceptance.append(modules.acceptance,modules.rules,modules.audit);
 live.append(modules.live);
+if(modules.live)modules.live.open=true;
 // Preserve the legacy local upload controls offstage so backward-compatible
 // event listeners never crash, but never expose a second duplicated player.
 const hiddenLegacy=document.createElement("div");hiddenLegacy.hidden=true;
@@ -121,6 +122,13 @@ document.body.addEventListener("click",e=>{
  showPanel(el.dataset.panel||el.dataset.go,true);
 });
 showPanel(selectedFromHash(),false);
+const logoff=byId("logout");
+if(logoff)logoff.onclick=async event=>{
+ event.preventDefault();
+ try{await api("/api/auth/logout","POST")}catch(e){}
+ sessionStorage.removeItem("zd_access_token");
+ location.replace("/login");
+};
 
 // Mirror actual imported counts; empty and error states stay empty rather
 // than filling a mock total. The original APIs remain the sole data source.
@@ -139,7 +147,7 @@ new MutationObserver(updateKpis).observe(byId("activityStats"),{childList:true,s
 updateKpis();
 
 function syncFromVideo(player){
- if(!window.sceneData&&!typeof sceneData==="object")return;
+ if(typeof sceneData==="undefined")return;
  if(typeof sceneData==="undefined"||!sceneData?.frame_cells?.length)return;
  const fps=Number(window.clipFPS||clipFPS)||25;
  const estimated=(60+player.currentTime)*fps;
