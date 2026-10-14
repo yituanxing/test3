@@ -278,6 +278,8 @@ def run():
                         # Real video and actual browser interaction: never rely
                         # on a stubbed API or synthetic detector boxes.
                         page.goto(base+"/monitor")
+                        expect(page.locator("#videoButton")).to_be_visible(timeout=12000)
+                        expect(page.locator("#syncButton")).to_be_visible(timeout=12000)
                         # The GB28181 status must be truthful even without SIP
                         # hardware or a WVP upstream: no simulated online device.
                         expect(page.locator("#gbStatus")).to_contain_text("尚未配置")
@@ -618,6 +620,13 @@ def run():
                             assert page.locator('nav a[href="/business"]:visible').count()==0
                             page.goto(base+"/monitor")
                             expect(page.locator("#videoButton")).to_be_hidden()
+                            # The page must remain usable for scoped real
+                            # data instead of failing on admin-only global
+                            # /api/frigate/status.
+                            expect(page.locator("#sampled")).not_to_have_text(
+                                "—",timeout=12000)
+                            expect(page.locator("#stages")).to_contain_text(
+                                "上游全局连接状态仅州级管理员可查看",timeout=12000)
                             expect(page.locator("#syncButton")).to_be_hidden()
                             page.goto(base+"/admin")
                             expect(page.locator("#accountPanel")).to_be_hidden()
