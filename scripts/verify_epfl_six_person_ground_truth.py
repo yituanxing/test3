@@ -23,7 +23,11 @@ VIDEO_BASE = "https://documents.epfl.ch/groups/c/cv/cvlab-pom-video1/www"
 OFFICIAL_BASE = "https://www.epfl.ch/labs/cvlab/wp-content/uploads/2018/08"
 GT_URL = OFFICIAL_BASE + "/gt_lab_6p.txt"
 CAL_URL = OFFICIAL_BASE + "/calibration-6p.txt"
-FRAMES = list(range(250, 2751, 125))  # GT label cadence is 25 frames.
+FRAMES = list(range(250, 2751, 125))  # Original fixed calibration baseline.
+# Distinct predeclared temporal holdout; do not retune the frozen matcher on it.
+HOLDOUT_FRAMES = list(range(275, 2751, 125))
+ALL_SCORED_FRAMES = sorted(set(FRAMES + HOLDOUT_FRAMES))
+PREVIEW_FRAMES = (500, 1750, 2500)
 MAX_BYTES = 180 * 1024 * 1024
 WORLD_GT_DISTANCE = 30.0
 CROSS_CAMERA_DISTANCE = 25.0
@@ -162,8 +166,9 @@ def real_detections(video_path, camera, homography, model):
     if not cap.isOpened():
         raise RuntimeError("Official six-person video cannot be decoded")
     actual_fps = cap.get(cv2.CAP_PROP_FPS)
-    selected = set(FRAMES)
+    selected = set(ALL_SCORED_FRAMES)
     found = {}
+    previews = {}
     index = 0
     try:
         while index <= max(selected):
@@ -171,6 +176,9 @@ def real_detections(video_path, camera, homography, model):
             if not ok:
                 break
             if index in selected:
+                if index in PREVIEW_FRAMES:
+                    # Research stills only, never the original video in CI artifact.
+                    previews[index] = image.copy()
                 boxes = model.predict(
                     source=image, classes=[0], conf=.25, imgsz=640,
                     device="cpu", verbose=False)[0].boxes
@@ -190,11 +198,11 @@ def real_detections(video_path, camera, homography, model):
             index += 1
     finally:
         cap.release()
-    if len(found) != len(FRAMES):
+    if len(found) != len(ALL_SCORED_FRAMES):
         raise RuntimeError(
-            f"Camera {camera}: expected {len(FRAMES)} official labeled "
+            f"Camera {camera}: expected {len(ALL_SCORED_FRAMES)} official labeled "
             f"frames, decoded only {len(found)}, last decoded {index}")
-    return found, {
+    return found, previews, {
         "decoded_up_to_0_based_frame": index - 1,
         "fps": round(actual_fps, 3),
         "sampled_labeled_frames": len(found),
@@ -253,6 +261,73 @@ def audit_pair(observations, truth):
     }
 
 
+def _sum_audits(rows):
+    total = defaultdict(int)
+    for audit in rows:
+        for key in ("cross_camera_candidates", "verified_same_gt_person_matches",
+                    "verified_different_gt_person_matches",
+                    "unscorable_pairs_no_two_sided_gt",
+                    "gt_persons_independently_detected_in_both_views",
+                    "eligible_gt_persons_covered_by_true_pair"):
+            total[key] += audit[key]
+    positive = total["verified_same_gt_person_matches"]
+    erroneous = total["verified_different_gt_person_matches"]
+    scorable = positive + erroneous
+    eligible = total["gt_persons_independently_detected_in_both_views"]
+    return {
+        **total,
+        "scorable_pair_precision": round(positive / scorable, 4) if scorable else None,
+        "detected_both_sides_pair_recall": (
+            round(total["eligible_gt_persons_covered_by_true_pair"] / eligible, 4)
+            if eligible else None),
+        "scored_frame_count": len(rows),
+        "not_full_person_recall": True,
+        "not_a_unique_people_measure": True,
+        "unmatched_GT_no_camera_visibility_labels": True,
+        "verification_scope": "anonymous per-frame association, not named identity",
+        "real_identity_global_person_roster_verified": False,
+        "automatic_real_person_alerts_verified": False,
+        "go_no_go": ("REVIEW_CANDIDATES_ONLY" if scorable > 0
+                     else "NO_SCORABLE_CROSS_CAMERA_PAIRS"),
+    }
+
+
+def _paired_preview(frame, image_by_camera, predictions, audit):
+    """Two original camera frames with YOLO boxes and candidate lines.
+
+    Never draws official GT identity labels in user-facing evidence.
+    """
+    left = image_by_camera[0][frame].copy()
+    right = image_by_camera[1][frame].copy()
+    h = max(left.shape[0], right.shape[0])
+    w0 = left.shape[1]
+    target = np.zeros((h + 30, w0 + right.shape[1], 3), dtype=np.uint8)
+    target[30:30 + left.shape[0], :w0] = left
+    target[30:30 + right.shape[0], w0:] = right
+    for cam, offset in ((0, 0), (1, w0)):
+        for i, item in enumerate(predictions[cam][frame]):
+            x1, y1, x2, y2 = [int(round(v)) for v in item["xyxy"]]
+            cv2.rectangle(target, (offset+x1, y1+30),
+                          (offset+x2, y2+30), (255, 160, 25), 2)
+            cv2.putText(target, str(i), (offset+x1, max(41, y1+23)),
+                        cv2.FONT_HERSHEY_SIMPLEX, .45, (255, 160, 25), 1)
+    for link in audit["candidate_evidence"]:
+        a = predictions[0][frame][link["cam0_model_box_index"]]["xyxy"]
+        b = predictions[1][frame][link["cam1_model_box_index"]]["xyxy"]
+        p0 = (int((a[0]+a[2])/2), int((a[1]+a[3])/2)+30)
+        p1 = (w0+int((b[0]+b[2])/2), int((b[1]+b[3])/2)+30)
+        cv2.line(target, p0, p1, (35, 240, 100), 1)
+    cv2.putText(target, f"EPFL SIX PERSON | frame {frame} | "
+                "YOLO + geometry candidate links, NO identity GT as input",
+                (5, 19), cv2.FONT_HERSHEY_SIMPLEX, .38,
+                (255, 255, 255), 1)
+    output = Path(f"reports/epfl6p-paired-frame-{frame}.jpg")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if not cv2.imwrite(str(output), target, [cv2.IMWRITE_JPEG_QUALITY, 85]):
+        raise RuntimeError("Failed to preserve research candidate screenshot")
+    return str(output)
+
+
 def main():
     from ultralytics import YOLO
     model = YOLO("yolo11n.pt")
@@ -273,6 +348,13 @@ def main():
             "metadata": {},
             "per_camera": {},
             "frame_audits": [],
+            "holdout_frame_audits": [],
+            "holdout_plan": {
+                "original_frames": FRAMES,
+                "fixed_untuned_holdout_frames": HOLDOUT_FRAMES,
+                "same_original_videos_model_and_calibration": True,
+            },
+            "candidate_preview_jpegs": [],
         }
         for name, url in (("gt", GT_URL), ("calibration", CAL_URL)):
             target = tmp / (name + ".txt")
@@ -282,55 +364,43 @@ def main():
             (tmp / "calibration.txt").read_text(encoding="utf-8"))
         evidence["ground_truth"] = info
         observations = {}
+        previews = {}
         for camera in (0, 1):
             p = tmp / f"6p-c{camera}.avi"
             downloaded = download_official(
                 f"{VIDEO_BASE}/6p-c{camera}.avi", p)
-            predictions, summary = real_detections(
+            predictions, preview, summary = real_detections(
                 p, camera, matrices[camera], model)
+            previews[camera] = preview
             # Reuse the previous REAL consecutive-frame ByteTrack test.
             local_tracking = _track_contiguous_windows(p, camera, model)
             evidence["per_camera"][str(camera)] = {
                 **downloaded, **summary, "local_tracking": local_tracking,
             }
             observations[camera] = predictions
-        total = defaultdict(int)
-        for frame in FRAMES:
-            audit = audit_pair(
-                (observations[0][frame], observations[1][frame]),
-                gt[frame])
-            evidence["frame_audits"].append({"frame_0_based": frame, **audit})
-            for key in ("cross_camera_candidates", "verified_same_gt_person_matches",
-                        "verified_different_gt_person_matches",
-                        "unscorable_pairs_no_two_sided_gt",
-                        "gt_persons_independently_detected_in_both_views",
-                        "eligible_gt_persons_covered_by_true_pair"):
-                total[key] += audit[key]
-        positive = total["verified_same_gt_person_matches"]
-        erroneous = total["verified_different_gt_person_matches"]
-        scorable = positive + erroneous
-        eligible = total["gt_persons_independently_detected_in_both_views"]
-        evidence["summary"] = {
-            **total,
-            "scorable_pair_precision": (
-                round(positive / scorable, 4) if scorable else None),
-            "detected_both_sides_pair_recall": (
-                round(total["eligible_gt_persons_covered_by_true_pair"] / eligible, 4)
-                if eligible else None),
-            "not_full_person_recall": True,
-            "unmatched_GT_no_camera_visibility_labels": True,
-            "verification_scope": "anonymous per-frame association, not named identity",
-            "real_identity_global_person_roster_verified": False,
-            "automatic_real_person_alerts_verified": False,
-            "go_no_go": ("REVIEW_CANDIDATES_ONLY" if scorable > 0
-                         else "NO_SCORABLE_CROSS_CAMERA_PAIRS"),
-        }
+        for key,frames in (
+            ("frame_audits", FRAMES),
+            ("holdout_frame_audits", HOLDOUT_FRAMES),
+        ):
+            for frame in frames:
+                audit = audit_pair(
+                    (observations[0][frame], observations[1][frame]),
+                    gt[frame])
+                evidence[key].append({"frame_0_based": frame, **audit})
+        evidence["summary"] = _sum_audits(evidence["frame_audits"])
+        evidence["holdout_summary"] = _sum_audits(evidence["holdout_frame_audits"])
+        for frame in PREVIEW_FRAMES:
+            audit = next(x for x in evidence["frame_audits"]
+                         if x["frame_0_based"] == frame)
+            evidence["candidate_preview_jpegs"].append(
+                _paired_preview(frame, previews, observations, audit))
     OUTPUT.parent.mkdir(exist_ok=True, parents=True)
     OUTPUT.write_text(json.dumps(evidence, ensure_ascii=False, indent=2),
                       encoding="utf-8")
     print(json.dumps({
         "dataset": evidence["dataset"], "cameras": evidence["selected_cameras"],
         "GT": info, "summary": evidence["summary"],
+        "holdout_summary": evidence["holdout_summary"],
         "camera_detection_counts": {
             camera: evidence["per_camera"][str(camera)]["total_model_person_detections"]
             for camera in (0, 1)},
