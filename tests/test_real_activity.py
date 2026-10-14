@@ -233,6 +233,22 @@ def test_real_video_scene_aggregate_is_anonymous_and_has_no_fake_gps():
     assert "candidate_key" not in json.dumps(result)
     assert "anonymous_fragment_id" not in json.dumps(result)
     assert "latitude" not in json.dumps(result)
+    assert result["grid_size"]==8
+    assert result["zone"]=={"x_bin":2,"y_bin":3,"width_cells":2,"height_cells":2}
+    assert len(result["frame_cells"])==2
+    assert len(result["demo_zone_events"])==2
+    assert [e["video_frame"] for e in result["demo_zone_events"]]==[500,525]
+    assert result["individual_trajectory_available"] is False
+    assert result["frame_cells"][0]["paired_detection_count"]==3
+    assert sum(c["paired_detection_count"] for c in result["frame_cells"][0]["cells"])==3
+    assert all("fragment_id" not in json.dumps(frame)
+               for frame in result["frame_cells"])
+    # Moving the demo rectangle recomputes against the SAME observed cells.
+    moved=summarize_scene({"ready":True,**facts},minimum_observations=3,
+                          zone_x_bin=6,zone_y_bin=5)
+    assert len(moved["demo_zone_events"])==1
+    assert moved["demo_zone_events"][0]["video_frame"]==500
+    assert moved["total_observations"]==result["total_observations"]
 
 
 def test_real_video_scene_aggregate_requires_real_import_and_admin(auth,monkeypatch):
@@ -255,6 +271,13 @@ def test_real_video_scene_aggregate_requires_real_import_and_admin(auth,monkeypa
     assert len(result["demo_scene_events"])==2
     assert len(result["heat_cells"])>=1
     assert client.get("/api/real/scene-aggregate?minimum_observations=11",
+                      headers=admin).status_code==422
+    zone=client.get("/api/real/scene-aggregate?zone_x_bin=0&zone_y_bin=0"
+                    "&minimum_observations=1",headers=admin).json()
+    assert len(zone["demo_zone_events"])==2
+    assert len(zone["frame_cells"])==2
+    assert zone["zone"]["x_bin"]==0
+    assert client.get("/api/real/scene-aggregate?zone_x_bin=7",
                       headers=admin).status_code==422
     with main.db() as db:
         assert db.execute("SELECT COUNT(*) FROM synthetic_observations").fetchone()[0]==0
