@@ -398,6 +398,8 @@ def _write_candidate_bundle(evidence):
         "matching_algorithm": evidence["matching_algorithm"],
         "matching_gt_is_never_input": True,
         "production_real_roster_or_alerts": False,
+        "temporal_fragment_verified": evidence["temporal_fragment_audit"]["temporal_fragment_verified"],
+        "temporal_delivery_decision": evidence["temporal_fragment_audit"]["delivery_decision"],
         "license": "EPFL research only; no original AVI or ground truth included",
         "generated_from": "real_video_owner_ci_detector_result",
         "source_ci_run_id": os.environ.get("GITHUB_RUN_ID"),
@@ -492,8 +494,25 @@ def main():
         evidence["summary"] = _sum_audits(evidence["frame_audits"])
         evidence["holdout_summary"] = _sum_audits(evidence["holdout_frame_audits"])
         evidence["temporal_fragment_audit"] = audit_temporal_fragments(evidence)
-        if evidence["temporal_fragment_audit"]["wrongly_merged_gt_person_fragments"]:
-            raise RuntimeError("Real EPFL anonymous time-fragment IDs switched official GT persons")
+        # Important: the older synchronous CAMERA-TO-CAMERA frame pair gate
+        # remains valid even when an experimental CROSS-TIME tracker switches
+        # people. In that case DISABLE cross-time IDs in the shipped activity
+        # viewer; keep the 119 real paired observations and their true frame
+        # clocks instead of falsely claiming long-range identity.
+        temporal = evidence["temporal_fragment_audit"]
+        temporal["temporal_fragment_verified"] = (
+            temporal["scorable_multi_instant_fragments"] > 0
+            and temporal["wrongly_merged_gt_person_fragments"] == 0
+            and temporal["unscorable_multi_instant_fragments"] == 0)
+        temporal["delivery_decision"] = (
+            "VERIFIED_ANONYMOUS_CROSS_TIME_FRAGMENTS"
+            if temporal["temporal_fragment_verified"]
+            else "PER_FRAME_DUAL_CAMERA_MATCHES_ONLY_NO_CROSS_TIME_ID")
+        for key in ("summary", "holdout_summary"):
+            report = evidence[key]
+            if report["verified_different_gt_person_matches"] != 0 or (
+                    report["verified_same_gt_person_matches"] <= 0):
+                raise RuntimeError("Even the actual per-frame dual-camera real match failed")
         for frame in PREVIEW_FRAMES:
             audit = next(x for x in evidence["frame_audits"]
                          if x["frame_0_based"] == frame)
