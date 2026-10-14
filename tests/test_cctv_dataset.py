@@ -364,6 +364,23 @@ def test_real_detector_runs_enter_canonical_anonymous_occurrences_and_qa_with_ve
     manual=[row for row in records if row['provider']=='caviar_ground_truth']
     assert len(yolo)==1 and len(manual)==2
     item=yolo[0]
+    # A reviewer must see ACTUAL stored MODEL geometry on the ORIGINAL
+    # video frame. Reusing CAVIAR's GT preview would falsely suggest
+    # automatic detector accuracy and invalidate manual QA.
+    proof=f'/api/cctv/sources/{sid}/model-frame'
+    query={'run_key':out.json()['run_key'],'frame':1}
+    assert client.get(proof,params=query).status_code==401
+    picture=client.get(proof,headers=county,params=query)
+    assert picture.status_code==200,picture.text[:100] if picture.status_code!=200 else ''
+    assert picture.headers['content-type']=='image/jpeg'
+    assert picture.headers['cache-control']=='private, no-store'
+    assert picture.headers['x-annotations']=='YOLO model local tracks, not ground truth'
+    assert picture.headers['x-model-boxes']=='1'
+    assert picture.content[:2]==b'\\xff\\xd8'
+    assert client.get(proof,headers=county,params={
+        'run_key':'f'*32,'frame':1}).status_code==404
+    assert client.get(proof,headers=county,params={
+        'run_key':out.json()['run_key'],'frame':13}).status_code==422
     assert item['first_seen']==1 and item['last_seen']==12
     assert item['annotation_frames']==12 and item['track_id']=='7'
     assert item['time_basis']=='archival_video_frame_number'
