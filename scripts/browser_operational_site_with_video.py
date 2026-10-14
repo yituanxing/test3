@@ -79,6 +79,7 @@ def main():
                         page.locator('.zd-nav[data-panel="video"]').click()
                         expect(page.locator("#researchActivity")).to_be_visible()
                         expect(page.locator("#activityStats")).to_contain_text("119")
+                        page.wait_for_timeout(800)
                         page.screenshot(path=str(OUT/"ui-shipped-real-video-analysis.png"),full_page=True)
                         page.locator('.zd-nav[data-panel="space"]').click()
                         expect(page.locator("#realSceneAggregation")).to_be_visible()
