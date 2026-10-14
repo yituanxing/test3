@@ -53,6 +53,14 @@ th{background:#f5f7fa}
 details{border-radius:10px}
 details>summary{cursor:pointer;color:#205a98;font-weight:650;list-style-position:inside}
 details>summary:hover{text-decoration:underline}
+.local-playback{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:22px;align-items:center;background:#fff}
+.local-playback h2{font-size:18px}
+.local-playback .choose-video{display:inline-flex;align-items:center;padding:10px 15px;border-radius:8px;background:#2862b2;color:white;cursor:pointer;font-weight:680;margin:7px 0 0}
+.local-playback .choose-video:hover{background:#194f98}
+.local-playback input[type=file]{font:12px/1.5 system-ui;display:block;max-width:100%;margin:8px 0;color:#4b6481}
+#demoClipPlayer{display:block;max-width:100%;width:100%;aspect-ratio:16/9;background:#122c46;border-radius:10px;min-height:190px}
+#demoClipPlayer[hidden]{display:none}
+@media(max-width:970px){.local-playback{grid-template-columns:1fr}}
 .story-hero{color:#fff;background:linear-gradient(125deg,#122c50,#1b5686 70%,#227a98);border-radius:0 0 21px 21px;padding:34px 36px 28px;margin:0 -12px 22px}
 .story-hero h1{color:white;margin:6px 0 12px}
 .story-hero p{color:#dceaf4;max-width:780px;line-height:1.85}
@@ -147,6 +155,18 @@ details>summary:hover{text-decoration:underline}
 <a href="#technicalArea"><small>STEP 04 · 管理</small><strong>系统与验收</strong><span>查看设备、权限和Excel</span></a>
 </nav>
 <div class="stage-head"><span class="stage-number">1</span><div><h2>先确认：视频已经被识别</h2><p>看观测次数和匿名片段，点击一次即可导入包内的真实研究视频检测证据。</p></div></div>
+<section class="local-playback box" id="localVideoPlayback">
+<div class="local-playback-meta">
+<h2>先看两台摄像机拍到的真实画面</h2>
+<p class="small">解压交付包，选择 <b>01_真实连续视频_需研究授权 / 真实原片连续双机画面_38秒.mp4</b>。视频只在当前浏览器本地播放，不上传服务器、也不会自动重新识别。</p>
+<label class="choose-video" for="demoClipInput">选择本地双机视频 MP4</label>
+<input id="demoClipInput" type="file" accept=".mp4,video/mp4" aria-label="从本地交付包选择连续双机演示视频">
+<p class="small" id="demoClipState">尚未选取本地连续视频；仍可先查看下方真实识别结果。</p>
+<div class="operation-notice">注意：播放器显示连续录像；下方119次配对和短轨迹来自以前在真实视频上完成的YOLO检测，不是在播放时即时推断。双摄像机位于同一实验室。</div>
+</div>
+<video id="demoClipPlayer" controls playsinline preload="metadata" hidden aria-label="用户自行选择的真实双摄像机原片连续回放"></video>
+</section>
+
 <section class="box" id="researchActivity">
 <h2>已检测的双摄像机录像</h2>
 <p class="small">使用两台摄像机拍摄的同一个真实实验室。程序会导入已经完成YOLO检测的录像证据；这里展示的是配对观测和短时匿名关联，<b>不是独立人数、实名身份或现场实时监控</b>。</p>
@@ -552,6 +572,10 @@ async function initializeResearchMode(){
   const me=await api('/api/auth/me');
   if(me.level!==1){
    $('introDemo').hidden=true;
+   $('localVideoPlayback').hidden=true;
+   document.querySelector('.story-steps').hidden=true;
+   document.querySelectorAll('.stage-head').forEach(el=>el.hidden=true);
+   $('liveEvidence').open=true;
    for(const id of ['researchActivity','demoAlerts','realSceneAggregation',
                     'excelRuleShowcase','excelAcceptance']){
     $(id).hidden=true;
@@ -569,6 +593,26 @@ async function initializeResearchMode(){
   $('message').textContent='身份权限检查失败：'+e.message;
  }
 }
+let currentLocalVideoURL=null;
+$('demoClipInput').onchange=()=>{
+ const selected=$('demoClipInput').files?.[0];
+ const video=$('demoClipPlayer');
+ if(currentLocalVideoURL){URL.revokeObjectURL(currentLocalVideoURL);currentLocalVideoURL=null}
+ video.pause();video.removeAttribute('src');video.hidden=true;
+ if(!selected)return;
+ if(!selected.name.toLowerCase().endsWith('.mp4')){
+  $('demoClipState').textContent='请选择交付包里的MP4视频；该文件不支持。';return;
+ }
+ currentLocalVideoURL=URL.createObjectURL(selected);
+ video.src=currentLocalVideoURL;
+ video.hidden=false;
+ $('demoClipState').textContent='已选择 '+selected.name+'（仅本地回放，未上传）；按播放键查看连续画面。';
+ video.load();
+};
+$('demoClipPlayer').onerror=()=>{
+ $('demoClipState').textContent='视频无法解码，请选择交付包内的H.264 MP4，或先用系统自带播放器试播。';
+};
+window.addEventListener('pagehide',()=>{if(currentLocalVideoURL)URL.revokeObjectURL(currentLocalVideoURL)});
 $('loadActivity').onclick=loadActivity;
 initializeResearchMode();
 $('days').onchange=reload;$('refresh').onclick=reload;
