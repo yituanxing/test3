@@ -4,8 +4,8 @@ try {
     $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
     Set-Location $projectRoot
     if (-not (Test-Path 'app/main.py')) { throw 'app/main.py not found. Extract the complete ZIP first.' }
-    $env:ZD_LEGACY_MODE = '0'
-    $env:ZD_DATA_DIR = Join-Path $projectRoot 'data/real-only'
+    $env:ZD_LEGACY_MODE = '1' # Explicit local business demonstration, not real people.
+    $env:ZD_DATA_DIR = Join-Path $projectRoot 'data/business-demo' # Isolated SQLite.
     New-Item -Path $env:ZD_DATA_DIR -ItemType Directory -Force | Out-Null
 
     $py = Join-Path $projectRoot '.venv-win/Scripts/python.exe'
