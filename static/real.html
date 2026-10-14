@@ -51,7 +51,7 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <tbody id="events"><tr><td colspan="6">加载中</td></tr></tbody></table></div><p id="tail" class="small"></p></section>
 <section class="box" id="researchActivity">
 <h2>真实双摄像机 · 匿名人员活动</h2>
-<p class="small">EPFL 六人实验室，两路真实同步录像。位置标定与 YOLO 检测得到跨摄像机配对，跨帧保守关联成为录像内匿名片段。这不是跨场所身份或今天的实况。</p>
+<p class="small">EPFL 六人实验室，两路真实同步录像。位置标定与 YOLO 检测得到同一视频时刻的跨摄像机配对；跨帧关联必须另过真实标注验收，没通过就只展示同帧活动记录。这不是跨场所身份或今天的实况。</p>
 <div><button id="loadActivity">导入真实双机研究证据</button> <span id="activityState" class="small">尚未读取证据</span></div>
 <div id="activityStats" class="cards" style="margin-top:14px"></div>
 <div class="scroll"><table><thead><tr><th>片段编号</th><th>录像开始</th><th>录像结束</th><th>双机配对帧数</th><th>研究范围</th></tr></thead>
@@ -125,7 +125,9 @@ async function loadActivity(){
     '</td><td>'+when(v.last_video_frame,v.last_video_second)+'</td><td>'+
     v.synchronized_pair_observations+'</td><td>EPFL 同一实验室，摄像机0和1</td></tr>';
   }).join('')||'<tr><td colspan="5">实际视频当前没有匹配成功的匿名片段</td></tr>';
-  state.textContent='已导入实际双机视频识别结果；不含任何合成人员';
+  state.textContent='已导入实际双机视频识别结果；'+
+   (response.cross_time_temporal_linkage_verified?'跨帧身份片段已独立评估':
+    '跨帧关联未通过验证，只展示真实同帧双机活动')+'；不含合成人员';
   $('activityEvidence').textContent='视频源SHA256: '+response.camera_sha256.map(x=>x.slice(0,16)+'…').join(' / ')+
     '；片段V编号仅在本段录像内有效，不代表自然人身份、唯一人数或跨场所轨迹。';
  }catch(e){state.textContent='读取真实双机活动失败：'+e.message}
