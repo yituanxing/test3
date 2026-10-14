@@ -26,7 +26,7 @@
   }
   if(location.pathname==='/monitor'){
    for(const id of ('videoButton','syncButton')){
-    const e=document.getElementById(id);if(e)e.hidden=true;
+    const e=document.getElementById(id);if(e)suppress(e);
    }
   }
  }
