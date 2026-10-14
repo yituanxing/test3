@@ -164,3 +164,30 @@ def test_reject_fake_or_inconsistent_detector_coordinates(auth,monkeypatch):
     raw["frame_audits"][0]["candidate_evidence"][0]["cam1_ground_xy"]=["not-a-coordinate",10.]
     r=client.post("/api/research/epfl/import",headers=admin,json=raw)
     assert r.status_code==422
+
+def test_seven_original_excel_alerts_are_actual_rule_engine_results():
+    from app.demo_excel_alerts import demo_excel_rule_analysis
+    from app.business import RULE_NAMES
+    out=demo_excel_rule_analysis()
+    assert out["mode"] == "synthetic_only"
+    assert out["based_on_real_video"] is False
+    assert out["no_mutation_to_real_database"] is True
+    assert {row["type"] for row in out["alerts"]} == set(RULE_NAMES)
+    assert all(row["origin"]=="synthetic_only" for row in out["alerts"])
+    assert sum(row["count"] for row in out["rule_counts"])==len(out["alerts"])
+
+
+def test_simulated_excel_alerts_are_admin_only_and_not_written_to_db(auth):
+    main,epfl,client,admin,county,tmp_path=auth
+    assert client.get("/api/real/excel-rule-demo").status_code == 401
+    assert client.get("/api/real/excel-rule-demo",headers=county).status_code == 403
+    response=client.get("/api/real/excel-rule-demo",headers=admin)
+    assert response.status_code==200,response.text
+    data=response.json()
+    assert len(data["rule_counts"])==7
+    assert {x["type"] for x in data["alerts"]}==set(
+        __import__('app.business',fromlist=['RULE_NAMES']).RULE_NAMES)
+    with main.db() as c:
+        assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
+        assert c.execute('SELECT COUNT(*) FROM synthetic_alert_reviews').fetchone()[0]==0
+
