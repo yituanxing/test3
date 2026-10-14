@@ -292,6 +292,6 @@ def real_activity(request: Request):
             "real_cross_site_visits": None,
             "real_identity_alerts": [],
             "scope": "same-site per-frame verified dual-camera anonymous activity; cross-time tracklets only if separately certified",
-            "note": "真实公开视频经YOLO及几何标定生成；若跨时刻关联未通过独立真值审核，V编号严格仅代表单帧双机配对，不是实名、跨场所身份或去重人数。",
+            "note": "真实公开视频经YOLO及几何标定生成；跨时间只限独立评分过的原候选图。如管理员否定任意配对，旧关联评分立即失效并关闭相应演示提醒；恢复前必须重验。V编号不是实名、跨场所身份或去重人数。",
             **result,
         }
