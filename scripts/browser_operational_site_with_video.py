@@ -171,6 +171,44 @@ def main():
                                               "screenshot":"ui-shipped-"+label+".png"}
                             page.screenshot(path=str(OUT/("ui-shipped-"+label+".png")),full_page=True)
                         assert page.locator("body").is_visible()
+                        # Drill into actual records: list -> details -> evidence -> review.
+                        page.goto(base+"/portal?tab=places")
+                        first_place=page.locator('a[href^="/portal?place="]').first
+                        expect(first_place).to_be_visible()
+                        first_place.click()
+                        expect(page.locator(".content")).to_contain_text("测试场所",timeout=10000)
+                        page.screenshot(path=str(OUT/"ui-shipped-business-place-detail.png"),full_page=True)
+                        page.goto(base+"/portal?tab=alerts")
+                        first_alert=page.locator('a[href^="/portal?alert="]').first
+                        expect(first_alert).to_be_visible()
+                        first_alert.click()
+                        expect(page.locator("#review")).to_be_visible(timeout=10000)
+                        expect(page.locator(".content")).to_contain_text("原始模拟观测证据 ID")
+                        assert "合成演示" in page.locator(".content").inner_text()
+                        page.screenshot(path=str(OUT/"ui-shipped-business-alert-detail.png"),full_page=True)
+                        page.locator("#reason").fill("真实浏览器核查合成规则证据")
+                        page.locator("#decision").select_option("confirmed")
+                        page.locator("#review").click()
+                        expect(page.locator(".content")).to_contain_text("已核实",timeout=15000)
+                        page.goto(base+"/insights")
+                        page.locator("#personQuery").fill("P099")
+                        page.locator("#search").click()
+                        expect(page.locator("#peopleList")).to_contain_text("P099",timeout=15000)
+                        page.screenshot(path=str(OUT/"ui-shipped-business-person-P099-search.png"),full_page=True)
+                        page.goto(base+"/base")
+                        expect(page.locator("#candidateRows")).to_contain_text("P099",timeout=15000)
+                        page.once("dialog",lambda dialog:dialog.accept())
+                        page.locator("#pub").click()
+                        page.wait_for_function("""async () => {
+                            const t=sessionStorage.getItem('zd_access_token');
+                            const r=await fetch('/api/base/active',{headers:{Authorization:'Bearer '+t}});
+                            const x=await r.json();return !!x.ready
+                        }""",timeout=15000)
+                        page.screenshot(path=str(OUT/"ui-shipped-business-published-roster.png"),full_page=True)
+                        # A successful click is not an empty shell: a published roster
+                        # must persist and use the chosen frequency home for P099.
+                        active=read("/api/base/active")
+                        assert active["ready"] and active["run"]["state"]=="published",active
                         page.goto(base+"/base")
                         expect(page.locator("#candidateRows")).to_contain_text("P099",timeout=15000)
                         page.goto(base+"/business")
