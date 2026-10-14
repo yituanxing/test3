@@ -157,7 +157,10 @@ jobs:
         run: python -m scripts.verify_epfl_six_person_ground_truth
       - name: Full browser EPFL real-video candidate import and audit closure
         if: steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
-        run: python -m scripts.browser_epfl_six_person_review
+        run: |
+          python -m pip install 'playwright>=1.55,<2'
+          python -m playwright install --with-deps chromium
+          python -m scripts.browser_epfl_six_person_review
       - name: Preserve real public CCTV evidence (no raw licensed videos)
         if: always() && steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         uses: actions/upload-artifact@v4
