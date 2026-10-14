@@ -18,6 +18,7 @@ name: ZD Frigate Real Person CI
       - "scripts/verify_epfl_alternative_cameras.py"
       - "scripts/verify_epfl_six_person_ground_truth.py"
       - "scripts/browser_epfl_six_person_review.py"
+      - "scripts/browser_real_smoke.py"
       - "scripts/assess_real_person_readiness.py"
       - "requirements-tracking.txt"
       - "requirements-person-detection.txt"
