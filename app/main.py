@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 
 import cv2
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse, Response
 from app.detector import choose_detector, detector_info, box_quality
@@ -262,6 +263,22 @@ async def app_lifespan(application):
 
 
 app = FastAPI(title='ZD Business Pipeline Demo', version='1.1.0', lifespan=app_lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def sanitized_validation_error(request: Request, error: RequestValidationError):
+    """Never JSON-serialize malformed raw inputs such as 1e999/Infinity.
+
+    FastAPI validation messages can include 'input': float('inf'), which cannot
+    be encoded into a strict JSON response, otherwise causing a 500 instead
+    of a 422. Do not echo private request bodies in public API error payloads.
+    """
+    details=[{'loc':[str(v) for v in e.get('loc',())],
+              'msg':str(e.get('msg','Invalid input')),
+              'type':str(e.get('type','value_error'))}
+             for e in error.errors()]
+    return JSONResponse(status_code=422,content={'detail':details})
+
 admin.register(app,db)
 base_registry.register(app,db)
 access.register(app,db)
