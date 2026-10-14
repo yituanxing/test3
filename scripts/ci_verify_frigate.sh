@@ -138,6 +138,7 @@ WEB_PID=$!
 python -m scripts.verify_portal_live   --frigate http://127.0.0.1:5000 --backend http://127.0.0.1:8001   --camera demo --report reports/verify-portal-live.json
 echo "::endgroup::"
 
-echo "::group::WVP API adapter -> actual moving RTSP -> OpenCV -> authenticated Web SQLite"
-python -m scripts.verify_wvp_rtsp_bridge
-echo "::endgroup::"
+# Do not run the WVP HTTP test-double here: this pipeline has NO GB28181
+# device, and the user requested real inputs only. Production GB acceptance
+# requires an authorized physical camera and its actual SIP/RTP stream.
+echo "GB28181现场SIP/媒体链未测试；不以模拟控制面代替"
