@@ -343,16 +343,17 @@
       "status": "missing",
       "verified_scope": "缺乏原片证据支持的真人GPS/地理轨迹；不生成虚假地图移动",
       "evidence_files": [
-        "tests/test_insights.py"
+        "tests/test_insights.py",
+        "tests/test_geo_demo.py"
       ],
-      "remaining_gap": "需实际场所地理坐标、可信真人关联和轨迹真值",
+      "remaining_gap": "#17仍缺真实位置和可信真人跨场所身份；本轮实现的地图只是独立的合成演示，原Excel完整要求未验收",
       "delivery_mode": "not_replaced",
-      "delivered_now": "仅有P###合成时间线、视频相对帧和D###人工候选会话",
-      "alternative_used": "没有有效替代；文本时间线只是相邻组件不能冒称轨迹地图",
-      "why_demo_usable": "可复用时间排序/场所详情，但没有可信地理路径",
-      "not_equivalent_to": "缺少真实经纬度、受信身份、UTC和空间证据",
-      "future_implementation": "收录合法场所点位/出入口拓扑及可信到访，展示仅有证据的离散轨迹",
-      "acceptance_gate": "真实坐标/时间/摄像机证据逐点对账及越权、换人负例",
+      "delivered_now": "新增了基于录入场所坐标的地图点位及P###合成到访时序点回放；无原始GPS数据，场所坐标默认不存在，示例点明确标注虚构",
+      "alternative_used": "可选地图V1使用MapLibre真实地图底图、虚构P###到访点与顺序连线；不模拟沿道路运动，无法替代真人轨迹",
+      "why_demo_usable": "可验证地图加载、场所坐标配置、按时间到访事件投影、权限过滤与轨迹可视化，不必声称真实身份",
+      "not_equivalent_to": "只有虚构主体及虚构/未经核验场所坐标，不能证明GPS、真实人员定位或道路轨迹；无坐标时必须显示缺失",
+      "future_implementation": "取得独立核验的场所/摄像机真实坐标后，接合法可信的真人到访证据，地图仅展示被证据支持的离散点，不推断道路",
+      "acceptance_gate": "真实场所坐标测绘+摄像机时间证据+授权真人事件逐点核验，跨区越权及错认负例，并证明路线不伪造",
       "next_priority": "P2"
     },
     {

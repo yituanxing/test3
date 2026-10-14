@@ -21,7 +21,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview, face_activity_details
-from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology, cctv_dataset, site_model, occurrences, occurrence_reviews, research_linkage, epfl_review
+from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology, cctv_dataset, site_model, occurrences, occurrence_reviews, research_linkage, epfl_review, geo_demo
 import httpx
 from pydantic import BaseModel, Field
 
@@ -230,6 +230,7 @@ def setup_db():
                 c.execute('INSERT INTO sources(place_id,name,kind,uri) VALUES(?,?,?,?)',
                           (place_id, '内置测试视频（无真人）', 'file', str(bundled_video)))
         admin.initialize(c)
+        geo_demo.initialize(c)
         base_registry.initialize(c)
         rule_instances.initialize(c)
         access.initialize(c)
@@ -274,6 +275,7 @@ occurrence_reviews.register(app,db)
 research_linkage.register(app,db)
 epfl_review.register(app,db)
 gb28181.register(app,db)
+geo_demo.register(app,db,lambda c: _analyze_synthetic(c))
 
 
 @app.middleware('http')
