@@ -27,7 +27,7 @@ FILES = (
     "requirements.txt", "requirements-business.txt", "requirements-tracking.txt",
     "requirements-person-detection.txt",
 )
-EXTENSIONS = {".py", ".html", ".sh", ".yml", ".yaml", ".md", ".txt", ".json", ".mp4"}
+EXTENSIONS = {".py", ".html", ".js", ".sh", ".yml", ".yaml", ".md", ".txt", ".json", ".mp4"}
 BANNED = {".git", ".venv", "data", "__pycache__", ".ci-data", "reports", "dist", "node_modules"}
 files = []
 for folder in FOLDERS:
@@ -47,6 +47,12 @@ with ZipFile(TARGET, "w", ZIP_DEFLATED, compresslevel=6) as archive:
 with ZipFile(TARGET) as archive:
     assert archive.testzip() is None
     assert "zd-demo/scripts/start_local_demo.sh" in archive.namelist()
+    # All shipped pages import this shared role UI script from the FastAPI
+    # /ui/role-navigation.js route. Omitting .js yields a locally broken demo
+    # despite passing checkout-based Chromium CI.
+    assert "zd-demo/static/role_navigation.js" in archive.namelist()
+    assert b"zdApplyRoleNavigation" in archive.read(
+        "zd-demo/static/role_navigation.js")
     assert not any(
         set(Path(name).parts) & BANNED for name in archive.namelist()
     )
