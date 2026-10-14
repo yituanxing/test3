@@ -103,6 +103,21 @@ def main():
                 assert detector_metrics['frames_decoded']==24
                 assert detector_metrics['real_pretrained_person_detector_ran'] is True
                 assert detector_metrics['detector_received_ground_truth_boxes'] is False
+                # Proof of the real two-camera YOLO→ByteTrack link, not merely
+                # a green import / a zero-detection fake. Scoring CVML held-out
+                # boxes must NOT turn them into model detector input.
+                assert detector_metrics['predicted_person_boxes']>0,view
+                assert detector_metrics['tracker_assigned_boxes']>0,view
+                ev=detector_metrics['detection_evaluation']
+                assert ev['manual_ground_truth_used_as_detector_input'] is False
+                assert ev['global_person_identity_evaluated'] is False
+                assert ev['true_positives']+ev['false_positives']==detector_metrics[
+                    'predicted_person_boxes']
+                assert ev['true_positives']+ev['false_negatives']==detector_metrics[
+                    'published_gt_boxes_on_inferred_frames']
+                assert ev['evaluated_frames']==24
+                assert ev['precision'] is None or 0<=ev['precision']<=1
+                assert ev['recall'] is None or 0<=ev['recall']<=1
                 assert detector_metrics['existing_automatic_tracker_ran'] is True
                 assert detector_metrics['cross_camera_identity_matching_ran'] is False
                 current=client.get('/api/site/occurrences',headers=auth)
