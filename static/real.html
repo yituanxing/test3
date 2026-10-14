@@ -88,6 +88,11 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <select id="sceneTrackSelect"><option value="">显示全部短片段</option></select>
 </label>
 <p id="sceneTrackSummary" class="small">等待导入真实视频匹配数据；这里只能展示可靠的短时匿名片段。</p>
+<div class="small"><b>示意区域：紫色虚线以上为室内虚拟A区，下方为B区（视频投影Y=150）；</b>
+两区只是同一个EPFL实验室内的演示分区，绝非两个真实场所。</div>
+<p id="sceneVirtualCrossSummary" class="small">等待真实录像核验。</p>
+<div class="scroll" style="max-height:140px"><table><thead><tr><th>短时匿名片段</th><th>真实观测帧</th><th>虚拟区域变化</th></tr></thead>
+<tbody id="sceneVirtualCrossRows"><tr><td colspan="3">未导入时不生成跨区记录</td></tr></tbody></table></div>
 <div class="scroll" style="max-height:180px"><table><thead><tr><th>匿名片段</th><th>真实录像帧</th><th>双摄像机来源</th></tr></thead><tbody id="sceneTrackRows"><tr><td colspan="3">尚无已验证短时片段</td></tr></tbody></table></div>
 <div style="margin-top:10px">
 <label>真实录像采样帧：<span id="sceneFrameLabel">汇总热度</span></label>
@@ -227,6 +232,16 @@ function sceneTracksPaint(){
  $('sceneTrackSummary').textContent=verified?
   '两台相机同一实验室的'+items.length+'条已核验约1秒匿名短关联；下方每条带原始录像帧。红线不连接跨越未验证时间间隔。':
   '未取得可靠的跨时间同目标认证（或人工否定过候选）；不绘制假路线。';
+ const transitions=verified?(sceneData.short_virtual_zone_crossings||[]):[];
+ $('sceneVirtualCrossSummary').textContent=verified?
+  '真实短时片段穿过室内虚拟A/B分界线 '+transitions.length+
+  ' 次（规则为演示划分，同一真实实验室，非跨地理场所）。':
+  '没有已验证的室内跨区片段；禁止冒充真实跨所记录。';
+ $('sceneVirtualCrossRows').innerHTML=transitions.map(t=>
+  '<tr><td>'+esc(t.fragment_id)+'</td><td>'+
+  esc(t.source_frames.join(' → '))+'</td><td>'+
+  esc(t.from_virtual_area)+' → '+esc(t.to_virtual_area)+'</td></tr>'
+ ).join('')||'<tr><td colspan="3">没有真实录像证据触发的虚拟A/B跨区示意</td></tr>';
  $('sceneTrackRows').innerHTML=items.map(t=>
   '<tr><td>'+esc(t.fragment_id)+'</td><td>'+
   esc(t.points.map(p=>p.video_frame).join(' → '))+
@@ -245,7 +260,7 @@ function sceneTracksDraw(){
  }
  const selected=$('sceneTrackSelect').value;
  const frame=sceneFrameIndex>0?sceneData.frame_cells[sceneFrameIndex-1]?.video_frame:null;
- let html='';
+ let html='<line data-virtual-border="true" x1="0" y1="150" x2="320" y2="150" stroke="#9048b9" stroke-width="2" stroke-dasharray="7 5"/>';
  for(const t of sceneData.short_anonymous_tracklets){
   if(selected&&t.fragment_id!==selected)continue;
   for(let i=0;i<t.points.length-1;i++){
@@ -253,7 +268,7 @@ function sceneTracksDraw(){
    if([a,b].some(p=>p.x<0||p.x>=320||p.y<0||p.y>=320))continue;
    if(frame!==null&&frame!==a.video_frame&&frame!==b.video_frame)continue;
    // All SVG numbers originate from server-side checked, finite coordinates.
-   html+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+
+   html+='<line data-short-trace="true" x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+
      '" stroke="'+(selected?'#d92929':'#e55336')+'" stroke-width="'+
      (selected?'5':'3')+'" stroke-linecap="round" opacity=".9"/>'+
      '<circle cx="'+a.x+'" cy="'+a.y+'" r="4" fill="#073b69"/>'+
