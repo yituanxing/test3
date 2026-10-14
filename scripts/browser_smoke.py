@@ -163,6 +163,16 @@ def run():
                             if dialog.type=="prompt" else dialog.accept()))
                         page.locator("#pub").click()
                         expect(page.locator("#kRunState")).to_contain_text("当前已发布底库")
+                        # The published roster is an immutable snapshot: the
+                        # user's next pending draft must not replace it.
+                        published_snapshot=page.evaluate("""async()=> (
+                            await (await fetch('/api/base/active')).json())""")
+                        assert published_snapshot['run']['state']=='published'
+                        original_run_id=published_snapshot['run']['id']
+                        orig_person=next(x for x in published_snapshot['people']
+                                         if x['person']=='P099')
+                        assert orig_person['place_id']==2,orig_person
+                        checks.append("published_roster_has_frequency_assignment_B")
                         page.locator("#strategy").select_option("earliest")
                         page.get_by_role("button",name="② 生成底库草稿").click()
                         expect(p099.locator("td").nth(2)).to_contain_text("测试场所 A")
@@ -181,6 +191,27 @@ def run():
                         expect(page.locator("#windowInfo")).to_contain_text("2035")
                         # A pending empty draft does not auto-publish itself.
                         expect(page.locator("#kRunState")).to_contain_text("未发布草稿")
+                        active_after_draft=page.evaluate("""async()=> (
+                            await (await fetch('/api/base/active')).json())""")
+                        assert active_after_draft['run']['id']==original_run_id,(
+                            active_after_draft,original_run_id)
+                        assert active_after_draft['run']['state']=='published'
+                        assert next(x for x in active_after_draft['people']
+                                    if x['person']=='P099')['place_id']==2
+                        latest_draft=page.evaluate("""async()=> (
+                            await (await fetch('/api/base')).json())""")
+                        assert latest_draft['run']['state']=='draft'
+                        assert latest_draft['run']['id'] != original_run_id
+                        assert latest_draft['people']==[],latest_draft
+                        # A second publish of the old completed run must not
+                        # silently discard the new draft or alter the release.
+                        republish=page.evaluate("""async id => {
+                            const r=await fetch('/api/base/runs/'+id+'/publish',
+                                                {method:'POST'});
+                            return {status:r.status,body:await r.json()};
+                        }""",original_run_id)
+                        assert republish['status']==409,republish
+                        checks.append("published_roster_immutable_during_new_draft_and_duplicate_publish_409")
                         checks.append("real_browser_rolling_window_removes_absent_fictional_person")
                         page.screenshot(path=str(OUT/"ui-roster-expiry-diff.png"),full_page=True)
                         # Excel #4/#5/#19: one analytics contract drives
@@ -209,6 +240,15 @@ def run():
                         assert rule_config['companion_min_people']==3,rule_config
                         assert rule_config['watch_person_ids']==['P099'],rule_config
                         assert len(rule_config['watch_place_ids'])==1,rule_config
+                        all_rules=page.evaluate("""async()=> (
+                            await (await fetch('/api/business/analysis')).json())""")
+                        assert all_rules['mode']=='synthetic_only'
+                        kinds={x['type'] for x in all_rules['rule_counts']}
+                        assert kinds=={'cross_place','companion','interaction',
+                            'gathering','absence','appearance','headcount'}, kinds
+                        assert all(v['count']>=0 for v in all_rules['rule_counts'])
+                        assert '合成' in all_rules['disclaimer'],all_rules
+                        checks.append("all_seven_real_rule_engine_types_synthetic_source")
                         checks.append("common_rule_n_person_and_multi_target_browser")
                         page.screenshot(path=str(OUT/"ui-shared-rules.png"),full_page=True)
                         # Excel #22: true browser CRUD with one shared rule
@@ -488,6 +528,88 @@ def run():
                         page.locator("#logout").click()
                         expect(page).to_have_url(base + "/login")
                         checks.append("logout")
+                        # Four-tier role UI/authorization: once the state admin
+                        # logs out, no subordinate may read the global acceptance
+                        # report, EPFL candidate import, or P### roster writes.
+                        # A second county is created to test *actual* data
+                        # visibility instead of only checking hidden buttons.
+                        with main.db() as scoped:
+                            root=scoped.execute(
+                                "SELECT id FROM regions WHERE level=1 LIMIT 1"
+                            ).fetchone()[0]
+                            county=scoped.execute(
+                                "SELECT id FROM regions WHERE level=2 LIMIT 1"
+                            ).fetchone()[0]
+                            street=scoped.execute(
+                                "SELECT id FROM regions WHERE level=3 LIMIT 1"
+                            ).fetchone()[0]
+                            community=scoped.execute(
+                                "SELECT id FROM regions WHERE level=4 LIMIT 1"
+                            ).fetchone()[0]
+                            external_county=scoped.execute(
+                                "INSERT INTO regions(name,parent_id,level) VALUES(?, ?, 2)",
+                                ("验收外县",root)).lastrowid
+                            external_street=scoped.execute(
+                                "INSERT INTO regions(name,parent_id,level) VALUES(?, ?, 3)",
+                                ("验收外街道",external_county)).lastrowid
+                            external_community=scoped.execute(
+                                "INSERT INTO regions(name,parent_id,level) VALUES(?, ?, 4)",
+                                ("验收外社区",external_street)).lastrowid
+                            scoped.execute(
+                                "INSERT INTO places(name,region_id) VALUES(?, ?)",
+                                ("验收外县专属场所",external_community))
+                            for username,region_id in (
+                                ("uiscopecounty",county),
+                                ("uiscopestreet",street),
+                                ("uiscopecommunity",community)):
+                                access.create_user(scoped,username,password,region_id)
+                        for username in ("uiscopecounty","uiscopestreet",
+                                         "uiscopecommunity"):
+                            page.goto(base+"/login")
+                            page.locator('input[name="username"]').fill(username)
+                            page.locator('input[name="password"]').fill(password)
+                            page.locator('button[type="submit"]').click()
+                            expect(page).to_have_url(base+"/portal",timeout=12000)
+                            expect(page.locator("h2.lead")).to_contain_text(
+                                "辖区重点场所运行概览",timeout=12000)
+                            assert page.locator('a[data-tab="acceptance"]').count()==0
+                            assert page.locator('a[href="/base"]').count()==0
+                            assert page.locator('a[href="/business"]').count()==0
+                            # Endpoints must be denied, not only hidden.
+                            protected=page.evaluate("""async()=> {
+                              const urls=['/api/demo/excel-acceptance',
+                                  '/api/research/epfl/bundled',
+                                  '/api/research/epfl/candidates',
+                                  '/api/base/active','/api/business/analysis'];
+                              const out={};
+                              for(const url of urls)
+                                  out[url]=(await fetch(url)).status;
+                              out['/api/base/generate']=(await fetch(
+                                  '/api/base/generate',{method:'POST',
+                                  headers:{'Content-Type':'application/json'},
+                                  body:JSON.stringify({days:7,strategy:'earliest',
+                                     correction_mode:'rebuild'})})).status;
+                              return out;
+                            }""")
+                            assert set(protected.values())=={403},(
+                                username,protected)
+                            places_scoped=page.evaluate("""async()=> (
+                                await (await fetch('/api/places')).json())""")
+                            assert any(p['name']=='测试场所 A'
+                                for p in places_scoped),places_scoped
+                            assert not any(p['name']=='验收外县专属场所'
+                                for p in places_scoped),(username,places_scoped)
+                            page.goto(base+"/portal?tab=acceptance")
+                            expect(page.locator("#view")).to_contain_text(
+                                "仅供州级演示管理员核验交付声明",timeout=12000)
+                            assert page.locator("#acceptanceRows tr").count()==0
+                            page.goto(base+"/cctv")
+                            expect(page.locator("#epflUseBundled")).to_be_hidden()
+                            expect(page.locator("#epflReviewPanel")).to_be_hidden()
+                            page.goto(base+"/portal")
+                            page.locator("#logout").click()
+                            expect(page).to_have_url(base+"/login",timeout=10000)
+                            checks.append("tiered_role_scope_and_real_ui_denial_"+username)
                         assert not errors, "JavaScript errors: " + str(errors)
                         checks.append("no_page_errors")
                     finally:
