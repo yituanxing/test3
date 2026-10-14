@@ -57,6 +57,9 @@ aside.innerHTML=`<div class="zd-brand-name">ZD · 场所预警分析<small>多�
  <a href="/admin" data-route="admin">⚑　辖区、场所与账号</a>
  <a href="/portal?tab=acceptance" data-research-only="1" data-route="acceptance">☑　需求验收 <small>管理</small></a>
 <div class="zd-global-note">真实匿名视频、研究配对与合成人员分别管理；页面数据不等于真人身份结论。</div>`;
+// Hide demo-only destinations until the server confirms that mode is enabled.
+const deferredLinks=[...aside.querySelectorAll('[href="/portal"],[href="/portal?tab=places"],[href="/portal?tab=alerts"],[href="/insights"],[data-research-only]')].map(el=>({el,after:el.nextSibling,parent:el.parentNode}));
+deferredLinks.forEach(x=>x.el.remove());
 const content=document.createElement("div");content.className="zd-global-body";
 const top=document.createElement("div");top.className="zd-global-top";
 const title=document.createElement("strong");title.textContent=pageNames[pathname];
@@ -73,8 +76,17 @@ if(!token){location.replace("/login");return}
 fetch("/api/auth/me",{headers:{Authorization:"Bearer "+token}})
 .then(r=>r.ok?r.json():null).then(actor=>{
  if(!actor){location.replace("/login");return}
- if(actor.level!==1){
-  aside.querySelectorAll("[data-research-only]").forEach(a=>a.remove());
- }
+ fetch("/api/insights/overview?days=7",{headers:{Authorization:"Bearer "+token}})
+ .then(resp=>{if(resp.ok){
+   for(const x of deferredLinks){
+     if(x.el.dataset.researchOnly&&actor.level!==1)continue;
+     // Original insertion point may be removed while pages initialize; restoring
+     // against the stored next sibling maintains the same business order.
+     if(x.after&&x.after.parentNode===x.parent)x.parent.insertBefore(x.el,x.after);
+     else x.parent.appendChild(x.el);
+   }
+ }else if(resp.status===410){
+   top.querySelector('a[href="/portal"]')?.setAttribute("href","/real");
+ }}).catch(()=>{});
 }).catch(()=>{aside.querySelectorAll("[data-research-only]").forEach(a=>a.remove())});
 })();
