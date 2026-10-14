@@ -203,7 +203,7 @@ def run():
                         expect(page.locator("#excelRuleRows tr")).to_have_count(
                             7,timeout=15000)
                         expect(page.locator("#excelRuleRows")).to_contain_text(
-                            "串所",timeout=15000)
+                            "跨场所同行",timeout=15000)
                         expect(page.locator("#excelAcceptanceRows tr")).to_have_count(
                             23,timeout=15000)
                         assert page.locator("#excelAcceptanceRows tr").count()==23
