@@ -177,6 +177,11 @@ def persist_detection_run(c, result):
         "model":result["model"],"tracker":result["tracker"],
         "model_weights_sha256":result.get("model_weights_sha256"),
         "detector_confidence_threshold":result.get("detector_confidence_threshold"),
+        # Tracker config IS part of provenance: changing activation
+        # thresholds can change trajectories even for identical MPEG/model.
+        "tracker_activation_threshold":result.get("tracker_activation_threshold"),
+        "tracker_minimum_consecutive_frames":1,
+        "pipeline_version":"yolo11n_bytetrack_gt_independent_v2",
         "frames_decoded":result["frames_decoded"],
         "sampling_step":result["sampling_step"],
     }
