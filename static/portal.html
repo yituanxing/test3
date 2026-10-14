@@ -150,7 +150,7 @@ function summary(){
  (state.user.level===1?
  '<section class="panel" aria-label="双机真实录像"><div class="row"><h2>真实录像概览（独立研究素材）</h2><a class="arrow" href="/real#video">查看检测帧和研究证据 →</a></div>'+
  '<p class="smallnote">38秒 EPFL 同一实验室双机研究录像；不能证明真人跨场所识别，也不计入上方Frigate现场统计。</p>'+
- '<video id="portalResearchClip" controls playsinline preload="metadata" style="display:block;width:100%;max-width:790px;aspect-ratio:16/9;background:#152c45;border-radius:10px"></video>'+
+ '<video id="portalResearchClip" controls playsinline preload="auto" style="display:block;width:100%;max-width:790px;aspect-ratio:16/9;background:#152c45;border-radius:10px"></video>'+
  '<div id="portalResearchStatus" class="smallnote">正在检查真实研究录像…</div></section>':'')+
  '<section class="panel"><div class="row"><h2>业务操作入口</h2><span class="smallnote">按原Excel的业务链路组织，页面共用已有数据库和接口。</span></div>'+
  '<div class="toolbar"><a href="/real">① 真实视频与检测 →</a><a href="/portal?tab=places">② 场所与辖区 →</a><a href="/portal?tab=alerts">③ 预警与复核 →</a><a href="/insights">④ 智能检索 →</a></div>'+
@@ -291,7 +291,7 @@ function listAlerts(){
  return title('ALERTS · 预警中心','业务规则候选与人工复核')+'<p class="sub">模拟规则采用统一列表、证据详情和审核结果；不将共同出现或跨场所活动直接认定为异常。</p>'+notice()+
  (a.length===0&&state.user.level===1?'<div class="banner">当前没有规则候选。这不是已完成预警验收；尚未初始化合成业务活动。<button id="seed" type="button">初始化合成规则演示事件</button></div>':'')+
  '<section class="panel"><div class="scroller"><table><thead><tr><th>类型</th><th>规则命中说明</th><th>场所</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
- rows(a.map(x=>'<tr><td><span class="pill demo">'+esc(x.type_name)+'</span></td><td>'+esc(x.title)+'</td><td>'+esc((x.place_names||[]).join('、'))+'</td><td>'+esc(x.status||'待复核')+'</td><td><a class="arrow" href="'+alertLink(x)+'">证据详情 →</a></td></tr>'))+'</tbody></table></div><p class="smallnote">当前只展示最多 30 条近期合成规则候选；完整规则列表请从管理员业务验证台查看。</p></section>';
+ rows(a.map(x=>'<tr><td><span class="pill demo">'+esc(x.type_name)+'</span></td><td>'+esc(x.title)+'</td><td>'+esc((x.place_names||[]).join('、'))+'</td><td>'+esc(({needs_review:'待复核',confirmed:'已核实',dismissed:'已排除',approved:'已确认',rejected:'已驳回'})[x.status]||x.status||'待复核')+'</td><td><a class="arrow" href="'+alertLink(x)+'">证据详情 →</a></td></tr>'))+'</tbody></table></div><p class="smallnote">当前只展示最多 30 条近期合成规则候选；完整规则列表请从管理员业务验证台查看。</p></section>';
 }
 function showAlert(key){
  const a=synthetic().recent_alerts.find(x=>x.key===key);
@@ -338,7 +338,20 @@ function render(){
     const blob=await response.blob();
     if(!clip.isConnected)return;
     clip.src=URL.createObjectURL(blob);clip.load();
-    status.textContent='已加载真实38秒历史双机录像；身份及预警未经过真人验证。';
+    clip.addEventListener('loadeddata',()=>{if(clip.currentTime<1)clip.currentTime=12},{once:true});
+    status.textContent='已加载38秒真实双机录像；正在获取实际检测记录…';
+    try{
+     let activity=await api('/api/real/activity');
+     if(!activity.ready){
+       await api('/api/research/epfl/bundled/import',{method:'POST'});
+       activity=await api('/api/real/activity');
+     }
+     if(activity.ready){
+       status.textContent='同批真实视频检测：'+activity.matched_pair_observations+
+        '次双机人体配对、'+activity.anonymous_activity_fragments+
+        '段短时匿名关联；不是独立人数或实名轨迹。';
+     }else status.textContent='真实录像可播放，但研究检测记录未导入。';
+    }catch(err){status.textContent='真实录像可播放；检测记录暂不可读取：'+err.message}
    }catch(error){status.textContent='研究录像暂不可用：'+error.message}
   })();
  }
