@@ -177,6 +177,25 @@ def test_seven_original_excel_alerts_are_actual_rule_engine_results():
     assert sum(row["count"] for row in out["rule_counts"])==len(out["alerts"])
 
 
+def test_original_excel_23_items_read_only_real_mode_and_admin_scope(auth):
+    main,epfl,client,admin,county,tmp_path=auth
+    assert client.get("/api/real/excel-acceptance").status_code==401
+    assert client.get("/api/real/excel-acceptance",headers=county).status_code==403
+    r=client.get("/api/real/excel-acceptance",headers=admin)
+    assert r.status_code==200,r.text
+    data=r.json()
+    assert [x["id"] for x in data["requirements"]]==list(range(1,24))
+    assert data["status_counts"]=={
+        "verified_real":3,"synthetic_only":10,"partial":8,"missing":2}
+    assert data["all_23_fully_accepted"] is False
+    assert all(x["demo_route"].startswith(("/real","/cctv","/admin"))
+               for x in data["requirements"])
+    assert {x["id"] for x in data["requirements"]
+            if x["status"]=="missing"}=={14,17}
+    with main.db() as db:
+        assert db.execute("SELECT COUNT(*) FROM synthetic_observations").fetchone()[0]==0
+
+
 def test_simulated_excel_alerts_are_admin_only_and_not_written_to_db(auth):
     main,epfl,client,admin,county,tmp_path=auth
     assert client.get("/api/real/excel-rule-demo").status_code == 401
