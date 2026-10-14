@@ -297,6 +297,57 @@ def _sum_audits(rows):
     }
 
 
+def audit_temporal_fragments(evidence):
+    """Score separate cross-time links against GT AFTER all matching.
+
+    The tracker sees detector positions only. This evaluation never supplies
+    official person IDs to temporal association nor to the packaged bundle.
+    """
+    from app.real_activity import track_fragments
+    records = []
+    labels = {}
+    for row in sorted(evidence["frame_audits"] + evidence["holdout_frame_audits"],
+                      key=lambda r: r["frame_0_based"]):
+        frame = row["frame_0_based"]
+        for index, pair in enumerate(row["candidate_evidence"]):
+            key = f"{frame}:{index}"
+            a, b = pair["cam0_ground_xy"], pair["cam1_ground_xy"]
+            records.append({
+                "candidate_key":key, "frame_0_based":frame,
+                "cam0_ground_x":a[0], "cam0_ground_y":a[1],
+                "cam1_ground_x":b[0], "cam1_ground_y":b[1]
+            })
+            # Scoring only; these NEVER enter track_fragments().
+            labels[key] = (pair.get("audit_gt_cam0"), pair.get("audit_gt_cam1"))
+    fragments = track_fragments(records)
+    count = 0
+    mixed = 0
+    unscorable = 0
+    scorable = 0
+    for fragment in fragments:
+        if len(fragment["observations"]) < 2:
+            continue
+        count += 1
+        ids = [labels[o["candidate_key"]] for o in fragment["observations"]]
+        if any(left is None or right is None or left != right for left,right in ids):
+            unscorable += 1
+            continue
+        scorable += 1
+        if len({left for left, right in ids}) > 1:
+            mixed += 1
+    return {
+        "candidate_records":len(records),
+        "temporal_fragments":len(fragments),
+        "multi_instant_fragments":count,
+        "scorable_multi_instant_fragments":scorable,
+        "unscorable_multi_instant_fragments":unscorable,
+        "wrongly_merged_gt_person_fragments":mixed,
+        "gt_only_used_for_post_link_scoring":True,
+        "not_cross_site_identity":True,
+        "not_unique_people":True
+    }
+
+
 def _paired_preview(frame, image_by_camera, predictions, audit):
     """Two original camera frames with YOLO boxes and candidate lines.
 
@@ -440,6 +491,9 @@ def main():
                 evidence[key].append({"frame_0_based": frame, **audit})
         evidence["summary"] = _sum_audits(evidence["frame_audits"])
         evidence["holdout_summary"] = _sum_audits(evidence["holdout_frame_audits"])
+        evidence["temporal_fragment_audit"] = audit_temporal_fragments(evidence)
+        if evidence["temporal_fragment_audit"]["wrongly_merged_gt_person_fragments"]:
+            raise RuntimeError("Real EPFL anonymous time-fragment IDs switched official GT persons")
         for frame in PREVIEW_FRAMES:
             audit = next(x for x in evidence["frame_audits"]
                          if x["frame_0_based"] == frame)
@@ -453,6 +507,7 @@ def main():
         "dataset": evidence["dataset"], "cameras": evidence["selected_cameras"],
         "GT": info, "summary": evidence["summary"],
         "holdout_summary": evidence["holdout_summary"],
+        "temporal_fragment_audit": evidence["temporal_fragment_audit"],
         "packaged_research_candidates": bundled,
         "camera_detection_counts": {
             camera: evidence["per_camera"][str(camera)]["total_model_person_detections"]
