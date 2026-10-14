@@ -225,6 +225,32 @@ def run():
                         expect(page.locator("#flowSummary")).to_contain_text("流入")
                         checks.append("shared_analytics_period_rank_flow_browser")
                         page.screenshot(path=str(OUT / "ui-shared-analytics.png"), full_page=True)
+                        # #17: actual map/browser operation uses only fictional
+                        # sites and P### chronology; all remote map requests
+                        # blocked to prove the offline coordinate fallback.
+                        page.route('https://cdn.jsdelivr.net/**',lambda route:route.abort())
+                        page.route('https://demotiles.maplibre.org/**',lambda route:route.abort())
+                        page.goto(base+'/geo',wait_until='domcontentloaded')
+                        expect(page.get_by_role('heading',name='场所地图与合成轨迹回放')).to_be_visible()
+                        page.once('dialog',lambda dialog:dialog.accept())
+                        page.locator('#seedGeo').click()
+                        expect(page.locator('#notice')).to_contain_text('已配坐标',timeout=12000)
+                        expect(page.locator('#mapFallback svg')).to_be_visible(timeout=12000)
+                        expect(page.locator('#trackSummary')).to_contain_text('合成到访',timeout=12000)
+                        assert page.locator('#events .event').count()>0
+                        assert page.locator('#placeRows tr').count()>=3
+                        page.screenshot(path=str(OUT/'ui-geo-fictional-track.png'),full_page=True)
+                        checks.append('offline_geographic_map_real_browser_synthetic_visits_and_coordinates')
+                        # #14: face-photo similarity is off until the operator
+                        # explicitly installs models and enables consented use.
+                        page.goto(base+'/face-lab',wait_until='domcontentloaded')
+                        expect(page.get_by_role('heading',name='已授权照片的临时相似度检索')).to_be_visible()
+                        expect(page.locator('#modelBadge')).to_contain_text('暂不可运行')
+                        expect(page.locator('#enroll')).to_be_disabled()
+                        expect(page.locator('#search')).to_be_disabled()
+                        checks.append('optional_photo_lab_off_without_models_no_fake_identity')
+                        page.unroute('https://cdn.jsdelivr.net/**')
+                        page.unroute('https://demotiles.maplibre.org/**')
                         # Excel #7/#11: one rule config drives repeated N-person
                         # group matching and selected synthetic place/person lists.
                         page.goto(base + "/business")
@@ -628,6 +654,14 @@ def run():
                             expect(page.locator("#stages")).to_contain_text(
                                 "上游全局连接状态仅州级管理员可查看",timeout=12000)
                             expect(page.locator("#syncButton")).to_be_hidden()
+                            page.goto(base+"/geo",wait_until="domcontentloaded")
+                            expect(page.locator("#seedGeo")).to_be_hidden()
+                            expect(page.locator("#editor")).to_be_hidden()
+                            expect(page.locator("#notice")).to_contain_text(
+                                "可见场所",timeout=12000)
+                            page.goto(base+"/face-lab",wait_until="domcontentloaded")
+                            expect(page.locator("#modelBadge")).to_contain_text(
+                                "当前账户不可操作",timeout=12000)
                             page.goto(base+"/admin")
                             expect(page.locator("#accountPanel")).to_be_hidden()
                             assert page.locator('nav a[href="/business"]:visible').count()==0
