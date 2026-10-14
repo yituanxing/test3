@@ -7,6 +7,8 @@ alerts into the real SQLite, and cannot impersonate Frigate/EPFL events.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import json
 from fastapi import APIRouter, Request
 from app import business, epfl_review
 
@@ -66,6 +68,52 @@ def demo_excel_rule_analysis():
 def excel_rule_demo(request: Request):
     epfl_review._admin(request)
     return demo_excel_rule_analysis()
+
+
+# Routes usable in the public, REAL-ONLY distribution. The old portal,
+# business, insights and roster pages are intentionally disabled there.
+_READ_ONLY_ROUTES = {
+    1:"/cctv", 2:"/admin", 3:"/real#excelRuleShowcase",
+    4:"/real", 5:"/real", 6:"/real#excelRuleShowcase",
+    7:"/real#excelRuleShowcase", 8:"/real#excelRuleShowcase",
+    9:"/real#excelRuleShowcase", 10:"/real#excelRuleShowcase",
+    11:"/real#excelRuleShowcase", 12:"/real#excelRuleShowcase",
+    13:"/cctv", 14:"/real", 15:"/real",
+    16:"/cctv", 17:"/real", 18:"/real",
+    19:"/real#researchActivity", 20:"/admin",
+    21:"/real#excelRuleShowcase", 22:"/real#excelRuleShowcase",
+    23:"/admin",
+}
+
+
+@router.get("/api/real/excel-acceptance")
+def real_excel_acceptance(request: Request):
+    """Truthful, 23-item original Excel checklist, not a feature PASS claim."""
+    epfl_review._admin(request)
+    manifest=json.loads((Path(__file__).resolve().parents[1] /
+        "config/excel_acceptance_v1.json").read_text(encoding="utf-8"))
+    req=manifest["requirements"]
+    if [x["id"] for x in req]!=list(range(1,24)):
+        raise RuntimeError("Incomplete Excel 23-item original acceptance contract")
+    counts={key:sum(x["status"]==key for x in req) for key in
+        ("verified_real","synthetic_only","partial","missing")}
+    return {
+        "source_file":manifest["source_file"],
+        "source_worksheet":manifest["source_worksheet"],
+        "source_rows":manifest["source_rows"],
+        "status_counts":counts,
+        "requirements":[{
+            "id":x["id"],"title":x["title"],"status":x["status"],
+            "delivered_now":x["delivered_now"],
+            "remaining_gap":x["remaining_gap"],
+            "alternative_used":x["alternative_used"],
+            "not_equivalent_to":x["not_equivalent_to"],
+            "demo_route":_READ_ONLY_ROUTES[x["id"]]
+        } for x in req],
+        "real_only":True,
+        "all_23_fully_accepted":False,
+        "note":"原23项按来源逐条说明；演示入口可打开不等于该条原始要求已经达标。"
+    }
 
 
 def register(app):
