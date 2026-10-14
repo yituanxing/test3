@@ -34,7 +34,7 @@ def _center(row):
     return (round((x0 + x1) / 2, 3), round((y0 + y1) / 2, 3))
 
 
-def track_fragments(rows):
+def track_fragments(rows, allow_temporal=True):
     """Associate different TIMESTAMPS without GT. No cross-site ReID.
 
     A pair already refers to the same time in two calibrated cameras.
@@ -50,7 +50,7 @@ def track_fragments(rows):
         for index, row in enumerate(current):
             xy = _center(row)
             row["ground_xy"] = list(xy) if xy else None
-            if xy is None:
+            if xy is None or not allow_temporal:
                 continue
             for fidx, track in enumerate(fragments):
                 gap = frame - track["end_frame"]
@@ -94,8 +94,8 @@ def track_fragments(rows):
     return fragments
 
 
-def activity_summary(rows, fps=None):
-    fragments = track_fragments(rows)
+def activity_summary(rows, fps=None, temporal_verified=False):
+    fragments = track_fragments(rows, allow_temporal=temporal_verified)
     timeline = []
     for frame in sorted({r["frame_0_based"] for r in rows}):
         n = sum(1 for r in rows if r["frame_0_based"] == frame)
@@ -155,7 +155,8 @@ def real_activity(request: Request):
     epfl_review._admin(request)
     with _db() as db:
         report = db.execute("""SELECT report_digest, origin, imported_at,
-           video_sha0, video_sha1, video_fps FROM epfl_candidate_reports
+           video_sha0, video_sha1, video_fps, temporal_fragment_verified
+           FROM epfl_candidate_reports
            WHERE origin='ci_generated_research_bundle'
            ORDER BY imported_at DESC,rowid DESC LIMIT 1""").fetchone()
         if not report:
@@ -182,7 +183,9 @@ def real_activity(request: Request):
         # Actual rejected matches never enter the personnel activity reader.
         active = [dict(r) for r in rows if r["verdict"] != "false_match"]
         fps = report["video_fps"]
-        result = activity_summary(active, fps if fps and fps > 0 else None)
+        temporal_verified = bool(report["temporal_fragment_verified"])
+        result = activity_summary(active, fps if fps and fps > 0 else None,
+                                  temporal_verified=temporal_verified)
         return {
             "mode": "recorded_real_video_activity", "ready": True,
             "site": "EPFL 6-person research laboratory (one real physical site)",
@@ -193,12 +196,16 @@ def real_activity(request: Request):
             "report_digest": report["report_digest"],
             "manifest_origin": report["origin"],
             "video_fps": fps,
+            "cross_time_temporal_linkage_verified": temporal_verified,
+            "cross_time_status": ("independently_scored_official_GT"
+                                  if temporal_verified
+                                  else "DISABLED_independent_GT_found_unreliable_links"),
             "excluded_manual_false_matches": len(rows) - len(active),
             "confirmed_natural_person_identity": False,
             "verified_unique_people": None,
             "real_cross_site_visits": None,
             "real_identity_alerts": [],
-            "scope": "same-site dual-camera anonymous per-frame matches, with conservative temporal activity fragments",
-            "note": "真实公开视频经YOLO及几何标定生成；V编号只是本段录像的匿名活动片段，不是实名、跨场所身份或去重人数。",
+            "scope": "same-site per-frame verified dual-camera anonymous activity; cross-time tracklets only if separately certified",
+            "note": "真实公开视频经YOLO及几何标定生成；若跨时刻关联未通过独立真值审核，V编号严格仅代表单帧双机配对，不是实名、跨场所身份或去重人数。",
             **result,
         }
