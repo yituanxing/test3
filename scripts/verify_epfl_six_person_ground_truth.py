@@ -259,6 +259,9 @@ def audit_pair(observations, truth):
             "calibration_distance": dist,
             "audit_gt_cam0": label0.get(i),
             "audit_gt_cam1": label1.get(j),
+            # Detector output in common ground coordinates, NEVER official GT.
+            "cam0_ground_xy": cam0[i]["world_xy"],
+            "cam1_ground_xy": cam1[j]["world_xy"],
         } for i,j,dist in links],
     }
 
@@ -348,7 +351,8 @@ def _write_candidate_bundle(evidence):
         "generated_from": "real_video_owner_ci_detector_result",
         "source_ci_run_id": os.environ.get("GITHUB_RUN_ID"),
         "per_camera": {str(i): {
-            "sha256": evidence["per_camera"][str(i)]["sha256"]
+            "sha256": evidence["per_camera"][str(i)]["sha256"],
+            "fps": evidence["per_camera"][str(i)]["fps"],
         } for i in (0, 1)},
     }
     for key in ("frame_audits", "holdout_frame_audits"):
@@ -359,6 +363,8 @@ def _write_candidate_bundle(evidence):
                 "cam0_model_box_index": p["cam0_model_box_index"],
                 "cam1_model_box_index": p["cam1_model_box_index"],
                 "calibration_distance": p["calibration_distance"],
+                "cam0_ground_xy": p["cam0_ground_xy"],
+                "cam1_ground_xy": p["cam1_ground_xy"],
             } for p in row["candidate_evidence"]],
         } for row in evidence[key]]
     raw = json.dumps(bundle, ensure_ascii=False, separators=(",", ":"))
