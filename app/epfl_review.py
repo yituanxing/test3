@@ -87,6 +87,9 @@ def initialize(c):
                    TEXT NOT NULL DEFAULT 'uploaded_research_json'""")
     if "video_fps" not in report_cols:
         c.execute("ALTER TABLE epfl_candidate_reports ADD COLUMN video_fps REAL")
+    if "temporal_fragment_verified" not in report_cols:
+        c.execute("""ALTER TABLE epfl_candidate_reports
+                     ADD COLUMN temporal_fragment_verified INTEGER NOT NULL DEFAULT 0""")
     candidate_cols = {r["name"] for r in c.execute(
         "PRAGMA table_info(epfl_pair_candidates)")}
     for name in ("cam0_ground_x", "cam0_ground_y",
@@ -269,6 +272,12 @@ def _import(raw: dict, request: Request, origin: str):
             or abs(rates[0] - rates[1]) > 0.05):
             _reject("双路研究录像FPS缺失或不同步")
         fps = float(rates[0])
+    temporal_flag = raw.get("temporal_fragment_verified", False)
+    if type(temporal_flag) is not bool:
+        _reject("跨时刻关联验收标志格式错误")
+    # Untrusted arbitrary uploaded JSON must never switch on live time IDs.
+    if origin != "ci_generated_research_bundle":
+        temporal_flag = False
     with _db() as c:
         c.execute("BEGIN IMMEDIATE")
         duplicate = c.execute(
@@ -278,9 +287,10 @@ def _import(raw: dict, request: Request, origin: str):
             now = datetime.now(timezone.utc).isoformat()
             c.execute("""INSERT INTO epfl_candidate_reports
             (report_digest,video_sha0,video_sha1,candidate_count,
-             imported_by,imported_at,trust_level,origin,video_fps)
-            VALUES(?,?,?,?,?,?,'user_provided_research_report',?,?)""",
-            (digest, *CAMERA_SHA256, len(records), actor["id"], now,origin,fps))
+             imported_by,imported_at,trust_level,origin,video_fps,temporal_fragment_verified)
+            VALUES(?,?,?,?,?,?,'user_provided_research_report',?,?,?)""",
+            (digest, *CAMERA_SHA256, len(records), actor["id"], now,origin,
+             fps,int(temporal_flag)))
             for split, frame, a, b, dist, x0, y0, x1, y1 in records:
                 key = sha256(
                     f"{digest}:{split}:{frame}:{a}:{b}:{dist}".encode()
@@ -298,9 +308,11 @@ def _import(raw: dict, request: Request, origin: str):
                          "user":actor["id"]})
         elif origin == "ci_generated_research_bundle":
             # Same verified geometry, preserve old reviewer decisions and ID.
-            c.execute("""UPDATE epfl_candidate_reports SET origin=?
-                         WHERE report_digest=? AND origin<>?""",
-                      (origin,digest,origin))
+            c.execute("""UPDATE epfl_candidate_reports SET origin=?,
+                         video_fps=COALESCE(?,video_fps),
+                         temporal_fragment_verified=?
+                         WHERE report_digest=?""",
+                      (origin,fps,int(temporal_flag),digest))
     return {"report_digest":digest,"candidate_count":len(records),
             "already_present":duplicate,"origin":origin,
             "real_person_identity_verified":False,
