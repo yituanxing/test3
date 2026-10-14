@@ -16,10 +16,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - name: Confirm ffmpeg and ffprobe
+      - name: Install ffmpeg and ffprobe explicitly (runner images differ)
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
           ffmpeg -version | head -1
-          ffprobe -version | head -1
       - name: Download original EPFL AVI privately in temporary CI workspace and pin both SHA256
         shell: bash
         run: |
