@@ -198,8 +198,15 @@ def run():
                                    for a in alert_facts['alerts'])
                         expect(page.locator("#demoAlertRows")).to_contain_text(
                             "EPFL-DEMO",timeout=15000)
-                        # Must be visible in the REAL-ONLY user-facing UI,
-                        # not in old /business or /portal which redirect/block.
+                        # Synthetic P### rule rows must NOT be loaded by
+                        # default on real-video dashboard. Only explicit,
+                        # separately labeled manual Excel algorithm checks.
+                        expect(page.locator("#excelRuleRows tr")).to_have_count(
+                            1,timeout=15000)
+                        assert not page.locator("#excelRuleShowcase").evaluate(
+                            "el=>el.open")
+                        page.locator("#excelRuleShowcase summary").click()
+                        page.locator("#reloadExcelRules").click()
                         expect(page.locator("#excelRuleRows tr")).to_have_count(
                             7,timeout=15000)
                         expect(page.locator("#excelRuleRows")).to_contain_text(
@@ -273,6 +280,21 @@ def run():
                             'x_bin':2,'y_bin':3,'width_cells':2,'height_cells':2}
                         assert len(spatial['demo_zone_events'])==20
                         assert spatial['individual_trajectory_available'] is False
+                        assert spatial['short_anonymous_tracklets_verified'] is True
+                        assert len(spatial['short_anonymous_tracklets'])==14
+                        assert all(t['site_kind']=='same_real_laboratory_two_views'
+                                   and not t['real_geographic_journey']
+                                   and not t['identity_verified']
+                                   and len(t['points'])>=2
+                                   for t in spatial['short_anonymous_tracklets'])
+                        expect(page.locator("#sceneTrackRows tr")).to_have_count(
+                            14,timeout=15000)
+                        expect(page.locator("#sceneTrackSummary")).to_contain_text(
+                            "14条",timeout=15000)
+                        page.locator("#sceneTrackSelect").select_option(
+                            spatial['short_anonymous_tracklets'][0]['fragment_id'])
+                        expect(page.locator("#sceneTrackRows")).to_contain_text(
+                            spatial['short_anonymous_tracklets'][0]['fragment_id'])
                         assert all('candidate_key' not in json.dumps(f)
                                    for f in spatial['frame_cells'])
                         expect(page.locator("#sceneZoneRows")).to_contain_text(
@@ -340,6 +362,8 @@ def run():
                 "anonymous_indoor_heatmap_cells":len(spatial['heat_cells']),
                 "video_derived_default_zone_sampled_instants":len(spatial['demo_zone_events']),
                 "coarse_scene_scrubber_verified_in_browser":True,
+                "verified_short_local_link_segments_shown":len(spatial['short_anonymous_tracklets']),
+                "synthetic_excel_not_auto_loaded_in_real_ui":True,
                 "video_derived_zone_rule_reposition_verified_in_browser":True,
                 "gps_or_real_cross_place_tracking_claimed":False,
                 "synthetic_excel_rule_types_verified_in_browser":7,
