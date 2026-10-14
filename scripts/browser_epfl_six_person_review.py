@@ -140,7 +140,15 @@ def run():
                         facts=activity['data']
                         assert facts['ready'] is True
                         assert facts['matched_pair_observations']==reference_total
-                        assert facts['sampled_video_instants']==41
+                        scored_instants = len({
+                            row['frame_0_based']
+                            for section in ('frame_audits','holdout_frame_audits')
+                            for row in proof[section] if row['candidate_evidence']
+                        })
+                        # Some of the 41 evaluated instants contain zero
+                        # actual matched people; they are NOT activity events.
+                        assert facts['sampled_video_instants']==scored_instants
+                        assert 0 < scored_instants <= 41
                         assert facts['anonymous_activity_fragments']>0
                         assert facts['confirmed_natural_person_identity'] is False
                         assert facts['verified_unique_people'] is None
