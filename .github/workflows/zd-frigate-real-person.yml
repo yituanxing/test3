@@ -15,6 +15,7 @@ name: ZD Frigate Real Person CI
       - "scripts/verify_gb28181_real_app.py"
       - "scripts/package_local_demo.py"
       - "scripts/verify_caviar_public_footage.py"
+      - "scripts/verify_epfl_alternative_cameras.py"
       - "scripts/assess_real_person_readiness.py"
       - "requirements-tracking.txt"
       - "requirements-person-detection.txt"
@@ -73,6 +74,11 @@ jobs:
           python -m pytest -q tests/test_cctv_dataset.py
           python -m scripts.verify_caviar_public_footage
           python -m scripts.assess_real_person_readiness --input reports/verify-caviar-fixed-cctv.json --output reports/real-person-identity-readiness.json
+      # A/B candidate only: EPFL synchronized laboratory pair. Do not replace
+      # accepted CAVIAR source until manual image review approves it.
+      - name: Try alternative EPFL two-camera source with same pretrained YOLO
+        if: contains(github.event.pull_request.labels.*.name, 'cctv-real')
+        run: python -m scripts.verify_epfl_alternative_cameras
       - name: Preserve real public CCTV evidence (no raw licensed videos)
         if: always() && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         uses: actions/upload-artifact@v4
@@ -83,6 +89,8 @@ jobs:
             reports/real-person-identity-readiness.json
             reports/caviar-*-gt.jpg
             reports/caviar-*-yolo.jpg
+            reports/verify-epfl-alternative-cameras.json
+            reports/epfl-lab-camera*-yolo-contact.jpg
           if-no-files-found: warn
       - name: Build auditable local demo ZIP
         run: python -m scripts.package_local_demo
