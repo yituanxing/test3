@@ -315,7 +315,6 @@ async function loadExcelRules(){
  }catch(e){status.textContent='规则计算异常：'+e.message}
 }
 $('reloadExcelRules').onclick=loadExcelRules;
-loadExcelRules();
 async function loadExcelAcceptance(){
  try{
   const data=await api('/api/real/excel-acceptance');
@@ -337,9 +336,29 @@ async function loadExcelAcceptance(){
    '工作表 '+data.source_rows+'行；不是23项全部通过。';
  }catch(e){$('excelAcceptanceNote').textContent='Excel核验读取失败：'+e.message}
 }
-loadExcelAcceptance();
+async function initializeResearchMode(){
+ try{
+  const me=await api('/api/auth/me');
+  if(me.level!==1){
+   for(const id of ['researchActivity','demoAlerts','realSceneAggregation',
+                    'excelRuleShowcase','excelAcceptance']){
+    $(id).hidden=true;
+   }
+   const hint=document.createElement('div');
+   hint.className='caveat';
+   hint.textContent='当前登录辖区仅可查看授权范围内真实视频事件。EPFL研究配对、室内研究热区和Excel全局验收仅州级管理员可访问。';
+   document.querySelector('main').insertBefore(hint,$('researchActivity'));
+   return;
+  }
+  loadExcelRules();
+  loadExcelAcceptance();
+  loadActivity();
+ }catch(e){
+  $('message').textContent='身份权限检查失败：'+e.message;
+ }
+}
 $('loadActivity').onclick=loadActivity;
-loadActivity();
+initializeResearchMode();
 $('days').onchange=reload;$('refresh').onclick=reload;
 $('logout').onclick=async ev=>{ev.preventDefault();await api('/api/auth/logout','POST').catch(()=>{});sessionStorage.removeItem('zd_access_token');location.replace('/login')};
 reload();
