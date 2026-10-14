@@ -87,6 +87,7 @@ def main():
                         expect(page).to_have_url(base+"/admin",timeout=15000)
                         expect(page.locator(".zd-global-nav")).to_be_visible()
                         expect(page.locator("#accountPanel")).to_be_visible(timeout=15000)
+                        page.screenshot(path=str(OUT/"ui-shipped-real-admin-roles.png"),full_page=True)
                         # Excel business information architecture must be reachable
                         # through the same sidebar; no dummy identities are added.
                         expect(page.locator('.zd-global-nav a[href="/base"]')).to_be_visible()
@@ -106,7 +107,78 @@ def main():
                         expect(page.locator('#navigation a[href="/business"]')).to_be_visible()
                         page.screenshot(path=str(OUT/"ui-shipped-business-overview.png"),full_page=True)
 
-                        page.screenshot(path=str(OUT/"ui-shipped-real-admin-roles.png"),full_page=True)
+                        # Business DATA contract: empty initial state is not a completed demo.
+                        token=page.evaluate("sessionStorage.getItem('zd_access_token')")
+                        head={"Authorization":"Bearer "+token}
+                        def read(url):
+                            resp=page.request.get(base+url,headers=head)
+                            assert resp.ok,(url,resp.status,resp.text()[:500])
+                            return resp.json()
+                        def post(url,payload=None):
+                            kw={"headers":head}
+                            if payload is not None:kw["data"]=payload
+                            resp=page.request.post(base+url,**kw)
+                            assert resp.ok,(url,resp.status,resp.text()[:500])
+                            return resp.json()
+                        initial=read("/api/insights/overview?days=7")
+                        initial_syn=initial["synthetic"]["cards"]
+                        assert initial_syn["synthetic_visits"]==0,initial_syn
+                        assert read("/api/monitoring/overview?days=7")["counts"]["person_objects"]==0
+                        # A controlled *synthetic* scenario is explicitly initialized.
+                        post("/api/business/seed")
+                        post("/api/base/demo/duplicates")
+                        generated=post("/api/base/generate",{
+                            "days":7,"strategy":"frequency","correction_mode":"rebuild"})
+                        assert generated["run"]["state"]=="draft"
+                        assert len(generated["people"])>=6
+                        assert any(x["person"]=="P099" and x["place_id"]==2
+                                   for x in generated["people"]),generated["people"]
+                        analysis=read("/api/business/analysis")
+                        overview=read("/api/insights/overview?days=7")
+                        assert analysis["visit_count"]>=15
+                        assert overview["synthetic"]["cards"]["synthetic_visits"]>=15
+                        assert sum(x["count"] for x in analysis["rule_counts"])>0
+                        assert read("/api/real/evidence?days=7")["real_event_counts"]["person_objects"]==0
+                        inspected={}
+                        targets=[
+                          ("/portal","business-overview","#navigation"),
+                          ("/base","business-roster","#candidateRows"),
+                          ("/business","business-seven-rules","#alerts"),
+                          ("/insights","business-people-search","#peopleList"),
+                          ("/portal?tab=alerts","business-alert-list",".content"),
+                          ("/portal?tab=places","business-places",".content"),
+                          ("/portal?tab=acceptance","business-23-acceptance","#acceptanceRows"),
+                          ("/monitor","business-devices","#capturePanel"),
+                          ("/cctv","business-review","#epflResearchPanel"),
+                        ]
+                        for route,label,selector in targets:
+                            page.goto(base+route,wait_until="domcontentloaded")
+                            expect(page.locator(selector)).to_be_visible(timeout=18000)
+                            page.wait_for_timeout(800)
+                            text=page.locator("body").inner_text()
+                            inspected[label]={"path":route,"visible_chars":len(text),
+                                              "screenshot":"ui-shipped-"+label+".png"}
+                            page.screenshot(path=str(OUT/("ui-shipped-"+label+".png")),full_page=True)
+                        assert page.locator("body").is_visible()
+                        page.goto(base+"/base")
+                        expect(page.locator("#candidateRows")).to_contain_text("P099",timeout=15000)
+                        page.goto(base+"/business")
+                        expect(page.locator("#alerts")).to_contain_text("P",timeout=15000)
+                        page.goto(base+"/insights")
+                        expect(page.locator("#peopleList")).to_contain_text("P",timeout=15000)
+                        page.goto(base+"/portal?tab=acceptance")
+                        expect(page.locator("#acceptanceRows tr")).to_have_count(23,timeout=15000)
+                        # 23 entries on screen are statuses, NOT 23 finished features.
+                        with (OUT/"excel-business-actual-browser-audit.json").open("w") as f:
+                            json.dump({"business_screens":inspected,
+                                "initial_synthetic_visits":initial_syn["synthetic_visits"],
+                                "post_seed_synthetic_visits":overview["synthetic"]["cards"]["synthetic_visits"],
+                                "synthetic_rule_counts":analysis["rule_counts"],
+                                "new_roster_people":len(generated["people"]),
+                                "real_person_events":0,
+                                "recorded_real_video_observations":119,
+                                "requirements_count":23,
+                                "browser_errors":errors},f,ensure_ascii=False,indent=2)
                         assert not errors,errors
                         print("OPERATIONAL_SITE_REAL_CLIP_BROWSER_PASS="+json.dumps({
                             "source_clip_duration":video["duration"],
