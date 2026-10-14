@@ -62,6 +62,12 @@ def main():
                         expect(page.locator("#realEvents")).to_have_text("0", timeout=12000)
                         expect(page.locator("#places")).to_contain_text("本辖区尚无场所")
                         assert page.locator('a[href="/business"]').count() == 0
+                        expect(page.locator('.zd-panel[data-view="overview"]')).to_be_visible()
+                        expect(page.locator('.zd-panel[data-view="video"]')).to_be_hidden()
+                        assert page.locator('.zd-nav[href="/admin"]').count()==1
+                        page.screenshot(path=str(OUT / "ui-product-first-impression.png"),full_page=True)
+                        page.locator('.zd-nav[data-panel="video"]').click()
+                        expect(page.locator("#researchActivity")).to_be_visible()
                         expect(page.locator("#videoClipPlaceholder")).to_be_visible()
                         page.locator("#videoClipPicker").set_input_files(
                             str(ROOT / "samples" / "test-pattern.mp4"))
@@ -83,6 +89,8 @@ def main():
                             page.locator("#videoClip").screenshot(
                                 path=str(OUT / "ui-actual-epfl-clip-frame.png"))
                             print("REAL_VIDEO_BROWSER_SEEK_AND_DECODE_PASS")
+                        page.locator('.zd-nav[data-panel="overview"]').click()
+                        expect(page.locator('.zd-panel[data-view="overview"]')).to_be_visible()
                         page.screenshot(path=str(OUT / "ui-real-only-landing.png"), full_page=True)
                         page.goto(base + "/monitor")
                         assert page.locator('a[href="/business"]').count() == 0
