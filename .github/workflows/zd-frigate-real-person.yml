@@ -79,6 +79,7 @@ jobs:
           path: |
             reports/verify-caviar-fixed-cctv.json
             reports/caviar-*-gt.jpg
+            reports/caviar-*-yolo.jpg
           if-no-files-found: warn
       - name: Build auditable local demo ZIP
         run: python -m scripts.package_local_demo
