@@ -95,13 +95,10 @@ jobs:
           python -m scripts.verify_face_photo_lab_local
       # One targeted UI acceptance for the open P0 capture branch. Do not
       # launch the heavy Docker/Frigate suite for ordinary PRs.
-      - name: Verify real Chromium RTSP start/stop and synthetic roster demo
+      - name: Verify real-only landing and block synthetic data APIs
         if: contains(github.event.pull_request.head.ref, 'continuous-capture')
-        run: |
-          python -m pip install 'playwright>=1.55,<2'
-          python -m playwright install --with-deps chromium
-          python -m scripts.browser_smoke
-      - name: Publish tested local demo browser screenshots
+        run: python -m pytest -q tests/test_real_only_runtime.py
+      - name: Publish real-only UI evidence when present
         if: always() && contains(github.event.pull_request.head.ref, 'continuous-capture')
         uses: actions/upload-artifact@v4
         with:
@@ -190,9 +187,11 @@ jobs:
           if-no-files-found: error
 
   real-media:
-    # GB28181 protocol-only changes should not repeat the unrelated
-    # 4-minute UI/Frigate acceptance suite; routine commits still do.
-    if: github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[gb-sip]'))
+    # Opt-in PR label executes genuine licensed-video -> RTSP -> Frigate
+    # -> SQLite -> /real acceptance. No mocked WVP control plane.
+    if: >-
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'cctv-real')) ||
+      (github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[gb-sip]')))
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -263,7 +262,6 @@ jobs:
           path: |
             reports/verify-live-frigate.json
             reports/verify-portal-live.json
-            reports/verify-wvp-rtsp-bridge.json
             reports/motion-diagnostics.json
             reports/frigate-frame-*.jpg
           if-no-files-found: warn
