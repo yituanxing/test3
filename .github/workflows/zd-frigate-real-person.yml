@@ -163,6 +163,9 @@ jobs:
       - name: Evaluate EPFL six-person official GT and real two-camera tracking
         if: steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         run: python -m scripts.verify_epfl_six_person_ground_truth
+      - name: Independently audit long-gap EPFL identity mismatch on genuine frame coordinates
+        if: steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
+        run: python -m scripts.audit_epfl_long_gap_safety
       - name: Full browser EPFL real-video candidate import and audit closure
         if: steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         run: |
@@ -181,6 +184,7 @@ jobs:
             reports/caviar-*-yolo.jpg
             reports/verify-epfl-alternative-cameras.json
             reports/verify-epfl-six-person-cross-camera.json
+            reports/epfl-long-gap-safety-audit.json
             reports/epfl6p-review-integration.json
             reports/ui-epfl-real-research-review.png
             reports/ui-epfl-real-research-activity.png
