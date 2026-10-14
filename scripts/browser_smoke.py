@@ -86,6 +86,16 @@ def run():
                         page.locator('a[data-tab="overview"]').click()
                         expect(page.locator("h2.lead")).to_contain_text("辖区重点场所运行概览")
                         checks.append("home_navigation")
+                        # Production-facing landing must start with actual
+                        # camera evidence, not virtual P### visits or rules.
+                        page.goto(base+"/real")
+                        expect(page.get_by_role("heading",name="仅真实视频 · 事件与证据")).to_be_visible()
+                        expect(page.locator("#realEvents")).to_have_text("0",timeout=12000)
+                        expect(page.locator("#events")).to_contain_text("没有用虚构P###填充",timeout=12000)
+                        expect(page.locator("#places")).to_contain_text("测试场所 A",timeout=12000)
+                        checks.append("true_data_only_browser_zero_state_no_synthetic_fallback")
+                        page.screenshot(path=str(OUT/"ui-real-evidence-only.png"),full_page=True)
+                        page.goto(base+"/portal")
                         # Primary human CCTV route: real-source catalog and
                         # truthful empty state. A real remote pair is verified
                         # separately in the cctv-real labelled CI step.
