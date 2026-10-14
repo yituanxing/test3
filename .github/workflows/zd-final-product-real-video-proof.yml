@@ -70,6 +70,36 @@ jobs:
         run: |
           mkdir -p reports
           python scripts/browser_operational_site_with_video.py
+      - name: Build complete Windows local demo with the genuine 38-second research clip
+        shell: bash
+        run: |
+          python -m scripts.package_local_demo
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          z=Path('dist/zd-demo-local-source.zip')
+          with ZipFile(z) as archive:
+              assert archive.testzip() is None
+              names=set(archive.namelist())
+              for required in (
+                  'zd-demo/static/portal.html',
+                  'zd-demo/static/site_navigation.js',
+                  'zd-demo/static/showcase_ui.js',
+                  'zd-demo/scripts/start_local_demo_windows.bat',
+                  'zd-demo/scripts/start_local_demo_windows.ps1',
+                  'zd-demo/samples/demo-media/epfl-dual-60-98.mp4',
+                  'zd-demo/config/epfl6p_real_pair_candidates_v1.json',
+              ):
+                  assert required in names,required
+          print('EXCEL_BUSINESS_WEB_WINDOWS_BUNDLE_OK',z.stat().st_size)
+          PY
+      - name: Upload single complete Windows demo with real video
+        uses: actions/upload-artifact@v4
+        with:
+          name: zd-final-excel-business-web-windows-with-real-video
+          path: dist/zd-demo-local-source.zip
+          retention-days: 7
+          if-no-files-found: error
       - name: Publish ACTUAL authenticated browser proof screenshots (not source AVI)
         if: always()
         uses: actions/upload-artifact@v4
