@@ -281,6 +281,16 @@ def run():
                         assert len(spatial['demo_zone_events'])==20
                         assert spatial['individual_trajectory_available'] is False
                         assert spatial['short_anonymous_tracklets_verified'] is True
+                        assert spatial["virtual_zone_division"]["true_different_sites"] is False
+                        assert spatial["short_virtual_zone_crossing_count"]==4
+                        assert len(spatial["short_virtual_zone_crossings"])==4
+                        assert all(c["real_video_evidence"]
+                                   and c["virtual_area_rule_only"]
+                                   and not c["different_real_world_sites_verified"]
+                                   and not c["gps_track"]
+                                   for c in spatial["short_virtual_zone_crossings"])
+                        expect(page.locator("#sceneVirtualCrossRows tr")).to_have_count(
+                            4,timeout=15000)
                         assert len(spatial['short_anonymous_tracklets'])==14
                         assert all(t['site_kind']=='same_real_laboratory_two_views'
                                    and not t['real_geographic_journey']
@@ -294,12 +304,12 @@ def run():
                         page.locator("#sceneTrackSelect").select_option(
                             spatial['short_anonymous_tracklets'][0]['fragment_id'])
                         page.locator("#sceneOverview").click()
-                        expect(page.locator("#sceneTrackOverlay line")).to_have_count(
+                        expect(page.locator("#sceneTrackOverlay line[data-short-trace]")).to_have_count(
                             1,timeout=15000)
                         # The SVG is derived from two GT-gated real video
                         # sample locations; not a decorative always-on path.
                         first_points=spatial['short_anonymous_tracklets'][0]['points']
-                        line=page.locator("#sceneTrackOverlay line")
+                        line=page.locator("#sceneTrackOverlay line[data-short-trace]")
                         assert abs(float(line.get_attribute("x1"))-
                                    first_points[0]["x"])<0.01
                         assert abs(float(line.get_attribute("y2"))-
@@ -378,6 +388,7 @@ def run():
                 "coarse_scene_scrubber_verified_in_browser":True,
                 "verified_short_local_link_segments_shown":len(spatial['short_anonymous_tracklets']),
                 "browser_svg_track_coordinates_match_source":True,
+                "verified_virtual_same_room_crossings":spatial["short_virtual_zone_crossing_count"],
                 "synthetic_excel_not_auto_loaded_in_real_ui":True,
                 "video_derived_zone_rule_reposition_verified_in_browser":True,
                 "gps_or_real_cross_place_tracking_claimed":False,
