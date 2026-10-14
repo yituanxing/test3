@@ -337,8 +337,9 @@ function render(){
     if(!response.ok)throw Error('HTTP '+response.status);
     const blob=await response.blob();
     if(!clip.isConnected)return;
+    const cover=await fetch('/api/real/showcase-media/poster',{headers:h});
+    if(cover.ok)clip.poster=URL.createObjectURL(await cover.blob());
     clip.src=URL.createObjectURL(blob);clip.load();
-    clip.addEventListener('loadeddata',()=>{if(clip.currentTime<1)clip.currentTime=12},{once:true});
     status.textContent='已加载38秒真实双机录像；正在获取实际检测记录…';
     try{
      let activity=await api('/api/real/activity');
