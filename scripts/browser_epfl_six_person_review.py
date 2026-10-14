@@ -31,6 +31,26 @@ def run():
         raise RuntimeError("Actual owner-job EPFL report has too few candidates")
     if proof.get("matching_gt_is_never_input") is not True:
         raise RuntimeError("EPFL research model consumed ground truth input")
+    # Both paths must represent the SAME actual detector-derived evidence.
+    # Print the first mismatched sanitized pair if source formats diverge;
+    # official GT labels must never enter this comparison.
+    from app import epfl_review
+    bundle = epfl_review._bundle()
+    if bundle is None:
+        raise RuntimeError("Official video owner must produce the candidate bundle")
+    original = epfl_review._extract(proof)
+    packaged = epfl_review._extract(bundle)
+    summary = {
+        "full_pairs":len(original), "bundle_pairs":len(packaged),
+        "full_digest":epfl_review._hash(original),
+        "bundle_digest":epfl_review._hash(packaged),
+        "identical":original == packaged,
+        "first_disagreement":next(
+            ({"original":a,"bundle":b}
+             for a,b in zip(original,packaged) if a!=b),None)
+    }
+    print("REAL_EVIDENCE_PROVENANCE_DIAGNOSTIC "+
+          json.dumps(summary,ensure_ascii=False),flush=True)
     with tempfile.TemporaryDirectory(prefix="zd-epfl-browser-") as tmp:
         env = dict(os.environ)
         env["ZD_DATA_DIR"] = str(Path(tmp)/"db")
