@@ -79,7 +79,16 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
 <div style="flex:0 1 350px;min-width:260px">
 <div class="small" style="margin-bottom:6px">室内局部投影示意（红框为演示区域，点击任意格子设置）</div>
-<div id="sceneHeatGrid" style="width:min(100%,320px);aspect-ratio:1;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:1px solid #dce7f2;border-radius:7px;overflow:hidden" aria-label="真实录像匿名检测的8×8局部投影热区示意"></div>
+<div style="position:relative;width:min(100%,320px);aspect-ratio:1">
+<div id="sceneHeatGrid" style="width:100%;height:100%;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:1px solid #dce7f2;border-radius:7px;overflow:hidden" aria-label="真实录像匿名检测的8×8局部投影热区示意"></div>
+<svg id="sceneTrackOverlay" viewBox="0 0 320 320" preserveAspectRatio="none"
+ style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" aria-label="真实摄像机同一实验室内经过独立核验的约1秒匿名短轨迹线段"></svg>
+</div>
+<label style="display:block;margin-top:8px">已核验匿名短时片段（两机同一实验室）
+<select id="sceneTrackSelect"><option value="">显示全部短片段</option></select>
+</label>
+<p id="sceneTrackSummary" class="small">等待导入真实视频匹配数据；这里只能展示可靠的短时匿名片段。</p>
+<div class="scroll" style="max-height:180px"><table><thead><tr><th>匿名片段</th><th>真实录像帧</th><th>双摄像机来源</th></tr></thead><tbody id="sceneTrackRows"><tr><td colspan="3">尚无已验证短时片段</td></tr></tbody></table></div>
 <div style="margin-top:10px">
 <label>真实录像采样帧：<span id="sceneFrameLabel">汇总热度</span></label>
 <input type="range" id="sceneFrameCursor" min="0" max="0" value="0" style="width:100%">
@@ -99,17 +108,18 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <tbody id="sceneEventRows"><tr><td colspan="3">等待真实视频证据</td></tr></tbody></table></div>
 </div></div>
 <p class="small"><strong>验收边界：</strong>这里的点位只在录像标定坐标系中有效，聚合观测次数不能当作独立人数。
-已验证的14条约1秒跨时关联单独在上方活动片段列表；本页面不把不同采样帧强行接成个人轨迹。
-长间隔跨人关联、跨真实场所和GPS都没有启用。</p>
+已验证的约1秒匿名跨帧片段在图上以短线段显示，支持查询来源帧及两机检测框索引；不会跨越没有被证实的时间间隔，也不代表人脸实名身份。
+**两机属于同一个实验室，因此这是跨摄像机/局部区域示意，绝不是跨真实场所或GPS路径。**</p>
 </section>
-<section class="box" id="excelRuleShowcase">
-<h2>Excel #6–12 · 七类预警规则验收（纯模拟业务）</h2>
+<details class="box" id="excelRuleShowcase">
+<summary style="cursor:pointer;font-weight:600">仅供Excel算法技术核对：七类旧规则的虚构测试样本（默认不加载、不作为真实预警）</summary>
+<h2>旧版七类规则单独验算（不属于本真实视频链路）</h2>
 <p class="small"><b>注意：此区的人员 P###、到访和场所全部是明确虚构的规则样本。</b>它调用项目已实现的七种规则算法，
 不是硬编码警情，不读取或改写 EPFL 视频数据，不能把命中称为真实人员预警。</p>
 <button id="reloadExcelRules">核验七种原Excel规则</button> <span class="small" id="excelRuleStatus">未读取</span>
 <div class="scroll"><table><thead><tr><th>Excel条目</th><th>预警类型</th><th>模拟命中</th><th>示例命中与原始模拟观测</th></tr></thead>
-<tbody id="excelRuleRows"><tr><td colspan="4">点击核验，不展示无来源的警情</td></tr></tbody></table></div>
-</section>
+<tbody id="excelRuleRows"><tr><td colspan="4">仅按需手动运行模拟算法核对</td></tr></tbody></table></div>
+</details>
 <section class="box" id="excelAcceptance">
 <h2>原 Excel 23 项 · 严格验收与缺口</h2>
 <p class="small">按原始需求逐项核对，已实现、模拟业务、部分实现、缺失严格区分。可跳转的页面是<strong>演示入口，不代表原需求通过</strong>。</p>
@@ -209,6 +219,50 @@ async function loadDemoAlerts(){
  }catch(e){$('demoAlertState').textContent='演示告警查询失败：'+e.message}
 }
 let sceneData=null,sceneFrameIndex=0,sceneZoneX=2,sceneZoneY=3,sceneTimer=null;
+function sceneTracksPaint(){
+ if(!sceneData)return;
+ const verified=sceneData.short_anonymous_tracklets_verified===true;
+ const selected=$('sceneTrackSelect').value;
+ const items=verified?(sceneData.short_anonymous_tracklets||[]):[];
+ $('sceneTrackSummary').textContent=verified?
+  '两台相机同一实验室的'+items.length+'条已核验约1秒匿名短关联；下方每条带原始录像帧。红线不连接跨越未验证时间间隔。':
+  '未取得可靠的跨时间同目标认证（或人工否定过候选）；不绘制假路线。';
+ $('sceneTrackRows').innerHTML=items.map(t=>
+  '<tr><td>'+esc(t.fragment_id)+'</td><td>'+
+  esc(t.points.map(p=>p.video_frame).join(' → '))+
+  '</td><td>'+esc(t.camera_pair.join(' / '))+'</td></tr>'
+ ).join('')||'<tr><td colspan="3">无可独立核验的短时关联，未生成轨迹</td></tr>';
+ $('sceneTrackSelect').innerHTML='<option value="">显示全部短片段</option>'+
+ items.map(t=>'<option value="'+esc(t.fragment_id)+'">'+esc(t.fragment_id)+
+  '：第'+t.points[0].video_frame+'→'+t.points[t.points.length-1].video_frame+'帧</option>').join('');
+ if(selected&&items.some(t=>t.fragment_id===selected))$('sceneTrackSelect').value=selected;
+ sceneTracksDraw();
+}
+function sceneTracksDraw(){
+ const overlay=$('sceneTrackOverlay');
+ if(!sceneData||!sceneData.short_anonymous_tracklets_verified){
+  overlay.innerHTML='';return;
+ }
+ const selected=$('sceneTrackSelect').value;
+ const frame=sceneFrameIndex>0?sceneData.frame_cells[sceneFrameIndex-1]?.video_frame:null;
+ let html='';
+ for(const t of sceneData.short_anonymous_tracklets){
+  if(selected&&t.fragment_id!==selected)continue;
+  for(let i=0;i<t.points.length-1;i++){
+   const a=t.points[i],b=t.points[i+1];
+   if([a,b].some(p=>p.x<0||p.x>=320||p.y<0||p.y>=320))continue;
+   if(frame!==null&&frame!==a.video_frame&&frame!==b.video_frame)continue;
+   // All SVG numbers originate from server-side checked, finite coordinates.
+   html+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+
+     '" stroke="'+(selected?'#d92929':'#e55336')+'" stroke-width="'+
+     (selected?'5':'3')+'" stroke-linecap="round" opacity=".9"/>'+
+     '<circle cx="'+a.x+'" cy="'+a.y+'" r="4" fill="#073b69"/>'+
+     '<circle cx="'+b.x+'" cy="'+b.y+'" r="4" fill="#ffdf5b" stroke="#753700"/>';
+  }
+ }
+ overlay.innerHTML=html;
+}
+$('sceneTrackSelect').onchange=sceneTracksDraw;
 function sceneStop(){if(sceneTimer){clearInterval(sceneTimer);sceneTimer=null}$('scenePlay').textContent='▶ 逐帧播放'}
 function scenePaint(){
  if(!sceneData)return;
@@ -232,6 +286,7 @@ function scenePaint(){
    (strength>.65?'white':'#17476a')+'">'+(n||'')+'</button>';
  }
  $('sceneHeatGrid').innerHTML=markup;
+ sceneTracksDraw();
  $('sceneFrameCursor').value=sceneFrameIndex;
  $('sceneFrameLabel').textContent=sample?'第'+sample.video_frame+'帧':'累计热度';
  $('sceneFrameInfo').textContent=sample?
@@ -250,6 +305,7 @@ async function loadSceneAggregate(){
     '&zone_x_bin='+sceneZoneX+'&zone_y_bin='+sceneZoneY;
   const data=await api(url);
   sceneData=data;
+  sceneTracksPaint();
   if(sceneFrameIndex>data.frame_cells.length)sceneFrameIndex=0;
   $('sceneFrameCursor').max=data.frame_cells.length;
   $('sceneMetrics').innerHTML=[
@@ -350,7 +406,7 @@ async function initializeResearchMode(){
    document.querySelector('main').insertBefore(hint,$('researchActivity'));
    return;
   }
-  loadExcelRules();
+  // Real-only screen never automatically calls the synthetic P### generator.
   loadExcelAcceptance();
   loadActivity();
  }catch(e){
