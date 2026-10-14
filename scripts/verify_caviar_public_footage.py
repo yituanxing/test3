@@ -101,6 +101,24 @@ def main():
                 assert detector_metrics['eligible_for_real_identity_or_visit'] is False
                 assert detector_metrics['frames_inferred']==24
                 assert detector_metrics['frames_decoded']==24
+                # Actual reviewer-facing image must include boxes from the
+                # PRETRAINED MODEL, not manually annotated CAVIAR ground truth.
+                first_pred=next((x['frame_number'] for x in
+                    detector_metrics['frame_summaries']
+                    if x['existing_tracker_assigned_boxes']>0),None)
+                assert first_pred is not None,(
+                    'No ByteTrack-assigned model box in actual '+view+' video')
+                model_image=client.get(
+                    f"/api/cctv/sources/{got['source_id']}/model-frame",
+                    headers=auth,params={'run_key':detector_metrics['run_key'],
+                                        'frame':first_pred})
+                assert model_image.status_code==200,model_image.text[:400]
+                assert model_image.headers['x-annotations']==(
+                    'YOLO model local tracks, not ground truth')
+                assert int(model_image.headers['x-model-boxes'])>0
+                assert model_image.content[:2]==bytes([255,216])
+                (target/f'caviar-{view}-yolo.jpg').write_bytes(model_image.content)
+                detector_metrics['actual_model_jpeg_frame']=first_pred
                 assert detector_metrics['real_pretrained_person_detector_ran'] is True
                 assert detector_metrics['detector_received_ground_truth_boxes'] is False
                 # Proof of the real two-camera YOLO→ByteTrack link, not merely
