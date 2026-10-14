@@ -14,7 +14,7 @@ label{display:flex;flex-direction:column;gap:5px;min-width:170px;font-size:13px;
 #toast{display:none;position:fixed;bottom:25px;right:24px;z-index:4;background:#143a63;color:white;padding:12px 17px;border-radius:8px;max-width:410px;box-shadow:0 9px 34px #20304040}#toast.error{background:#ac3434}
 footer{font-size:12px;color:#657994;margin-top:19px}
 @media(max-width:950px){.grid{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}header .wrap{display:block}nav{margin-top:14px}.flow{grid-template-columns:repeat(2,1fr)}}@media(max-width:550px){.wrap{padding:0 13px}.grid{grid-template-columns:1fr 1fr}h1{font-size:20px}.card{padding:12px}.card .big{font-size:26px}}
-</style><script>
+</style><script src="/ui/role-navigation.js"></script><script>
 (function(){
 const token=sessionStorage.getItem('zd_access_token');
 if(!token){location.replace('/login');return}
@@ -42,6 +42,7 @@ window.addEventListener('load',async()=>{
     const r=await fetch('/api/auth/me');
     if(!r.ok)return;
     const user=await r.json();
+    zdApplyRoleNavigation(user);
     const badge=document.createElement('div');badge.style.cssText='position:fixed;right:12px;top:6px;z-index:500;background:#132c4a;color:#fff;border-radius:8px;padding:5px 12px;font:12px system-ui';
     badge.textContent=user.username+' · '+user.region_name+' · '+user.role+'　';
     const btn=document.createElement('button');btn.textContent='退出';btn.style.cssText='background:#3e648f;color:#fff;padding:3px 8px;border:0;border-radius:5px;cursor:pointer';
@@ -76,7 +77,7 @@ const fmt=s=>{try{return new Date(s).toLocaleString('zh-CN',{hour12:false})}catc
 async function api(p,m='GET',b){let r=await fetch(p,{method:m,headers:{'Content-Type':'application/json'},body:b===undefined?undefined:JSON.stringify(b)});let x=await r.json();if(!r.ok){let d=x.detail;throw Error(typeof d==='string'?d:JSON.stringify(d))}return x}
 function toast(s,error=false){let e=$('toast');e.textContent=s;e.className=error?'error':'';e.style.display='block';clearTimeout(window._hide);window._hide=setTimeout(()=>e.style.display='none',6200)}
 async function runAction(f,msg){try{await f();await load();toast(msg)}catch(e){toast('操作失败：'+e.message,true)}}
-async function load(){let [b,p,r,a,act]=await Promise.all([api('/api/base'),api('/api/places'),api('/api/base/runs'),api('/api/base/audit'),api('/api/base/active')]);state=b;places=p;active=act;
+async function load(){const actor=await api('/api/auth/me');if(zdGateStateOnlyPage(actor,'合成人员底库'))return;let [b,p,r,a,act]=await Promise.all([api('/api/base'),api('/api/places'),api('/api/base/runs'),api('/api/base/audit'),api('/api/base/active')]);state=b;places=p;active=act;
 const d=b.run?await api('/api/base/runs/'+b.run.id+'/diff'):null;
 const maintenance=await api('/api/base/maintenance/config');
 $('autoRoster').checked=!!maintenance.enabled;

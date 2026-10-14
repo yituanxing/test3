@@ -84,6 +84,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 </main>
 </div>
 <div id="flash"></div>
+<script src="/ui/role-navigation.js"></script>
 <script>
 (function(){
 'use strict';
@@ -325,6 +326,7 @@ $('logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST'}).catc
   $('who').textContent=state.user.username+' · '+state.user.region_name;
   $('scope').textContent='当前授权辖区：'+state.user.region_name+' · '+['','州级','县市级','街道级','社区级'][state.user.level];
   if(state.user.level!==1)document.querySelectorAll('.state-only').forEach(x=>x.remove());
+  zdApplyRoleNavigation(state.user);
   await loadData();
   if(state.user.level===1)await loadAcceptance();
   render();

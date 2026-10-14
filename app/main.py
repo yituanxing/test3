@@ -336,6 +336,12 @@ def home():
     return FileResponse(STATIC)
 
 
+@app.get('/ui/role-navigation.js')
+def role_navigation_script():
+    return FileResponse(ROOT / 'static' / 'role_navigation.js',
+                        media_type='text/javascript')
+
+
 @app.get('/portal')
 def portal_home():
     return FileResponse(PORTAL_STATIC)

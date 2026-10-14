@@ -610,9 +610,31 @@ def run():
                             expect(page.locator("#view")).to_contain_text(
                                 "仅供州级演示管理员核验交付声明",timeout=12000)
                             assert page.locator("#acceptanceRows tr").count()==0
+                            # Real pages must not offer controls whose API
+                            # reliably returns HTTP 403 for subordinate tiers.
+                            page.goto(base+"/insights")
+                            expect(page.locator("#seed")).to_be_hidden()
+                            assert page.locator('nav a[href="/base"]:visible').count()==0
+                            assert page.locator('nav a[href="/business"]:visible').count()==0
+                            page.goto(base+"/monitor")
+                            expect(page.locator("#videoButton")).to_be_hidden()
+                            expect(page.locator("#syncButton")).to_be_hidden()
+                            page.goto(base+"/admin")
+                            expect(page.locator("#accountPanel")).to_be_hidden()
+                            assert page.locator('nav a[href="/business"]:visible').count()==0
                             page.goto(base+"/cctv")
+                            expect(page.locator("#epflResearchPanel")).to_be_hidden()
                             expect(page.locator("#epflUseBundled")).to_be_hidden()
                             expect(page.locator("#epflReviewPanel")).to_be_hidden()
+                            assert page.locator('.jumpnav a[href="#epflResearchPanel"]:visible').count()==0
+                            page.goto(base+"/base")
+                            expect(page.get_by_role("heading",name=
+                                "当前账号仅能使用获授权的辖区功能")).to_be_visible()
+                            expect(page.locator("main")).to_contain_text("合成人员底库")
+                            page.goto(base+"/business")
+                            expect(page.get_by_role("heading",name=
+                                "当前账号仅能使用获授权的辖区功能")).to_be_visible()
+                            expect(page.locator("main")).to_contain_text("七类合成预警规则")
                             page.goto(base+"/portal")
                             page.locator("#logout").click()
                             expect(page).to_have_url(base+"/login",timeout=10000)

@@ -16,6 +16,11 @@ def test_product_portal_serves_integrated_workbench(tmp_path, monkeypatch):
     assert '匿名目标事件' in page.text and '合成演示' in page.text
     assert '/api/insights/overview?days=7' in page.text
     assert '/api/frigate/events?limit=100' in page.text
+    assert 'src="/ui/role-navigation.js"' in page.text
+    js=client.get('/ui/role-navigation.js')
+    assert js.status_code==200
+    assert 'zdApplyRoleNavigation' in js.text
+    assert 'zdGateStateOnlyPage' in js.text
     assert client.get('/api/insights/overview').status_code == 401
     assert client.get('/api/frigate/events').status_code == 401
     with main.db() as c:
