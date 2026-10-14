@@ -125,7 +125,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: zd-p0-excel-demo-source
-          run-id: 38515621715
+          run-id: 38549272390
           github-token: ${{ github.token }}
           path: .ci-restored-epfl
       - name: Verify restored research evidence is separate from runtime GT
@@ -142,7 +142,7 @@ jobs:
           assert raw is not None
           records=_extract(raw)
           assert len(records)==119, len(records)
-          print('RESTORED_FROM_VALIDATED_OWNER_RUN=38515621715; pairs=119; NOT newly inferred')
+          print('RESTORED_FROM_VALIDATED_OWNER_RUN=38549272390; pairs=119; NOT newly inferred')
           PY
       # Explicit, short opt-in: verify actual Edinburgh CAVIAR files, not mocks.
       # Does not repeat the heavyweight GB28181/Frigate Docker integration.
