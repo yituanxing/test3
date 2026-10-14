@@ -99,6 +99,40 @@ async function reload(){
  }catch(e){$('message').textContent='获取真实证据失败：'+e.message}
  finally{$('refresh').disabled=false;}
 }
+async function loadActivity(){
+ const state=$('activityState'),button=$('loadActivity');
+ button.disabled=true;
+ try{
+  let response=await api('/api/real/activity');
+  if(!response.ready){
+   let availability=await api('/api/research/epfl/bundled');
+   if(!availability.available)throw Error('本机没有真实视频生成的双机研究包；请使用官方双机 CI 导出的源码包');
+   await api('/api/research/epfl/bundled/import','POST');
+   response=await api('/api/real/activity');
+  }
+  if(!response.ready)throw Error('导入成功前没有可显示的数据');
+  const cards=[
+   ['两摄像机同帧配对',response.matched_pair_observations],
+   ['真实录像采样时刻',response.sampled_video_instants],
+   ['匿名活动片段（非人数）',response.anonymous_activity_fragments],
+   ['跨多个时刻的片段',response.multi_instant_fragments]
+  ];
+  $('activityStats').innerHTML=cards.map(x=>'<div class="card"><span class="small">'+esc(x[0])+
+   '</span><strong>'+x[1]+'</strong></div>').join('');
+  $('activityTable').innerHTML=response.activities.slice(0,40).map(v=>{
+   const when=(f,t)=>'第'+f+'帧'+(t==null?'':' / '+Number(t).toFixed(2)+'秒');
+   return '<tr><td>'+esc(v.activity_id)+'</td><td>'+when(v.first_video_frame,v.first_video_second)+
+    '</td><td>'+when(v.last_video_frame,v.last_video_second)+'</td><td>'+
+    v.synchronized_pair_observations+'</td><td>EPFL 同一实验室，摄像机0和1</td></tr>';
+  }).join('')||'<tr><td colspan="5">实际视频当前没有匹配成功的匿名片段</td></tr>';
+  state.textContent='已导入实际双机视频识别结果；不含任何合成人员';
+  $('activityEvidence').textContent='视频源SHA256: '+response.camera_sha256.map(x=>x.slice(0,16)+'…').join(' / ')+
+    '；片段V编号仅在本段录像内有效，不代表自然人身份、唯一人数或跨场所轨迹。';
+ }catch(e){state.textContent='读取真实双机活动失败：'+e.message}
+ finally{button.disabled=false}
+}
+$('loadActivity').onclick=loadActivity;
+loadActivity();
 $('days').onchange=reload;$('refresh').onclick=reload;
 $('logout').onclick=async ev=>{ev.preventDefault();await api('/api/auth/logout','POST').catch(()=>{});sessionStorage.removeItem('zd_access_token');location.replace('/login')};
 reload();
