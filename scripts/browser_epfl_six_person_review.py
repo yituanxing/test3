@@ -267,6 +267,38 @@ def run():
                         assert sum(x['paired_detection_count']
                                    for x in spatial['heat_cells'])==reference_total
                         assert not any('person_id' in k for k in spatial)
+                        assert spatial['grid_size']==8
+                        assert len(spatial['frame_cells'])==40
+                        assert spatial['zone']=={
+                            'x_bin':2,'y_bin':3,'width_cells':2,'height_cells':2}
+                        assert len(spatial['demo_zone_events'])==20
+                        assert spatial['individual_trajectory_available'] is False
+                        assert all('candidate_key' not in json.dumps(f)
+                                   for f in spatial['frame_cells'])
+                        expect(page.locator("#sceneZoneRows")).to_contain_text(
+                            "真实视频投影检测",timeout=15000)
+                        # User can scrub ACTUAL recorded frame samples. The UI
+                        # does not assert a single person moved between samples.
+                        page.locator("#sceneFrameCursor").evaluate(
+                            """el=>{el.value='1';el.dispatchEvent(
+                              new Event('input',{bubbles:true}))}""")
+                        expect(page.locator("#sceneFrameLabel")).to_contain_text(
+                            "第",timeout=15000)
+                        assert '轨迹' not in page.locator("#sceneFrameInfo").inner_text().split(
+                            "不推断")[0]
+                        page.screenshot(
+                            path=str(OUT/"ui-epfl-room-zone-demo.png"),
+                            full_page=True)
+                        # Click one grid square and RECOMPUTE zone hits from
+                        # video: the result must change with no synthetic seed.
+                        page.locator('[data-scene-x="6"][data-scene-y="5"]').click()
+                        expect(page.locator("#sceneZoneSummary")).to_contain_text(
+                            "(6,5)",timeout=15000)
+                        expect(page.locator("#sceneZoneRows")).to_contain_text(
+                            "真实视频投影检测",timeout=15000)
+                        page.locator("#sceneOverview").click()
+                        expect(page.locator("#sceneFrameLabel")).to_contain_text(
+                            "累计热度",timeout=15000)
                         page.screenshot(
                             path=str(OUT/"ui-epfl-real-research-activity.png"),
                             full_page=True)
@@ -306,6 +338,9 @@ def run():
                 "real_source_derived_demo_alerts":len(alert_facts['alerts']),
                 "real_aggregate_video_threshold_events":len(spatial['demo_scene_events']),
                 "anonymous_indoor_heatmap_cells":len(spatial['heat_cells']),
+                "video_derived_default_zone_sampled_instants":len(spatial['demo_zone_events']),
+                "coarse_scene_scrubber_verified_in_browser":True,
+                "video_derived_zone_rule_reposition_verified_in_browser":True,
                 "gps_or_real_cross_place_tracking_claimed":False,
                 "synthetic_excel_rule_types_verified_in_browser":7,
                 "original_excel_requirements_visible_in_browser":23,
