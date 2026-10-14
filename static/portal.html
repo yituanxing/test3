@@ -204,8 +204,10 @@ function applyAcceptanceFilter(){
  const filter=$('acceptStatusFilter').value,query=$('acceptSearch').value.trim().toLowerCase();
  let count=0;
  for(const row of tbody.querySelectorAll('tr[data-acceptance-status]')){
+  const cells=row.querySelectorAll('td');
+  const idAndName=(cells[0].textContent+' '+cells[1].textContent).toLowerCase();
   row.hidden=!( (filter==='all'||row.dataset.acceptanceStatus===filter) &&
-                (!query||row.textContent.toLowerCase().includes(query)));
+                (!query||idAndName.includes(query)));
   if(!row.hidden)count++;
  }
  $('acceptVisibleCount').textContent='显示 '+count+' / 23 项';
