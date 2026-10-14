@@ -106,7 +106,8 @@ jobs:
         with:
           name: zd-real-video-product-browser-evidence
           path: |
-            reports/ui-shipped-real-*.png
+            reports/ui-shipped-*.png
+            reports/excel-business-actual-browser-audit.json
             reports/actual-product-server.log
           retention-days: 2
           if-no-files-found: warn
