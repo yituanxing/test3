@@ -5,6 +5,7 @@ on:
       - agent/continuous-capture-mvp-v1
     paths:
       - .github/workflows/zd-final-product-real-video-proof.yml
+      - scripts/browser_operational_site_with_video.py
   workflow_dispatch:
 permissions:
   contents: read
