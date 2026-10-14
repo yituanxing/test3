@@ -1,9 +1,42 @@
-# ZD 场所分析演示系统
+# ZD 真实视频与匿名事件工作台
 
-本仓库提供两套语义隔离的可运行服务：
+## 当前实际运行入口（2026-10-14：仅真实数据）
 
-1. **业务Web平台**：`python -m uvicorn app.main:app --port 8001`。页面：`/admin`、`/business`、`/monitor`；行政区域、场所与设备管理、视频观测、合成规则、审核和纠错。
-2. **Frigate技术验收桥**：`python -m uvicorn app.bridge:app --port 8000`，供 Docker/RTSP/OpenVINO 实机验收使用。
+**普通运行已默认关闭合成业务。** 登录后进入 `/real`；`/` 和
+`/portal` 均转到 `/real`。虚构人员底库、模拟七类预警、模拟地理轨迹、
+旧动漫实验页面及相应写入 API 返回 HTTP 410，不会再生成 P001/P002 或
+虚构到访。历史合成代码仅保留给隔离的 pytest 回归测试，不参与正常进程。
+
+本机启动（在仓库根目录执行）：
+
+```bash
+bash scripts/start_local_demo.sh
+```
+
+首次启动在终端设置管理员密码；然后访问
+`http://127.0.0.1:8001/login`。数据库默认位于
+`data/real-only/demo.sqlite3`，不复用旧版包含模拟人员的数据文件。
+未连接实际摄像机、或没有读取到真实人体事件时，`/real` 就显示 **0**；
+这是正确状态，不会用测试样本填充。
+
+**真实视频主线：** 在 `/admin` 配置获授权的真实场所、文件/RTSP 视频源；
+在 `/monitor` 检查解码和持续采集状态；使用实际 Frigate/MediaMTX
+源进行人体目标检测，服务端用 `/api/frigate/sync` 从 Frigate 同步到
+SQLite；最终在 `/real` 查看摄像机、UTC 时间、Frigate 事件 ID、
+场所绑定和匿名目标事件数。研究视频在 `/cctv` 单独展示，
+**不能当作现场实况，也不能直接认作同一自然人**。
+
+**真实验收：** `cctv-real` 标签下 PR 的 `real-media` CI 使用许可公开
+行人录像，经 FFmpeg → MediaMTX RTSP → Frigate → SQLite →
+`/api/real/evidence` 验证上游真实目标 ID 的完整传递。CI 的公开视频
+**不是用户现场摄像机**，也没有证明 GB28181 实机 SIP/RTP 成功。
+未具备可核查跨机位身份真值时，不生成真人跨场所轨迹或身份级预警。
+
+### 以下为历史原型记录（不再是当前操作入口）
+
+早期版本有独立的合成规则演示；下方文档和原 Excel 进度保留作需求追踪，
+其中的 `/portal`、`/base`、`/business` 等路径在当前真实模式中已禁用。
+
 
 ## 最终演示与页面验收（2026-10-14）
 
