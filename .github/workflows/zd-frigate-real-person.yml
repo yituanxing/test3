@@ -73,11 +73,26 @@ jobs:
           fi
           git log -1 --format=%s 'HEAD^2' | grep -q '\[cctv-full\]' && run_full=true || true
           echo "run=$run_full" >> "$GITHUB_OUTPUT"
+          if [ -f /tmp/zd_changed_files ] && grep -Eq '^(app/face_photo_lab\.py|scripts/(install_sface|verify_face_photo_lab_local)\.py|static/face-lab\.html|tests/test_face_photo_lab\.py)' /tmp/zd_changed_files; then
+            echo "face=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "face=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "Targeted full public-media run: $run_full"
       - name: Python compilation and isolated regression suite
         run: |
           python -m compileall -q app tests
           python -m pytest -q
+      # Only rerun real 38MB SFace model inference when its owner changed.
+      # On normal UI/map commits preserve the fast pure-API/browser tests.
+      - name: Verify optional face models with genuine public-domain astronaut image
+        if: steps.media_scope.outputs.face == 'true'
+        env:
+          ZD_FACE_LAB_ENABLE: '1'
+        run: |
+          python -m scripts.install_yunet
+          python -m scripts.install_sface
+          python -m scripts.verify_face_photo_lab_local
       # One targeted UI acceptance for the open P0 capture branch. Do not
       # launch the heavy Docker/Frigate suite for ordinary PRs.
       - name: Verify real Chromium RTSP start/stop and synthetic roster demo
@@ -95,6 +110,7 @@ jobs:
             reports/ui-smoke-result.json
             reports/ui-*.png
             reports/ui-server.log
+            reports/verify-face-photo-lab-local.json
           if-no-files-found: warn
       # Restore a fixed, previously verified (GT-free) EPFL bundle on fast
       # UI-only PRs. Do not claim this as a new real-video inference result.
