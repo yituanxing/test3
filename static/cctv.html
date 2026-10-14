@@ -89,6 +89,19 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <div class="scroller"><table><thead><tr><th>审核记录ID</th><th>结论</th><th>依据</th><th>证据摘要</th></tr></thead>
 <tbody id="qaHistory"><tr><td colspan="4">选择一条实际匿名事件</td></tr></tbody></table></div>
 </section>
+<section class="panel" id="epflResearchPanel">
+<h2>⑥B EPFL 六人双摄像机 · 自动候选关联的真值审计</h2>
+<p class="warning">这是<b>研究数据上的候选配对审查</b>，不是现实身份识别、跨场所到访或七类预警。与上面的 CAVIAR 场所数据、下方 Frigate 人工研究关联互不混合。配对方法使用同步固定机位与地面单应矩阵；官方六人真值仅用于计算核验结果。</p>
+<div class="row"><label>本地打开 CI 中的六人研究报告 JSON（不会上传服务器）
+<input type="file" id="epflReportInput" accept=".json,application/json"></label>
+<button type="button" class="secondary" id="epflClearReport">清空研究报告</button>
+<a class="small" href="https://github.com/yituanxing/test3/actions/workflows/zd-frigate-real-person.yml" target="_blank" rel="noopener noreferrer">查看已有 CI 工件来源</a></div>
+<p class="small" id="epflReportStatus">请选择 CI 工件内 verify-epfl-six-person-cross-camera.json。只读、浏览器本地核对，文件本身不能代替 GitHub CI 与媒体 SHA256 的可信来源验证。配对截图在同一 CI 工件中。</p>
+<div class="row" id="epflSummary"></div>
+<div class="scroller"><table><thead><tr><th>时间帧（从0开始）</th><th>测试集</th><th>模型框（0 / 1）</th><th>自动配对</th><th>官方真值同人</th><th>错配 / 无法核验</th></tr></thead>
+<tbody id="epflAuditRows"><tr><td colspan="6">尚未导入研究报告；默认不把匿名检测结果解释为真实人员身份。</td></tr></tbody></table></div>
+<p class="small">每行是<b>一个同步帧时刻</b>，同一人可在多个时间点被重复计入。百分比是“两个机位均检测并且可用官方标注核验”的条件关联指标，不是个人识别准确率。选择报告仅更新这个浏览器视图，不保存关系、不提交审核、更不修改 P### 底库。</p>
+</section>
 <section class="panel" id="researchPanel" hidden>
 <h2>⑦ 研究样本匿名轨迹 · 人工关联与候选到访</h2>
 <p class="warning">仅最高级管理员的人工研究演示：首先为上方 <b>有UTC时钟和历史位置证据</b> 的 Frigate 局部目标审核“合理目标”，再把不同机位证据人工关联到匿名 D### 标签。<b>这不是机器识别同一真人</b>，不进入 P### 底库或真实预警。只有 CAVIAR 原片帧号的轨迹不能冒充具体时刻的到访。</p>
@@ -397,6 +410,73 @@ async function start(){
  setStatus('已读取：'+imported.length+' 路公开固定监控视频。');
  }catch(e){setStatus('无法加载：'+e.message,true)}
 }
+
+function clearEpflResearchReport(){
+ $('epflReportStatus').textContent='未加载研究文件；没有自动确认人员身份。';
+ $('epflSummary').textContent='';
+ $('epflAuditRows').innerHTML='<tr><td colspan="6">尚未加载研究报告</td></tr>';
+ $('epflReportInput').value='';
+}
+async function openEpflResearchReport(event){
+ const file=event.target.files?.[0];if(!file)return;
+ try{
+  if(file.size>5*1024*1024)throw Error('研究报告JSON超过5MiB上限');
+  const report=JSON.parse(await file.text());
+  if(report.dataset!=='laboratory_six_person_four_synced_views'||
+      report.matching_gt_is_never_input!==true||
+      report.production_real_roster_or_alerts!==false||
+      !Array.isArray(report.selected_cameras)||
+      report.selected_cameras.join(',')!=='0,1'||
+      report.model!=='yolo11n.pt'||
+      !Array.isArray(report.frame_audits)||
+      !Array.isArray(report.holdout_frame_audits)||
+      report.frame_audits.length===0||
+      !report.per_camera?.['0']?.sha256||!report.per_camera?.['1']?.sha256)
+   throw Error('文件不是完整的EPFL六人独立真值研究格式');
+  const rows=[...report.frame_audits.map(x=>({...x,kind:'基线'})),
+              ...report.holdout_frame_audits.map(x=>({...x,kind:'冻结留出集'}))];
+  for(const row of rows){
+   if(!Number.isInteger(row.frame_0_based)||row.frame_0_based<0||
+      !Number.isInteger(row.cross_camera_candidates)||
+      !Number.isInteger(row.verified_same_gt_person_matches)||
+      !Number.isInteger(row.verified_different_gt_person_matches)||
+      !Number.isInteger(row.unscorable_pairs_no_two_sided_gt)||
+      row.cross_camera_candidates!==row.verified_same_gt_person_matches+
+       row.verified_different_gt_person_matches+row.unscorable_pairs_no_two_sided_gt)
+     throw Error('关联候选计数或官方核验计数不一致');
+  }
+  const sum=key=>rows.reduce((v,x)=>v+x[key],0);
+  const same=sum('verified_same_gt_person_matches');
+  const diff=sum('verified_different_gt_person_matches');
+  const unknown=sum('unscorable_pairs_no_two_sided_gt');
+  const pairs=sum('cross_camera_candidates');
+  $('epflSummary').innerHTML=[
+   '同步时刻 '+rows.length,
+   '匿名配对 '+pairs,'真值一致 '+same,
+   '不同人错配 '+diff,'无法核验 '+unknown,
+   '条件可评分精确率 '+(same+diff?((100*same/(same+diff)).toFixed(2)+'%'):'未知')
+  ].map(x=>'<span class="badge">'+esc(x)+'</span>').join(' ');
+  $('epflAuditRows').innerHTML=rows.sort((a,b)=>a.frame_0_based-b.frame_0_based)
+   .map(x=>'<tr><td>'+x.frame_0_based+'</td><td>'+esc(x.kind)+'</td><td>'+
+       Number(x.camera_0_predicted_person_boxes)+' / '+Number(x.camera_1_predicted_person_boxes)+
+       '</td><td>'+x.cross_camera_candidates+'</td><td>'+
+       x.verified_same_gt_person_matches+'</td><td>'+
+       x.verified_different_gt_person_matches+' / '+x.unscorable_pairs_no_two_sided_gt+
+       '</td></tr>').join('');
+  $('epflReportStatus').textContent='本地研究文件：'+file.name+
+   '。官方6人标签只用于审计。视频摘要：cam0 '+
+   report.per_camera['0'].sha256.slice(0,16)+'… / cam1 '+
+   report.per_camera['1'].sha256.slice(0,16)+
+   '…。请另行核对原CI工件来源，禁止把本地文件内容视为人员身份证明。';
+ }catch(e){
+  $('epflSummary').textContent='';
+  $('epflAuditRows').innerHTML='<tr><td colspan="6">文件没有通过本地结构和计数检查</td></tr>';
+  $('epflReportStatus').textContent='不能读取该研究报告：'+e.message;
+ }
+}
+$('epflReportInput').addEventListener('change',openEpflResearchReport);
+$('epflClearReport').addEventListener('click',clearEpflResearchReport);
+
 $('loadPair').onclick=loadPair;$('viewFrame').onclick=()=>viewFrame().catch(e=>$('frameNote').textContent=e.message);
 $('process').onclick=detect;
 $('benchmarkTracker').onclick=evaluateExistingTracker;
