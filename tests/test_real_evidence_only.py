@@ -81,7 +81,13 @@ def test_real_upstream_events_count_once_and_hide_neighboring_jurisdiction(case)
     assert {e['event_id'] for e in d['recent_frigate_events']}=={
         'real-fixture-1','real-fixture-2'}
     assert d['confirmed_cross_camera_identity'] is False
-    assert all(e['subject_id'] is None for e in d['recent_frigate_events'])
+    assert d['counts_real_site_visits'] is False
+    assert d['real_event_counts']['person_objects']==len(d['recent_frigate_events'])
+    assert all(e['subject_id'] is None and e['identity_confirmed'] is False
+               for e in d['recent_frigate_events'])
+    assert all(e['source']=='frigate_actual_upstream_event'
+               for e in d['recent_frigate_events'])
+    assert {e['camera'] for e in d['recent_frigate_events']}=={'camera_a'}
     assert 'other-county-fixture' not in str(d)
     all_=client.get('/api/real/evidence',headers=auth('realadmin')).json()
     assert all_['real_event_counts']['person_objects']==3
