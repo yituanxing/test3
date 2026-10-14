@@ -86,3 +86,11 @@ Important distinctions:
 **Go/no-go:** Candidate association A/B **PASS on this bounded research set**.
 Production real-person identity/real alert **NO_GO** until separate
 authorization, independent identity evaluation, and alert correctness evidence.
+
+## V1 implementation and final evidence (2026-10-14)
+
+- Code: `app/epfl_review.py`, `tests/test_epfl_review.py`, `static/cctv.html`, `scripts/browser_epfl_six_person_review.py`.
+- Admin-only report import from genuine CI data; immutable research-only geometry manifest stored in SQLite; candidate review decisions append-only with `admin_audit`; official EPFL GT IDs not stored or exposed.
+- Frozen holdout: 20 extra synchronization instants, 57/57 official-ID-agreeing geometry candidates, 0 mismatches. Original baseline 62/62; combined 119/119 of 41 labelled instants, 119/123 conditional association coverage. Neither a unique-person count nor general ReID.
+- CI [#38503988215](https://github.com/yituanxing/test3/actions/runs/38503988215) SUCCESS: 164 passed +6 skipped, model scenario 9 passed, geometry-negative 4 passed. Same CI actual-video-produced JSON imported via Chromium; 119 candidates in same SQLite, one reviewed record, two audit entries, zero synthetic roster or real risk alerts generated.
+- Uploading a locally edited JSON does not cryptographically prove results; model/video source SHA pinning reduces accidental mixing only. Promote no candidate to verified real identity. Formal Excel item statuses remain unchanged.
