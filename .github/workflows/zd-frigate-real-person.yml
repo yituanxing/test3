@@ -188,6 +188,7 @@ jobs:
             reports/epfl6p-review-integration.json
             reports/ui-epfl-real-research-review.png
             reports/ui-epfl-real-research-activity.png
+            reports/ui-epfl-room-zone-demo.png
             reports/ui-excel-23-live-acceptance.png
             reports/epfl6p-paired-frame-*.jpg
             reports/epfl-lab-camera*-yolo-contact.jpg
