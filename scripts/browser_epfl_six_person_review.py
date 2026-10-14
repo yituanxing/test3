@@ -198,6 +198,47 @@ def run():
                                    for a in alert_facts['alerts'])
                         expect(page.locator("#demoAlertRows")).to_contain_text(
                             "EPFL-DEMO",timeout=15000)
+                        # Must be visible in the REAL-ONLY user-facing UI,
+                        # not in old /business or /portal which redirect/block.
+                        expect(page.locator("#excelRuleRows tr")).to_have_count(
+                            7,timeout=15000)
+                        expect(page.locator("#excelRuleRows")).to_contain_text(
+                            "串所",timeout=15000)
+                        expect(page.locator("#excelAcceptanceRows tr")).to_have_count(
+                            23,timeout=15000)
+                        assert page.locator("#excelAcceptanceRows tr").count()==23
+                        contract=page.evaluate("""async () => {
+                           const r=await fetch('/api/real/excel-acceptance',{headers:{
+                             Authorization:'Bearer '+sessionStorage.getItem('zd_access_token')}});
+                           return {status:r.status,data:await r.json()};
+                        }""")
+                        assert contract['status']==200,contract
+                        accepted=contract['data']
+                        assert len(accepted['requirements'])==23
+                        assert accepted['status_counts']=={
+                            'verified_real':3,'synthetic_only':10,
+                            'partial':8,'missing':2}
+                        assert accepted['all_23_fully_accepted'] is False
+                        assert all(r['demo_route'].startswith(
+                            ('/real','/cctv','/admin'))
+                            for r in accepted['requirements'])
+                        expect(page.locator("#excelAcceptanceStats")).to_contain_text(
+                            "10",timeout=15000)
+                        rules=page.evaluate("""async () => {
+                           const r=await fetch('/api/real/excel-rule-demo',{headers:{
+                             Authorization:'Bearer '+sessionStorage.getItem('zd_access_token')}});
+                           return {status:r.status,data:await r.json()};
+                        }""")
+                        assert rules['status']==200,rules
+                        assert {x['type'] for x in rules['data']['alerts']} == {
+                            'cross_place','companion','interaction',
+                            'gathering','absence','appearance','headcount'}
+                        assert rules['data']['based_on_real_video'] is False
+                        assert rules['data']['no_mutation_to_real_database'] is True
+                        page.locator("#excelAcceptance details summary").click()
+                        page.screenshot(
+                            path=str(OUT/"ui-excel-23-live-acceptance.png"),
+                            full_page=True)
                         page.screenshot(
                             path=str(OUT/"ui-epfl-real-research-activity.png"),
                             full_page=True)
@@ -235,6 +276,9 @@ def run():
                 "activity_fragments": facts['anonymous_activity_fragments'],
                 "cross_time_fragments":facts['multi_instant_fragments'],
                 "real_source_derived_demo_alerts":len(alert_facts['alerts']),
+                "synthetic_excel_rule_types_verified_in_browser":7,
+                "original_excel_requirements_visible_in_browser":23,
+                "excel_acceptance_status_counts":accepted["status_counts"],
                 "real_video_fps":facts['video_fps'],
                 "admin_audit_entries":audit,
                 "identity_confirmed":False,
