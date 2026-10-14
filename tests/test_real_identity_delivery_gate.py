@@ -79,3 +79,19 @@ def test_perfect_local_detection_is_not_real_person_identity():
     assert all(x["precision_at_iou_0_5"]==1 for x in result["camera_detection"])
     assert result["cross_camera_real_reid_verified"] is False
     assert result["identity_based_real_alerts_verified"] is False
+
+
+def test_existing_same_camera_tracking_vendor_does_not_create_global_ids():
+    fixture=_real_report_fixture()
+    # One joined HTTP route only proves the two local camera trackers ran.
+    # A shared local string such as "local-1" or identical detector IDs is
+    # explicitly insufficient for declaring a global person identity.
+    fixture["joined_two_camera_http_proof"].update({
+        "algorithms":["bytetrack","ocsort"],
+        "uses_actual_downloaded_official_media":True,
+    })
+    decision=decide(fixture)
+    assert decision["camera_local_tracking_verified"] is True
+    assert decision["global_same_different_person_ground_truth_available"] is False
+    assert decision["real_person_identity_go_no_go"]=="NO_GO"
+    assert decision["real_person_roster_verified"] is False
