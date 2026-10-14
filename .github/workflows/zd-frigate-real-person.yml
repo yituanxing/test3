@@ -16,6 +16,7 @@ name: ZD Frigate Real Person CI
       - "scripts/package_local_demo.py"
       - "scripts/verify_caviar_public_footage.py"
       - "scripts/verify_epfl_alternative_cameras.py"
+      - "scripts/verify_epfl_six_person_ground_truth.py"
       - "scripts/assess_real_person_readiness.py"
       - "requirements-tracking.txt"
       - "requirements-person-detection.txt"
@@ -76,9 +77,9 @@ jobs:
           python -m scripts.assess_real_person_readiness --input reports/verify-caviar-fixed-cctv.json --output reports/real-person-identity-readiness.json
       # A/B candidate only: EPFL synchronized laboratory pair. Do not replace
       # accepted CAVIAR source until manual image review approves it.
-      - name: Try alternative EPFL two-camera source with same pretrained YOLO
+      - name: Evaluate EPFL six-person official GT and real two-camera tracking
         if: contains(github.event.pull_request.labels.*.name, 'cctv-real')
-        run: python -m scripts.verify_epfl_alternative_cameras
+        run: python -m scripts.verify_epfl_six_person_ground_truth
       - name: Preserve real public CCTV evidence (no raw licensed videos)
         if: always() && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         uses: actions/upload-artifact@v4
@@ -90,6 +91,7 @@ jobs:
             reports/caviar-*-gt.jpg
             reports/caviar-*-yolo.jpg
             reports/verify-epfl-alternative-cameras.json
+            reports/verify-epfl-six-person-cross-camera.json
             reports/epfl-lab-camera*-yolo-contact.jpg
             reports/epfl-lab-camera*-bytetrack-contiguous.jpg
           if-no-files-found: warn
