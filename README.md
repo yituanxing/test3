@@ -67,6 +67,8 @@ SQLite；最终在 `/real` 查看摄像机、UTC 时间、Frigate 事件 ID、
 ## 最新交付：真实双机录像与空间预警演示（2026-10-14）
 
 **当前演示入口是 `/real`，不是旧 `/portal`、`/base`、`/business`。**
+Windows 10/11：在仓库根目录双击 `scripts/start_local_demo_windows.bat`（或在CMD中运行该文件）。脚本在退出后始终保留窗口显示错误；首次联网安装依赖并输入至少12位密码。启动成功后打开 `http://127.0.0.1:8001/login`；在运行期间不要关闭CMD窗口。
+**数据空态不是假绿**：没有接入真实摄像机时，`/real` 实时事件为0；新数据库没有真实场所/账号时，`/admin` 场所表为空。EPFL研究视频必须由州级管理账号在 `/real` 导入独立的真实研究证据包，才会出现119条候选和14条短时关联；不能用虚构数据填空。
 当前启动脚本强制 `ZD_LEGACY_MODE=0`；旧合成业务页面和 API 已被拦截，不能依照历史使用说明去访问。
 
 启动：解压由真实EPFL owner CI生成的验收ZIP；进入 `zd-demo`，执行 `bash scripts/start_local_demo.sh`。首次设定至少12位管理员密码，用用户名 `demo_state` 登录 `http://127.0.0.1:8001/login`。
