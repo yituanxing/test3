@@ -166,6 +166,63 @@ def register(app, db):
     app.include_router(router)
 
 
+def build_demo_activity_alerts(activity):
+    """Example policy against ACTUAL recorded EPFL observations, not fake visits.
+
+    A rule firing is a synthetic business policy demonstration, NOT an actual
+    incident, face identity, risk finding, or verified human notification.
+    """
+    result = []
+    if not activity.get("ready"):
+        return result
+    # This rule is disabled if independent video-time association has failed
+    # its official-GT scoring gate. Every alert points to source candidate IDs.
+    if not activity.get("cross_time_temporal_linkage_verified"):
+        return result
+    for row in activity["activities"]:
+        if not row["cross_frame_linked"]:
+            continue
+        samples = row["samples"]
+        if len(samples) < 2:
+            continue
+        result.append({
+            "demo_alert_id": "EPFL-DEMO-" + row["activity_id"],
+            "rule": "demo_same_anonymous_target_reappeared_within_recorded_clip",
+            "rule_name": "演示规则：同一匿名目标在录像中连续出现",
+            "rule_is_demo": True,
+            "alert_is_real_incident": False,
+            "source_evidence_is_real_video": True,
+            "identity_real_name_verified": False,
+            "source_site": "EPFL laboratory (archival research)",
+            "camera_names": row["camera_names"],
+            "anonymous_fragment_id": row["activity_id"],
+            "start_video_frame": row["first_video_frame"],
+            "end_video_frame": row["last_video_frame"],
+            "start_video_second": row["first_video_second"],
+            "end_video_second": row["last_video_second"],
+            "supporting_candidate_keys": [item["candidate_key"] for item in samples],
+            "message": "使用真实双机人体配对演示活动规则触发；这不是人员风险或真实预警。",
+        })
+    return result
+
+
+@router.get("/api/real/demo-alerts")
+def demo_activity_alerts(request: Request):
+    activity = real_activity(request)
+    return {
+        "mode": "demonstration_policy_on_real_recorded_video",
+        "source_evidence_is_real": bool(activity.get("ready")),
+        "rule_is_demo": True,
+        "real_world_risk_confirmed": False,
+        "real_person_identity_verified": False,
+        "temporal_association_enabled": bool(
+            activity.get("cross_time_temporal_linkage_verified")),
+        "alerts": build_demo_activity_alerts(activity),
+        "note": "规则为演示用途；活动证据来自原始真实双摄像机视频，"
+                "不包含虚构人员、虚构到访或真实违法异常判断。",
+    }
+
+
 @router.get("/api/real/activity")
 def real_activity(request: Request):
     # EPFL laboratory is a separate scientific site, outside an operator's
