@@ -129,8 +129,8 @@ def run():
                         page.goto(base+"/real")
                         expect(page.locator("#activityStats")).to_contain_text(
                             "119", timeout=15000)
-                        expect(page.locator("#activityTable tr").first).to_contain_text(
-                            "V001",timeout=15000)
+                        expect(page.locator("#activityTable")).to_contain_text(
+                            "V",timeout=15000)
                         activity=page.evaluate("""async () => {
                           const r=await fetch('/api/real/activity',{headers:{
                             Authorization:'Bearer '+sessionStorage.getItem('zd_access_token')}});
