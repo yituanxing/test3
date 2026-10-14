@@ -67,21 +67,41 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <tbody id="demoAlertRows"><tr><td colspan="6">暂无由真实视频活动触发的演示告警</td></tr></tbody></table></div>
 </section>
 <section class="box" id="realSceneAggregation">
-<h2>真实双机视频 · 室内空间热区与事件提醒</h2>
-<p class="small">这里用真实 EPFL 双机视频中的匿名配对检测坐标生成空间热区；<b>仅是两路摄像机共同场景的局部投影坐标，不是 GPS、经纬度、跨场所移动或某个人的轨迹。</b>
-多目标同时出现时运行<b>演示阈值规则</b>，并列出对应真实录像帧号。不是风险认定，不计为去重人数。</p>
-<label>同时检测配对阈值
-<select id="sceneCountThreshold"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
-<button id="sceneRefresh">重新计算</button><span id="sceneState" class="small">正在读取真实视频证据</span>
+<h2>双机真实录像 · 室内位置示意与区域活动规则</h2>
+<p class="small">直接读取EPFL两台真实摄像机的检测配对坐标，投影到<strong>8×8示意网格</strong>。
+可以逐个录像采样帧播放区域热度，查看场景内活动分布变化；<strong>颜色变化不等于同一个人的移动轨迹</strong>。
+网格不是实测建筑平面图、真实GPS或经纬度。红框是演示区域，点击格子可重新选择区域（固定2×2）。</p>
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+<label>同帧双机配对数阈值 <select id="sceneCountThreshold"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
+<button id="sceneRefresh">重新计算真实录像</button>
+<span id="sceneState" class="small">尚未读取真实录像</span></div>
 <div id="sceneMetrics" class="cards" style="margin:12px 0"></div>
 <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
-<div><div class="small">相对投影热度（8×8 网格，颜色越深配对检测越多）</div>
-<div id="sceneHeatGrid" style="width:320px;height:320px;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:1px solid #dce7f2;border-radius:7px;overflow:hidden" aria-label="非GPS的实验室标定空间统计网格"></div>
-<div class="small">单位：校准视频投影格，不是米或地理位置；颜色代表检测次数。</div></div>
-<div style="flex:1;min-width:300px"><div class="scroll"><table><thead><tr>
-<th>真实视频帧号</th><th>同帧配对数</th><th>演示规则</th><th>性质</th></tr></thead>
-<tbody id="sceneEventRows"><tr><td colspan="4">尚无匹配录像事件</td></tr></tbody></table></div></div>
-</div></section>
+<div style="flex:0 1 350px;min-width:260px">
+<div class="small" style="margin-bottom:6px">室内局部投影示意（红框为演示区域，点击任意格子设置）</div>
+<div id="sceneHeatGrid" style="width:min(100%,320px);aspect-ratio:1;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:1px solid #dce7f2;border-radius:7px;overflow:hidden" aria-label="真实录像匿名检测的8×8局部投影热区示意"></div>
+<div style="margin-top:10px">
+<label>真实录像采样帧：<span id="sceneFrameLabel">汇总热度</span></label>
+<input type="range" id="sceneFrameCursor" min="0" max="0" value="0" style="width:100%">
+<div style="display:flex;gap:8px;align-items:center">
+<button id="scenePlay" type="button">▶ 逐帧播放</button>
+<button id="sceneOverview" type="button">查看累计热度</button>
+</div></div>
+<p id="sceneFrameInfo" class="small">选择采样帧，只显示该时刻落入各格子的双摄像机配对观测次数。</p>
+</div>
+<div style="flex:1;min-width:300px">
+<h3 style="margin:0 0 5px;font-size:15px">区域规则：真实视频活动进入红框</h3>
+<p id="sceneZoneSummary" class="small">视频加载后显示源帧号和观测数量；区域是人为指定的演示规则，不是实际警情。</p>
+<div class="scroll"><table><thead><tr><th>录像帧</th><th>区域配对观测</th><th>依据</th><th>性质</th></tr></thead>
+<tbody id="sceneZoneRows"><tr><td colspan="4">等待真实视频证据</td></tr></tbody></table></div>
+<h3 style="margin:16px 0 5px;font-size:15px">同帧检测数量阈值提醒</h3>
+<div class="scroll"><table><thead><tr><th>录像帧</th><th>配对观测</th><th>规则阈值</th></tr></thead>
+<tbody id="sceneEventRows"><tr><td colspan="3">等待真实视频证据</td></tr></tbody></table></div>
+</div></div>
+<p class="small"><strong>验收边界：</strong>这里的点位只在录像标定坐标系中有效，聚合观测次数不能当作独立人数。
+已验证的14条约1秒跨时关联单独在上方活动片段列表；本页面不把不同采样帧强行接成个人轨迹。
+长间隔跨人关联、跨真实场所和GPS都没有启用。</p>
+</section>
 <section class="box" id="excelRuleShowcase">
 <h2>Excel #6–12 · 七类预警规则验收（纯模拟业务）</h2>
 <p class="small"><b>注意：此区的人员 P###、到访和场所全部是明确虚构的规则样本。</b>它调用项目已实现的七种规则算法，
@@ -188,41 +208,95 @@ async function loadDemoAlerts(){
   ).join('')||'<tr><td colspan="6">无经过视频证据支持的预警。不会制造假人员或假到访。</td></tr>';
  }catch(e){$('demoAlertState').textContent='演示告警查询失败：'+e.message}
 }
+let sceneData=null,sceneFrameIndex=0,sceneZoneX=2,sceneZoneY=3,sceneTimer=null;
+function sceneStop(){if(sceneTimer){clearInterval(sceneTimer);sceneTimer=null}$('scenePlay').textContent='▶ 逐帧播放'}
+function scenePaint(){
+ if(!sceneData)return;
+ const sample=sceneFrameIndex>0?sceneData.frame_cells[sceneFrameIndex-1]:null;
+ const values=new Map((sample?sample.cells:sceneData.heat_cells).map(
+  cell=>[cell.x_bin+','+cell.y_bin,cell.paired_detection_count]));
+ const peak=Math.max(1,...values.values());
+ let markup='';
+ for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+  const n=values.get(x+','+y)||0;
+  const strength=n?Math.min(.95,.13+.82*n/peak):0;
+  const inside=x>=sceneZoneX&&x<sceneZoneX+2&&y>=sceneZoneY&&y<sceneZoneY+2;
+  markup+='<button type="button" data-scene-x="'+x+'" data-scene-y="'+y+
+   '" title="格子 '+x+','+y+'：真实配对观测 '+n+' 次；点击设置演示区域" '+
+   'aria-label="区域格子 '+x+'-'+y+'，'+n+'次观测'+
+   (inside?'，当前演示区':'')+'" style="padding:0;border:0;border-radius:0;'+
+   'border-inline:1px solid #edf3fb;border-bottom:1px solid #edf3fb;'+
+   'background:rgba(27,112,179,'+strength.toFixed(3)+');'+
+   (inside?'box-shadow:inset 0 0 0 3px #e75a58;':'')+
+   'font-size:11px;text-align:center;line-height:1;color:'+
+   (strength>.65?'white':'#17476a')+'">'+(n||'')+'</button>';
+ }
+ $('sceneHeatGrid').innerHTML=markup;
+ $('sceneFrameCursor').value=sceneFrameIndex;
+ $('sceneFrameLabel').textContent=sample?'第'+sample.video_frame+'帧':'累计热度';
+ $('sceneFrameInfo').textContent=sample?
+  '当前真实录像采样帧：'+sample.paired_detection_count+
+  '次同步双机配对；高亮区域内有'+
+  sample.cells.filter(c=>c.x_bin>=sceneZoneX&&c.x_bin<sceneZoneX+2&&
+     c.y_bin>=sceneZoneY&&c.y_bin<sceneZoneY+2)
+      .reduce((sum,c)=>sum+c.paired_detection_count,0)+
+  '次配对观测。只展示匿名空间分布，不推断个人移动路线。':
+  '全录像已采样时间点的累计热度。选择下方进度条逐帧查看场景活动变化。';
+}
 async function loadSceneAggregate(){
  try{
   const threshold=Number($('sceneCountThreshold').value);
-  const data=await api('/api/real/scene-aggregate?minimum_observations='+threshold);
-  const heat=$('sceneHeatGrid');
-  const counts=new Map(data.heat_cells.map(x=>[x.x_bin+','+x.y_bin,x.paired_detection_count]));
-  const peak=Math.max(1,...counts.values());
-  let cells='';
-  for(let y=0;y<8;y++)for(let x=0;x<8;x++){
-   const n=counts.get(x+','+y)||0;
-   const opacity=n?Math.min(.95,.12+.82*n/peak):0;
-   cells+='<div title="局部网格 '+x+','+y+': '+n+' 次匿名双机配对检测" style="border:1px solid #eff4f9;background:rgba(27,112,179,'+
-    opacity.toFixed(3)+');text-align:center;line-height:38px;font-size:11px;color:'+
-    (opacity>.65?'white':'#17476a')+'">'+(n||'')+'</div>';
-  }
-  heat.innerHTML=cells;
-  const cards=[
-   ['视频配对观测',data.total_observations],
-   ['有观测的空间网格',data.heat_cells.length],
-   ['达到演示阈值的录像时刻',data.demo_scene_events.length],
-   ['真实跨地理场所',data.real_cross_location_identity_available?'已核验':'不可判定']
-  ];
-  $('sceneMetrics').innerHTML=cards.map(x=>'<div class="card"><span class="small">'+
-   esc(x[0])+'</span><strong>'+esc(x[1])+'</strong></div>').join('');
-  $('sceneEventRows').innerHTML=data.demo_scene_events.slice(0,35).map(e=>
+  const url='/api/real/scene-aggregate?minimum_observations='+threshold+
+    '&zone_x_bin='+sceneZoneX+'&zone_y_bin='+sceneZoneY;
+  const data=await api(url);
+  sceneData=data;
+  if(sceneFrameIndex>data.frame_cells.length)sceneFrameIndex=0;
+  $('sceneFrameCursor').max=data.frame_cells.length;
+  $('sceneMetrics').innerHTML=[
+   ['真实双机配对',data.total_observations],
+   ['累计有活动网格',data.heat_cells.length],
+   ['红框区域命中时刻',data.demo_zone_events.length],
+   ['多目标阈值命中时刻',data.demo_scene_events.length]
+  ].map(a=>'<div class="card"><span class="small">'+esc(a[0])+
+   '</span><strong>'+a[1]+'</strong></div>').join('');
+  $('sceneZoneRows').innerHTML=data.demo_zone_events.slice(0,24).map(e=>
+   '<tr><td>第'+e.video_frame+'帧</td><td>'+e.paired_detection_count_in_zone+
+   '</td><td>真实视频投影检测</td><td>演示区域规则</td></tr>').join('')||
+   '<tr><td colspan="4">当前区域无真实观测，未生成演示提醒</td></tr>';
+  $('sceneEventRows').innerHTML=data.demo_scene_events.slice(0,24).map(e=>
    '<tr><td>第'+e.video_frame+'帧</td><td>'+e.paired_detection_count+
-   '</td><td>同帧配对数 ≥ '+e.threshold+'</td><td>仅演示，非真实风险</td></tr>'
-  ).join('')||'<tr><td colspan="4">当前阈值下，没有真实录像支持的演示事件</td></tr>';
-  $('sceneState').textContent=data.ready?
-    '真实双机数据已聚合；演示命中 '+data.demo_scene_events.length+
-    ' 个采样时刻；无GPS及真人身份结论。':
-    '尚未导入双机真实视频结果；不生成假事件。';
- }catch(e){$('sceneState').textContent='空间统计失败：'+e.message}
+   '</td><td>≥'+e.threshold+'（演示）</td></tr>').join('')||
+   '<tr><td colspan="3">没有达到当前阈值的真实录像时刻</td></tr>';
+  $('sceneZoneSummary').textContent='红框区域从 ('+sceneZoneX+','+sceneZoneY+
+   ') 开始，覆盖2×2格；真实视频命中 '+data.demo_zone_events.length+
+   '个采样时刻。规则可调整，不代表危险或人员身份。';
+  $('sceneState').textContent=data.ready?'已加载真实双摄像机视频证据':'缺少视频证据，无预警';
+  scenePaint();
+ }catch(e){$('sceneState').textContent='视频空间示意无法加载：'+e.message}
 }
-$('sceneRefresh').onclick=loadSceneAggregate;
+$('sceneHeatGrid').onclick=event=>{
+ const button=event.target.closest('[data-scene-x]');
+ if(!button||!sceneData)return;
+ sceneZoneX=Math.min(6,Number(button.dataset.sceneX));
+ sceneZoneY=Math.min(6,Number(button.dataset.sceneY));
+ sceneStop();loadSceneAggregate();
+};
+$('sceneFrameCursor').oninput=event=>{
+ sceneStop();sceneFrameIndex=Number(event.target.value);scenePaint();
+};
+$('scenePlay').onclick=()=>{
+ if(!sceneData?.frame_cells?.length)return;
+ if(sceneTimer){sceneStop();return}
+ if(sceneFrameIndex===0)sceneFrameIndex=1;
+ scenePaint();
+ $('scenePlay').textContent='Ⅱ 停止播放';
+ sceneTimer=setInterval(()=>{
+  sceneFrameIndex=sceneFrameIndex>=sceneData.frame_cells.length?1:sceneFrameIndex+1;
+  scenePaint();
+ },800);
+};
+$('sceneOverview').onclick=()=>{sceneStop();sceneFrameIndex=0;scenePaint()};
+$('sceneRefresh').onclick=()=>{sceneStop();loadSceneAggregate()};
 async function loadExcelRules(){
  const status=$('excelRuleStatus');
  try{
