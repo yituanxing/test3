@@ -8,7 +8,8 @@ from collections import Counter, defaultdict
 from math import isfinite
 from pathlib import Path
 from fastapi import APIRouter, Query, Request, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+import cv2
 from app import epfl_review
 from app.real_activity import real_activity
 
@@ -217,6 +218,33 @@ def research_showcase_media_video(request: Request):
     return FileResponse(SHOWCASE_VIDEO,media_type="video/mp4",
                         headers={"Cache-Control":"private, max-age=0",
                                  "X-Content-Type-Options":"nosniff"})
+
+
+@router.get("/api/real/showcase-media/poster")
+def research_showcase_media_actual_frame(request: Request):
+    """JPEG decoded from the shipped real video itself, never a sample placeholder.
+
+    Requires research-admin login. Local-on-demand extraction avoids committing
+    copyrighted original frames in the public repository.
+    """
+    epfl_review._admin(request)
+    if not SHOWCASE_VIDEO.is_file() or SHOWCASE_VIDEO.stat().st_size < 100_000:
+        raise HTTPException(404,"研究视频尚未安装")
+    capture=cv2.VideoCapture(str(SHOWCASE_VIDEO))
+    try:
+        if not capture.isOpened():
+            raise HTTPException(503,"研究视频无法解码")
+        capture.set(cv2.CAP_PROP_POS_MSEC,12000)
+        ok,frame=capture.read()
+        if not ok:
+            raise HTTPException(503,"真实研究视频未能提取有效封面帧")
+        ok,encoded=cv2.imencode(".jpg",frame,[int(cv2.IMWRITE_JPEG_QUALITY),83])
+        if not ok:raise HTTPException(503,"真实封面编码失败")
+        return Response(content=encoded.tobytes(),media_type="image/jpeg",
+                        headers={"Cache-Control":"private, max-age=0",
+                                 "X-Content-Type-Options":"nosniff"})
+    finally:
+        capture.release()
 
 
 @router.get("/api/real/scene-aggregate")
