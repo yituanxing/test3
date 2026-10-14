@@ -318,6 +318,8 @@ def test_review_rejection_invalidates_the_old_ground_truth_temporal_certificatio
     assert client.get("/api/real/demo-alerts",headers=admin).json()["alerts"]==[]
     assert client.get("/api/real/scene-aggregate",
                       headers=admin).json()["short_time_linkage_separately_qualified"] is False
+    assert client.get("/api/real/scene-aggregate",
+                      headers=admin).json()["short_anonymous_tracklets"] == []
 
 
 def test_negative_candidate_removal_can_create_new_unscored_links():
@@ -330,3 +332,36 @@ def test_negative_candidate_removal_can_create_new_unscored_links():
                 if len(frag["observations"])>1}
     assert not links([a,b,c])
     assert links([a,c])=={("a","c")}
+
+
+def test_very_short_cross_camera_tracklets_are_video_grounded_and_never_gps():
+    from app.real_scene_aggregate import summarize_scene
+    observations=[
+        _row("first",500,120,150,122,150),
+        _row("second",525,122,152,124,152),
+    ]
+    verified=real_activity.activity_summary(observations,25.,
+                                            temporal_verified=True)
+    assert verified["multi_instant_fragments"]==1
+    scene=summarize_scene({
+        "ready":True, "cross_time_temporal_linkage_verified":True,
+        **verified})
+    assert scene["short_anonymous_tracklets_verified"] is True
+    assert len(scene["short_anonymous_tracklets"])==1
+    track=scene["short_anonymous_tracklets"][0]
+    assert track["site_kind"]=="same_real_laboratory_two_views"
+    assert track["camera_pair"]==["6p-c0.avi","6p-c1.avi"]
+    assert [p["video_frame"] for p in track["points"]]==[500,525]
+    assert [p["candidate_key"] for p in track["points"]]==["first","second"]
+    assert track["identity_verified"] is False
+    assert track["real_geographic_journey"] is False
+    assert scene["wgs84_available"] is False
+    assert scene["individual_trajectory_available"] is False
+    assert scene["real_cross_location_identity_available"] is False
+    downgraded=summarize_scene({
+        "ready":True, "cross_time_temporal_linkage_verified":False,
+        **{**verified,"cross_time_temporal_linkage_verified":False}})
+    assert downgraded["short_anonymous_tracklets_verified"] is False
+    assert downgraded["short_anonymous_tracklets"]==[]
+    assert downgraded["total_observations"]==2
+
