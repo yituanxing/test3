@@ -37,3 +37,9 @@ The host operator is responsible for upstream license notices, consent for any r
   alert or person registry.
 - Research dataset attribution: EC-funded CAVIAR project / IST 2001 37540,
   CAVIAR study material CC BY-SA. Raw licensed clips are not shipped.
+
+## Optional SFace consented photo sandbox
+
+- `scripts/install_sface.py` optionally obtains OpenCV Zoo's 2021dec SFace ONNX model, checksum-checked. No face weights are shipped in the source ZIP.
+- The OpenCV Zoo SFace directory states Apache-2.0, **however the original weight's training dataset and redistribution/commercial permission are under an open clarification request**: https://github.com/opencv/opencv_zoo/issues/313 (as of 2026-10-14). Do not redistribute weight or deploy commercially without verifying rights.
+- Feature only processes individually uploaded, consented photos in ephemeral memory; not permitted to process CCTV streams, enroll unconsenting persons, or produce automatic identity determinations.
