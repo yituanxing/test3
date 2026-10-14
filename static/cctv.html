@@ -34,6 +34,15 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 .nav-pager{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
 @media(max-width:780px){.flowsteps{grid-template-columns:1fr}.jumpnav a{padding:7px 9px}}
 @media(max-width:780px){.grid{grid-template-columns:1fr}}
+
+/* Research and decoding actions are hidden until the state administrator is
+   verified by /api/auth/me. Even incomplete requests must fail closed. */
+#epflResearchPanel,#researchPanel,#process,
+.jumpnav a[href="#epflResearchPanel"]{display:none!important}
+body[data-state-ui="yes"] #epflResearchPanel,
+body[data-state-ui="yes"] #researchPanel{display:block!important}
+body[data-state-ui="yes"] #process,
+body[data-state-ui="yes"] .jumpnav a[href="#epflResearchPanel"]{display:inline-block!important}
 </style><script src="/ui/role-navigation.js"></script></head><body>
 <header><h1>真实监控与人体关联 · 验收工作台</h1><p>真实视频、匿名人体检测、跨机位候选与人工审核分别存证</p>
 <nav><a href="/portal?tab=acceptance">← Excel 23项验收</a><a href="/portal">综合工作台</a><a href="/monitor">视频运行</a><a href="/insights">统计分析</a><a href="/business">合成业务规则</a><a href="/admin">摄像机/场所管理</a><a href="/anime-scenes">旧动画场景实验</a></nav></header>
@@ -449,6 +458,7 @@ async function detect(){
 async function start(){
  try{
  const [p,,actor]=await Promise.all([api('/api/places'),api('/api/cctv/datasets'),api('/api/auth/me')]);
+ document.body.dataset.stateUi=actor.level===1?'yes':'no';
  zdApplyRoleNavigation(actor);
  $('researchPanel').hidden=actor.level!==1;
  $('epflImportReport').hidden=actor.level!==1;
