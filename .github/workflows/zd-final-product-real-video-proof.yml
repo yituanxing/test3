@@ -26,6 +26,28 @@ jobs:
           run-id: 38585465839
           github-token: ${{ github.token }}
           path: /tmp/zd-authorized-research
+      - name: Download real YOLO-derived EPFL candidate manifest (not a fake seed)
+        uses: actions/download-artifact@v4
+        with:
+          name: zd-p0-excel-demo-source
+          run-id: 38598197003
+          github-token: ${{ github.token }}
+          path: /tmp/zd-official-owner-source
+      - name: Restore official model-derived candidate evidence from scored owner job
+        shell: bash
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from io import BytesIO
+          from pathlib import Path
+          outer=ZipFile('/tmp/zd-official-owner-source/dist/zd-demo-local-source.zip')
+          payload=outer.read('zd-demo/config/epfl6p_real_pair_candidates_v1.json')
+          assert len(payload)>5000, len(payload)
+          path=Path('config/epfl6p_real_pair_candidates_v1.json')
+          path.parent.mkdir(parents=True,exist_ok=True)
+          path.write_bytes(payload)
+          print('RESTORED_REAL_OWNER_CANDIDATES',len(payload))
+          PY
       - name: Install exact approved video in app media path
         shell: bash
         run: |
