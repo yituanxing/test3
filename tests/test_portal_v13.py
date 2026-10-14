@@ -56,6 +56,11 @@ def test_portal_place_scope_enforced_for_lower_role(tmp_path, monkeypatch):
 def test_legacy_workbenches_link_back_to_portal():
     from pathlib import Path
     base=Path(__file__).resolve().parents[1]/'static'
-    for name in ('index','admin','base','business','insights','monitor'):
+    # Archived synthetic UIs remain pytest-only, while operational pages
+    # must navigate back to the real-evidence workbench.
+    for name in ('index','base','business','insights'):
         page=(base/(name+'.html')).read_text(encoding='utf-8')
         assert 'href="/portal"' in page, name
+    for name in ('admin','monitor','cctv','real'):
+        page=(base/(name+'.html')).read_text(encoding='utf-8')
+        assert 'href="/real"' in page, name
