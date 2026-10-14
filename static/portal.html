@@ -64,20 +64,21 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 <aside>
   <div class="logo"><b>ZD · 智能预警</b><small>重点场所 / 综合治理 / DEMO</small></div>
   <div class="navtitle">业务工作台</div>
-  <nav id="navigation">
-    <a data-tab="overview" href="/portal">◉ &nbsp;综合态势</a>
+  <nav id="navigation" aria-label="业务主导航">
+    <div class="navtitle">业务功能</div>
+    <a data-tab="overview" href="/portal">◈ &nbsp;综合态势</a>
+    <a href="/real">▣ &nbsp;视频监控</a>
+    <a class="state-only" href="/base">▤ &nbsp;场所人员底库 · 演示</a>
+    <a data-tab="alerts" href="/portal?tab=alerts">♢ &nbsp;预警中心</a>
+    <a href="/insights">⌕ &nbsp;智能检索与分析</a>
+    <div class="navtitle">业务操作</div>
     <a data-tab="places" href="/portal?tab=places">▦ &nbsp;场所监测</a>
-    <a data-tab="alerts" href="/portal?tab=alerts">◇ &nbsp;模拟预警中心</a>
-    <a class="state-only" data-tab="acceptance" href="/portal?tab=acceptance">✓ &nbsp;Excel 23项验收</a>
-    <a href="/real">◆ &nbsp;真实数据（不含模拟）</a>
-    <a href="/monitor">◷ &nbsp;视频监测</a>
-    <a href="/cctv#epflResearchPanel">◉ &nbsp;人体关联审核</a>
-    <a href="/insights">↗ &nbsp;合成身份分析</a>
-    <a href="/geo">⌖ &nbsp;地图·模拟轨迹</a>
-    <a class="state-only" href="/face-lab">▧ &nbsp;授权照片实验</a>
-    <a class="state-only" href="/base">▤ &nbsp;模拟人员底库</a>
-    <a class="state-only" href="/business">⚙ &nbsp;规则与复核</a>
-    <a href="/admin">▣ &nbsp;系统管理</a>
+    <a class="state-only" href="/business">⚙ &nbsp;预警规则与复核</a>
+    <a href="/cctv">▥ &nbsp;抓拍证据与人工复核</a>
+    <div class="navtitle">基础管理</div>
+    <a href="/monitor">◷ &nbsp;设备与采集</a>
+    <a href="/admin">⚑ &nbsp;辖区、场所与账号</a>
+    <a class="state-only" data-tab="acceptance" href="/portal?tab=acceptance">☑ &nbsp;需求验收</a>
   </nav>
   <div class="sidebar-foot">真实视频仅统计匿名目标事件；P### 人员、跨所关系及预警为合成演示。</div>
 </aside>
@@ -146,6 +147,9 @@ function summary(){
  '<div class="statline"><span>人脸候选框</span><b>'+real.counts.face_detections+'</b></div>'+
  '<p class="smallnote">这三项均来自媒体实际处理，不是合成人员或身份匹配成功率。</p>'+
  '<a class="arrow" href="/real">检查证据和UTC时间 →</a></section></div>'+
+ '<section class="panel"><div class="row"><h2>业务操作入口</h2><span class="smallnote">按原Excel的业务链路组织，页面共用已有数据库和接口。</span></div>'+
+ '<div class="toolbar"><a href="/real">① 真实视频与检测 →</a><a href="/portal?tab=places">② 场所与辖区 →</a><a href="/portal?tab=alerts">③ 预警与复核 →</a><a href="/insights">④ 智能检索 →</a></div>'+
+ '<p class="smallnote">真人跨场所身份尚未验收；人员底库与七类规则的演示数据独立于真实视频。</p></section>'+
  (state.user.level===1?'<section class="panel"><div class="row"><h2>单独的合成算法验证区（非真实业务结果）</h2><a href="/portal?tab=acceptance">查看真实/合成验收对照 →</a></div>'+
  '<p class="smallnote">原有P###模拟底库和七类规则仅用于软件逻辑回归。不会写入真实人体库，不计入真实事件、预警或身份分析。</p>'+
  '<div class="toolbar"><a href="/base">模拟底库</a><a href="/business">模拟规则</a><a href="/insights">合成统计</a></div></section>':'');

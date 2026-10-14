@@ -13,17 +13,22 @@ const modules={
 };
 const app=document.createElement("div");app.className="zd-shell";app.id="zdApp";
 const sidebar=document.createElement("aside");sidebar.className="zd-sidebar";
-sidebar.innerHTML=`<div class="zd-brand"><span class="zd-logo">ZD</span><span>视频空间分析<small>演示与管理系统</small></span></div>
- <div class="zd-menu-heading">业务功能</div>
- <button class="zd-nav" data-panel="overview"><span>◈</span> 系统总览</button>
- <button class="zd-nav" data-panel="video"><span>▣</span> 视频与检测</button>
+sidebar.innerHTML=`<div class="zd-brand"><span class="zd-logo">ZD</span><span>场所预警分析<small>综合业务系统 · 视频监控</small></span></div>
+ <div class="zd-menu-heading">业务工作台</div>
+ <a class="zd-nav" href="/portal"><span>◈</span> 综合态势</a>
+ <button class="zd-nav" data-panel="overview"><span>▣</span> 视频监控</button>
+ <button class="zd-nav" data-panel="video"><span>▷</span> 录像与检测</button>
  <button class="zd-nav" data-panel="space"><span>◎</span> 空间活动</button>
- <button class="zd-nav" data-panel="alerts"><span>♢</span> 活动提醒</button>
- <div class="zd-menu-heading">系统管理</div>
- <a class="zd-nav" href="/monitor"><span>▤</span> 设备与采集</a>
- <a class="zd-nav" href="/admin"><span>⚙</span> 场所与权限</a>
- <a class="zd-nav" href="/cctv"><span>▥</span> 检测证据审核</a>
- <button class="zd-nav" data-panel="acceptance"><span>☑</span> 功能验收</button>
+ <a class="zd-nav zd-research-only" href="/base"><span>▤</span> 场所人员底库 <small>演示</small></a>
+ <a class="zd-nav" href="/portal?tab=alerts"><span>♢</span> 预警中心</a>
+ <a class="zd-nav" href="/insights"><span>⌕</span> 智能检索与分析</a>
+ <div class="zd-menu-heading">操作与管理</div>
+ <a class="zd-nav zd-research-only" href="/business"><span>⚙</span> 规则配置与复核 <small>演示</small></a>
+ <a class="zd-nav" href="/cctv"><span>▥</span> 抓拍证据审核</a>
+ <a class="zd-nav" href="/monitor"><span>◷</span> 设备与采集</a>
+ <a class="zd-nav" href="/admin"><span>⚑</span> 场所与权限</a>
+ <button class="zd-nav" data-panel="alerts"><span>♧</span> 视频活动提醒</button>
+ <button class="zd-nav zd-research-only" data-panel="acceptance"><span>☑</span> 需求验收</button>
  <div class="zd-sidebar-bottom"><span class="zd-status-light"></span> 本地运行 <a href="#" id="logout">退出</a></div>`;
 const work=document.createElement("div");work.className="zd-work";
 const top=document.createElement("div");top.className="zd-top";
@@ -40,8 +45,8 @@ function panel(id){
 }
 const home=panel("overview");
 home.innerHTML=`<div class="zd-welcome"><span class="zd-eyebrow">ZD · 实验室双机视频分析</span>
- <h1>从两台摄像机，看到空间中的活动</h1>
- <p>看真实录像、看人体检测、看短时位置变化，再按规则查看活动提醒。每个功能都有独立入口。</p>
+ <h1>视频监控与检测证据</h1>
+ <p>当前展示真实双机研究录像及匿名目标证据。完整的场所态势、人员底库、预警中心和智能检索请通过左侧菜单进入；研究结果不是跨场所真人识别。</p>
  <div class="zd-welcome-actions"><button type="button" data-go="video">进入视频分析 →</button><button type="button" data-go="space" class="zd-ghost">查看空间活动</button></div>
  </div>
  <div class="zd-main-grid"><div class="zd-primary-card">
@@ -55,7 +60,7 @@ home.innerHTML=`<div class="zd-welcome"><span class="zd-eyebrow">ZD · 实验室
   <div class="zd-success-note" id="overviewEvidenceStatus">正在连接本地研究数据库…</div>
   <button class="zd-inline-link" data-go="video" type="button">查看每一次检测及源帧 →</button>
  </div></div>
- <div class="zd-section-label">按业务顺序操作</div>
+ <div class="zd-section-label">视频证据操作</div>
  <div class="zd-action-grid">
   <button data-go="video"><span class="zd-step">01</span><b>视频与检测</b><small>双机录像、配对记录、研究证据</small><em>进入 →</em></button>
   <button data-go="space"><span class="zd-step">02</span><b>空间活动</b><small>短轨迹、室内A/B分区、动态热区</small><em>进入 →</em></button>
@@ -89,7 +94,7 @@ if(modules.oldPlayer)hiddenLegacy.append(modules.oldPlayer);
 main.replaceChildren(home,video,space,alerts,acceptance,live,hiddenLegacy);
 for(const old of document.querySelectorAll(".zd-panel .stage-head"))old.remove();
 const views={overview:home,video,space,alerts,acceptance,live};
-const headings={overview:"系统总览",video:"视频与检测",space:"空间活动",alerts:"活动提醒",acceptance:"功能验收",live:"现场设备事件"};
+const headings={overview:"视频监控",video:"录像与检测",space:"空间活动",alerts:"视频活动提醒",acceptance:"需求验收",live:"现场设备事件"};
 const hashMapping={
  researchActivity:"video",videoEvidence:"video",realSceneAggregation:"space",
  demoAlerts:"alerts",excelRuleShowcase:"acceptance",excelAcceptance:"acceptance",
@@ -222,6 +227,7 @@ if(mainVideo)new MutationObserver(()=>{
 api("/api/auth/me").then(actor=>{
  window.zdActor=actor;
  if(actor.level!==1){
+  sidebar.querySelectorAll(".zd-research-only").forEach(el=>el.remove());
   sidebar.querySelectorAll('[data-panel="video"],[data-panel="space"],[data-panel="alerts"],[data-panel="acceptance"]').forEach(el=>el.hidden=true);
   byId("overviewKpis").innerHTML='<div><b>—</b><span>研究视频仅向研究管理员开放</span></div>';
   byId("overviewEvidenceStatus").textContent="当前账号仅显示授权辖区数据；可进入设备与采集页面。";

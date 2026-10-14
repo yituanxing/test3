@@ -1,64 +1,80 @@
-/* A consistent navigation frame for the actual administrator, CCTV and
-   device pages. These are working modules, not cards on a mock homepage. */
+/* Unified ZD business navigation. Presentation never grants API permissions. */
 (function(){
 "use strict";
-if(!["/admin","/cctv","/monitor"].includes(location.pathname))return;
-const page={
- "/admin":{title:"场所与权限管理",active:"admin",subtitle:"维护四级区域、摄像机与授权账户"},
- "/cctv":{title:"视频检测证据",active:"cctv",subtitle:"检查真实研究帧、检测结果和人工审核记录"},
- "/monitor":{title:"设备与采集",active:"monitor",subtitle:"连接现场视频源、查看采集与服务状态"}
-}[location.pathname];
-const css=document.createElement("style");
-css.textContent=`
-body{margin:0!important}.zd-global-shell{display:grid;grid-template-columns:235px minmax(0,1fr);min-height:100vh}
-.zd-global-nav{box-sizing:border-box;position:sticky;top:0;left:0;height:100vh;z-index:40;background:#122d49;color:#e8f0f7;padding:24px 13px;display:flex;flex-direction:column;font:14px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}
-.zd-global-brand{font-size:17px;font-weight:800;display:flex;align-items:center;gap:11px;padding:0 10px 30px;color:white}
-.zd-global-brand span:first-child{width:43px;height:43px;border-radius:13px;background:#418fe0;display:grid;place-items:center;color:white;font-weight:900}
-.zd-global-brand small{display:block;color:#91adc6;font-size:11px;font-weight:400}
-.zd-global-nav label{display:block;padding:9px 13px;color:#809eb7;font-size:11px;letter-spacing:.1em;margin-top:9px}
-.zd-global-nav a{box-sizing:border-box;display:block;margin:2px 0;border-radius:9px;color:#d7e8f5!important;background:transparent;text-decoration:none!important;font-size:14px;padding:13px 16px!important;font-weight:500}
-.zd-global-nav a.active,.zd-global-nav a:hover{background:#245274!important;color:white!important;text-decoration:none!important}
-.zd-global-nav a.active{box-shadow:inset 3px 0 0 #65b5fa;font-weight:800}
-.zd-global-nav>p{border-top:1px solid #34566e;font-size:11px;padding:16px 12px;margin-top:auto;color:#a6bbcc}
+if(location.pathname==="/real"||location.pathname==="/portal"||location.pathname==="/login")return;
+const pathname=location.pathname;
+const pageNames={
+ "/base":"场所人员底库 · 建立、归并、矫正（合成演示）",
+ "/business":"预警规则与复核（合成演示）",
+ "/insights":"智能检索与活动分析",
+ "/cctv":"抓拍证据与人工复核",
+ "/monitor":"视频设备与持续采集",
+ "/admin":"辖区、场所与权限管理",
+ "/geo":"活动区域与地图（合成演示）",
+ "/face-lab":"授权照片实验",
+};
+if(!pageNames[pathname])return;
+const styles=document.createElement("style");
+styles.textContent=`
+html body{margin:0!important;background:#f5f7fb}
+.zd-global-shell{display:grid;grid-template-columns:238px minmax(0,1fr);min-height:100vh}
+.zd-global-nav{position:sticky;top:0;box-sizing:border-box;height:100vh;overflow-y:auto;background:#142c47;color:#f0f6fe;padding:20px 13px;display:flex;flex-direction:column;gap:3px;font:14px/1.45 "Segoe UI","Microsoft YaHei",sans-serif;z-index:20}
+.zd-global-nav .zd-brand-name{padding:8px 10px 17px;font-size:17px;font-weight:800;color:#fff}
+.zd-global-nav .zd-brand-name small{display:block;font-size:11px;color:#aabdd0;font-weight:400}
+.zd-global-nav .zd-nav-group{padding:15px 11px 5px;font-size:11px;color:#8faec9;letter-spacing:.08em}
+.zd-global-nav a{display:block!important;color:#d9e7f5!important;border-radius:9px!important;padding:10px 12px!important;text-decoration:none!important;font-size:13px!important;font-weight:500!important;background:transparent!important;margin:1px 0!important}
+.zd-global-nav a:hover,.zd-global-nav a.active{color:#fff!important;background:#27567b!important}
+.zd-global-nav a.active{box-shadow:inset 3px 0 #76bdff;font-weight:750!important}
+.zd-global-nav a small{display:inline;color:#a7c3d8;font-size:10px}
+.zd-global-nav [hidden]{display:none!important}
+.zd-global-nav .zd-global-note{padding:16px 10px 0;margin-top:auto;border-top:1px solid #31506b;font-size:11px;color:#adc4d8}
 .zd-global-body{min-width:0}
-.zd-global-top{background:#fff;border-bottom:1px solid #dfe8f0;padding:17px 34px;color:#263d54;display:flex;justify-content:space-between;gap:18px;align-items:center;font:14px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}
-.zd-global-top b{font-size:17px}.zd-global-top span{color:#8392a3;font-size:12px}
-.zd-global-body>header{display:none!important}
-.zd-global-body>main{max-width:1320px!important;margin:0 auto!important;padding:24px 32px 65px!important}
-.zd-global-body>.wrap{max-width:1320px!important;margin:auto!important}
-@media(max-width:700px){.zd-global-shell{display:block}.zd-global-nav{height:auto;position:static;display:flex;flex-wrap:wrap;flex-direction:row;padding:10px}.zd-global-brand{width:100%;padding:5px 8px}.zd-global-nav label,.zd-global-nav>p{display:none}.zd-global-nav a{font-size:12px;padding:8px 10px!important}.zd-global-top{padding:10px 16px}.zd-global-top span{display:none}.zd-global-body>main{padding:15px!important}}
+.zd-global-body>.zd-global-top{display:flex;gap:18px;align-items:center;justify-content:space-between;min-height:62px;padding:12px 32px;background:#fff;border-bottom:1px solid #e3e9f0;color:#233d5b;font:14px/1.4 "Segoe UI","Microsoft YaHei",sans-serif}
+.zd-global-top strong{font-size:16px}
+.zd-global-top small{color:#74889a}
+.zd-global-body>header,.zd-global-body>main>header{display:none!important}
+.zd-global-body>main{width:auto!important;max-width:1370px!important;box-sizing:border-box;margin:0 auto!important;padding:22px 26px 65px!important}
+.zd-global-body>main.wrap{max-width:1370px!important}
+.zd-global-body>.wrap{max-width:1370px;margin:auto}
+@media(max-width:750px){.zd-global-shell{display:block}.zd-global-nav{height:auto;position:static;display:flex;flex-direction:row;flex-wrap:wrap;gap:2px;padding:9px}.zd-global-nav .zd-brand-name{width:100%;padding:4px 8px 8px}.zd-global-nav .zd-nav-group,.zd-global-nav .zd-global-note{display:none}.zd-global-nav a{padding:7px 8px!important;font-size:12px!important}.zd-global-top small{display:none}.zd-global-body>.zd-global-top{padding:11px 17px;min-height:45px}.zd-global-body>main{padding:16px!important}}
 `;
-document.head.append(css);
+document.head.append(styles);
 const root=document.createElement("div");root.className="zd-global-shell";
-const aside=document.createElement("aside");aside.className="zd-global-nav";
-aside.innerHTML=`<div class="zd-global-brand"><span>ZD</span><span>视频空间分析<small>演示与管理系统</small></span></div>
- <label>业务功能</label>
- <a href="/real#overview">◈ &nbsp;系统总览</a>
- <a href="/real#video">▣ &nbsp;视频与检测</a>
- <a href="/real#space">◎ &nbsp;空间活动</a>
- <a href="/real#alerts">♢ &nbsp;活动提醒</a>
- <label>系统管理</label>
- <a data-active="monitor" href="/monitor">▤ &nbsp;设备与采集</a>
- <a data-active="admin" href="/admin">⚙ &nbsp;场所与权限</a>
- <a data-active="cctv" href="/cctv">▥ &nbsp;视频证据审核</a>
- <a href="/real#acceptance">☑ &nbsp;功能验收</a>
- <p>本地演示 · 权限由服务器验证</p>`;
-const right=document.createElement("div");right.className="zd-global-body";
-const bar=document.createElement("div");bar.className="zd-global-top";
-bar.innerHTML="<b>"+page.title+"</b><span>"+page.subtitle+"</span>";
-const nodes=[...document.body.childNodes];document.body.append(root);root.append(aside,right);right.append(bar);
-for(const node of nodes)right.append(node);
-const formerHeader=right.querySelector("header");
-if(formerHeader)formerHeader.style.display="none";
-const active=aside.querySelector('a[data-active="'+page.active+'"]');
+const aside=document.createElement("aside");aside.className="zd-global-nav";aside.setAttribute("aria-label","业务主导航");
+aside.innerHTML=`<div class="zd-brand-name">ZD · 场所预警分析<small>多场所人员活动 · 业务演示系统</small></div>
+ <div class="zd-nav-group">业务工作台</div>
+ <a href="/portal" data-route="overview">◈　综合态势</a>
+ <a href="/real#overview" data-route="video">▣　视频监控</a>
+ <a href="/base" data-research-only="1" data-route="base">▤　场所人员底库 <small>演示</small></a>
+ <a href="/portal?tab=alerts" data-route="alerts">♢　预警中心</a>
+ <a href="/insights" data-route="insights">⌕　智能检索与分析</a>
+ <div class="zd-nav-group">业务操作</div>
+ <a href="/portal?tab=places" data-route="places">▦　场所列表</a>
+ <a href="/business" data-research-only="1" data-route="rules">⚙　预警规则与复核 <small>演示</small></a>
+ <a href="/cctv" data-route="cctv">▥　抓拍证据与人工复核</a>
+ <div class="zd-nav-group">基础管理</div>
+ <a href="/monitor" data-route="monitor">◷　设备与采集</a>
+ <a href="/admin" data-route="admin">⚑　辖区、场所与账号</a>
+ <a href="/portal?tab=acceptance" data-research-only="1" data-route="acceptance">☑　需求验收 <small>管理</small></a>
+<div class="zd-global-note">真实匿名视频、研究配对与合成人员分别管理；页面数据不等于真人身份结论。</div>`;
+const content=document.createElement("div");content.className="zd-global-body";
+const top=document.createElement("div");top.className="zd-global-top";
+const title=document.createElement("strong");title.textContent=pageNames[pathname];
+const home=document.createElement("a");home.href="/portal";home.textContent="返回综合态势 →";
+top.append(title,home);
+const nodes=[...document.body.childNodes];
+document.body.append(root);root.append(aside,content);content.append(top);
+for(const n of nodes)content.append(n);
+const activeByPath={"/base":"base","/business":"rules","/insights":"insights","/cctv":"cctv","/monitor":"monitor","/admin":"admin","/geo":"insights","/face-lab":"insights"};
+const active=aside.querySelector('[data-route="'+activeByPath[pathname]+'"]');
 if(active){active.classList.add("active");active.setAttribute("aria-current","page")}
 const token=sessionStorage.getItem("zd_access_token");
-if(token){
- fetch("/api/auth/me",{headers:{Authorization:"Bearer "+token}})
- .then(r=>r.ok?r.json():null).then(user=>{
-  if(!user||user.level!==1){
-   aside.querySelectorAll('a[href="/real#video"],a[href="/real#space"],a[href="/real#alerts"],a[href="/real#acceptance"]').forEach(a=>{a.hidden=true;a.style.display="none"});
-  }
- }).catch(()=>{});
-}
+if(!token){location.replace("/login");return}
+fetch("/api/auth/me",{headers:{Authorization:"Bearer "+token}})
+.then(r=>r.ok?r.json():null).then(actor=>{
+ if(!actor){location.replace("/login");return}
+ if(actor.level!==1){
+  aside.querySelectorAll("[data-research-only]").forEach(a=>a.remove());
+ }
+}).catch(()=>{aside.querySelectorAll("[data-research-only]").forEach(a=>a.remove())});
 })();

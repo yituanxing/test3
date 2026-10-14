@@ -87,6 +87,25 @@ def main():
                         expect(page).to_have_url(base+"/admin",timeout=15000)
                         expect(page.locator(".zd-global-nav")).to_be_visible()
                         expect(page.locator("#accountPanel")).to_be_visible(timeout=15000)
+                        # Excel business information architecture must be reachable
+                        # through the same sidebar; no dummy identities are added.
+                        expect(page.locator('.zd-global-nav a[href="/base"]')).to_be_visible()
+                        page.locator('.zd-global-nav a[href="/base"]').click()
+                        expect(page).to_have_url(base+"/base",timeout=15000)
+                        expect(page.locator("#candidateRows")).to_be_visible()
+                        expect(page.locator('.zd-global-nav a[href="/business"]')).to_be_visible()
+                        page.locator('.zd-global-nav a[href="/business"]').click()
+                        expect(page).to_have_url(base+"/business",timeout=15000)
+                        expect(page.locator("#instancePanel")).to_be_visible()
+                        page.locator('.zd-global-nav a[href="/insights"]').click()
+                        expect(page).to_have_url(base+"/insights",timeout=15000)
+                        expect(page.locator("#personQuery")).to_be_visible()
+                        page.locator('.zd-global-nav a[href="/portal"]').click()
+                        expect(page).to_have_url(base+"/portal",timeout=15000)
+                        expect(page.locator('#navigation a[href="/base"]')).to_be_visible()
+                        expect(page.locator('#navigation a[href="/business"]')).to_be_visible()
+                        page.screenshot(path=str(OUT/"ui-shipped-business-overview.png"),full_page=True)
+
                         page.screenshot(path=str(OUT/"ui-shipped-real-admin-roles.png"),full_page=True)
                         assert not errors,errors
                         print("OPERATIONAL_SITE_REAL_CLIP_BROWSER_PASS="+json.dumps({

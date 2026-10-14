@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/zd-final-product-real-video-proof.yml
       - scripts/browser_operational_site_with_video.py
+      - static/**
   workflow_dispatch:
 permissions:
   contents: read
