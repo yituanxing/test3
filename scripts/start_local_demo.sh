@@ -2,9 +2,9 @@
 # First-run local demo. Never expose to the public network.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-# Never reopen the legacy database with synthetic P### records.
-export ZD_LEGACY_MODE=0
-export ZD_DATA_DIR="${ZD_DATA_DIR:-$PWD/data/real-only}"
+# Explicit localhost Excel business demonstration; P### identifiers are fictional.
+export ZD_LEGACY_MODE=1
+export ZD_DATA_DIR="${ZD_DATA_DIR:-$PWD/data/business-demo}"
 mkdir -p "$ZD_DATA_DIR"
 if [ ! -x ".venv/bin/python" ]; then
   python3 -m venv .venv
