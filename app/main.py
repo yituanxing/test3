@@ -393,6 +393,12 @@ def role_navigation_script():
     return FileResponse(ROOT / 'static' / 'role_navigation.js',
                         media_type='text/javascript')
 
+@app.get('/ui/site-navigation.js')
+def operational_site_navigation_script():
+    return FileResponse(ROOT / 'static' / 'site_navigation.js',
+                        media_type='text/javascript',headers={"Cache-Control":"no-store"})
+
+
 @app.get('/ui/showcase.js')
 def operational_site_script():
     return FileResponse(ROOT / 'static' / 'showcase_ui.js',
