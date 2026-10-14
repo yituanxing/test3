@@ -258,7 +258,13 @@ def real_activity(request: Request):
         # Actual rejected matches never enter the personnel activity reader.
         active = [dict(r) for r in rows if r["verdict"] != "false_match"]
         fps = report["video_fps"]
-        temporal_verified = bool(report["temporal_fragment_verified"])
+        # The original GT-certified one-second graph was scored with *all*
+        # candidate detections. Removing a reviewed false match changes
+        # mutual-nearest alternatives, which can create NEW, unscored links.
+        # Fail closed rather than quietly call those links 'GT verified'.
+        rejected_count = len(rows) - len(active)
+        originally_verified = bool(report["temporal_fragment_verified"])
+        temporal_verified = originally_verified and rejected_count == 0
         result = activity_summary(active, fps if fps and fps > 0 else None,
                                   temporal_verified=temporal_verified)
         return {
@@ -272,9 +278,14 @@ def real_activity(request: Request):
             "manifest_origin": report["origin"],
             "video_fps": fps,
             "cross_time_temporal_linkage_verified": temporal_verified,
-            "cross_time_status": ("independently_scored_official_GT"
-                                  if temporal_verified
-                                  else "DISABLED_independent_GT_found_unreliable_links"),
+            "cross_time_verification_invalidated_by_rejection": (
+                originally_verified and rejected_count > 0),
+            "cross_time_status": (
+                "DISABLED_review_changed_candidate_set_recertification_required"
+                if originally_verified and rejected_count > 0
+                else ("independently_scored_official_GT"
+                      if temporal_verified
+                      else "DISABLED_independent_GT_found_unreliable_links")),
             "excluded_manual_false_matches": len(rows) - len(active),
             "confirmed_natural_person_identity": False,
             "verified_unique_people": None,
