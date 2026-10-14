@@ -1,0 +1,96 @@
+# One-time academic/teaching research-only export.
+# Source AVI stays ephemeral on the runner. No raw AVI or GT identities uploaded.
+# Downloaded footage and derived frames are CVLab-EPFL copyrighted.
+name: ZD Final Actual Continuous EPFL Video Excerpts
+"on":
+  push:
+    branches:
+      - agent/continuous-capture-mvp-v1
+    paths:
+      - .github/workflows/zd-final-research-video-clips.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verified-research-video:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Confirm ffmpeg and ffprobe
+        run: |
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+      - name: Download original EPFL AVI privately in temporary CI workspace and pin both SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/zd-epfl-licensed-source dist-research
+          for n in 0 1; do
+            curl --fail --location --retry 3 --connect-timeout 15 --max-time 360 \
+              "https://documents.epfl.ch/groups/c/cv/cvlab-pom-video1/www/6p-c${n}.avi" \
+              -o "/tmp/zd-epfl-licensed-source/6p-c${n}.avi"
+            test -s "/tmp/zd-epfl-licensed-source/6p-c${n}.avi"
+          done
+          echo '0ea883222b6518a321d081b2e5570c0b02d568b5cc7cb70b6b72d4af8d50d8a9  /tmp/zd-epfl-licensed-source/6p-c0.avi' > /tmp/zd-epfl-sha
+          echo '17e497340d92291793649dd378923c717eb2f7a0a419419041d9d9415f8b534f  /tmp/zd-epfl-licensed-source/6p-c1.avi' >> /tmp/zd-epfl-sha
+          sha256sum -c /tmp/zd-epfl-sha
+          for n in 0 1; do
+            ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,r_frame_rate \
+              -of default=noprint_wrappers=1 "/tmp/zd-epfl-licensed-source/6p-c${n}.avi"
+          done
+      - name: Encode 38 seconds of ACTUAL synchronized continuously moving two-camera video
+        shell: bash
+        run: |
+          set -euo pipefail
+          ffmpeg -hide_banner -loglevel error -stats -y \
+            -ss 60 -i /tmp/zd-epfl-licensed-source/6p-c0.avi \
+            -ss 60 -i /tmp/zd-epfl-licensed-source/6p-c1.avi \
+            -t 38 \
+            -filter_complex "[0:v]scale=640:512:flags=lanczos,drawbox=x=0:y=0:w=iw:h=48:color=black@0.65:t=fill,drawtext=fontcolor=white:fontsize=23:text='EPFL REAL CAMERA 0 - SAME LAB':x=10:y=12[v0];[1:v]scale=640:512:flags=lanczos,drawbox=x=0:y=0:w=iw:h=48:color=black@0.65:t=fill,drawtext=fontcolor=white:fontsize=23:text='EPFL REAL CAMERA 1 - SAME LAB':x=10:y=12[v1];[v0][v1]hstack=inputs=2[v]" \
+            -map '[v]' -r 15 -an -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
+            -movflags +faststart dist-research/真实原片连续双机画面_38秒.mp4
+          ffmpeg -hide_banner -loglevel error -y -ss 60 \
+            -i /tmp/zd-epfl-licensed-source/6p-c0.avi -t 15 -vf scale=640:512 \
+            -r 15 -an -c:v libx264 -preset veryfast -crf 24 -pix_fmt yuv420p \
+            -movflags +faststart dist-research/真实相机0_连续15秒.mp4
+          ffmpeg -hide_banner -loglevel error -y -ss 60 \
+            -i /tmp/zd-epfl-licensed-source/6p-c1.avi -t 15 -vf scale=640:512 \
+            -r 15 -an -c:v libx264 -preset veryfast -crf 24 -pix_fmt yuv420p \
+            -movflags +faststart dist-research/真实相机1_连续15秒.mp4
+      - name: Fail closed unless video is actually decoded and has sufficient frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          for p in dist-research/*.mp4; do
+            test -s "$p"
+            length="$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$p")"
+            video_codec="$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=nw=1:nk=1 "$p")"
+            echo "$p duration=$length codec=$video_codec"
+            test "$video_codec" = h264
+            awk -v seconds="$length" -v name="$p" 'BEGIN { if (seconds < 14.0) { print name " too short"; exit 1 }}'
+            # Decodes the entire output, not just probes container metadata.
+            ffmpeg -v error -xerror -i "$p" -f null -
+          done
+          cat > dist-research/IMPORTANT-COPYRIGHT-AND-PROVENANCE.txt <<'EOF'
+          RESEARCH AND TEACHING USE ONLY — THIS IS NOT A COMMERCIAL DISTRIBUTION LICENSE.
+          Copyright: CVLab — EPFL.
+          Source: https://www.epfl.ch/labs/cvlab/data/data-pom-index-php/
+          Original file hashes:
+          camera0 0ea883222b6518a321d081b2e5570c0b02d568b5cc7cb70b6b72d4af8d50d8a9
+          camera1 17e497340d92291793649dd378923c717eb2f7a0a419419041d9d9415f8b534f
+          Filming context: two synchronized views of one EPFL laboratory, NOT different sites.
+          These videos show actual continuously changing original frames.
+          The 38s side-by-side file starts at source video 60 seconds and runs 38 seconds.
+          Each 15s source camera file starts at video 60 seconds.
+          NO original AVI distributed in the Git repository, no EPFL GT IDs embedded.
+          Cannot infer natural-person identities, GPS or real-world security risks.
+          Public redistribution and commercial display require appropriate rights.
+          EOF
+          sha256sum dist-research/*.mp4 > dist-research/rendered-video-sha256.txt
+      - name: Save research-only limited video excerpts as downloadable CI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zd-licensed-epfl-real-continuous-38-second-research-clips
+          path: dist-research/
+          retention-days: 2
+          if-no-files-found: error
