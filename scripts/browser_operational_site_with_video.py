@@ -20,10 +20,10 @@ def main():
         raise RuntimeError("Authentic continuous EPFL clip missing")
     OUT.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="zd-video-product-") as tmp:
-        env=dict(os.environ, ZD_DATA_DIR=tmp,ZD_LEGACY_MODE="0")
+        env=dict(os.environ, ZD_DATA_DIR=tmp,ZD_LEGACY_MODE="1")
         env.pop("ZD_AUTH_TEST_COMPAT",None)
         os.environ["ZD_DATA_DIR"]=tmp
-        os.environ["ZD_LEGACY_MODE"]="0"
+        os.environ["ZD_LEGACY_MODE"]="1"
         from app import main as backend,access
         backend.setup_db()
         with backend.db() as conn:
