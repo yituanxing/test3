@@ -282,3 +282,51 @@ def test_real_video_scene_aggregate_requires_real_import_and_admin(auth,monkeypa
     with main.db() as db:
         assert db.execute("SELECT COUNT(*) FROM synthetic_observations").fetchone()[0]==0
         assert db.execute("SELECT COUNT(*) FROM synthetic_alert_reviews").fetchone()[0]==0
+
+
+def test_review_rejection_invalidates_the_old_ground_truth_temporal_certification(auth,monkeypatch):
+    """Removing any candidate changes mutual-nearest alternatives.
+
+    A once-correct 14-link benchmark cannot certify a different post-review
+    graph. Unit labels here are artificial contract fixtures, not real video.
+    """
+    main,epfl,client,admin,county,tmp_path=auth
+    raw=_manifest()
+    raw["holdout_frame_audits"][0]["frame_0_based"]=525
+    raw["temporal_fragment_verified"]=True
+    bundle=tmp_path/"review-test-only-bundle.json"
+    bundle.write_text(json.dumps(raw),encoding="utf-8")
+    monkeypatch.setattr(epfl,"BUNDLED_CANDIDATES",bundle)
+    assert client.post("/api/research/epfl/bundled/import",
+                       headers=admin,json={}).status_code==201
+    pre=client.get("/api/real/activity",headers=admin).json()
+    assert pre["cross_time_temporal_linkage_verified"] is True
+    assert pre["multi_instant_fragments"]==1
+    assert len(client.get("/api/real/demo-alerts",headers=admin).json()["alerts"])==1
+    key=client.get("/api/research/epfl/candidates",
+                   headers=admin).json()["candidates"][0]["candidate_key"]
+    rv=client.post("/api/research/epfl/reviews",headers=admin,json={
+        "candidate_key":key,"verdict":"false_match",
+        "reason":"此配对已确认错误，必须关闭旧关联真值标记"})
+    assert rv.status_code==201
+    post=client.get("/api/real/activity",headers=admin).json()
+    assert post["matched_pair_observations"]==1
+    assert post["cross_time_temporal_linkage_verified"] is False
+    assert post["cross_time_verification_invalidated_by_rejection"] is True
+    assert post["multi_instant_fragments"]==0
+    assert "recertification_required" in post["cross_time_status"]
+    assert client.get("/api/real/demo-alerts",headers=admin).json()["alerts"]==[]
+    assert client.get("/api/real/scene-aggregate",
+                      headers=admin).json()["short_time_linkage_separately_qualified"] is False
+
+
+def test_negative_candidate_removal_can_create_new_unscored_links():
+    a=_row("a",500,0,0,2,0)
+    b=_row("b",500,20,0,22,0)
+    c=_row("c",525,13,0,15,0)
+    def links(rs):
+        return {tuple(o["candidate_key"] for o in frag["observations"])
+                for frag in real_activity.track_fragments(rs)
+                if len(frag["observations"])>1}
+    assert not links([a,b,c])
+    assert links([a,c])=={("a","c")}
