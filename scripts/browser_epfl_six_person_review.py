@@ -155,6 +155,22 @@ def run():
                             "人脸检索")
                         expect(page.locator("#view")).to_contain_text(
                             "缺失")
+                        # Inspect the SAME one-row evidence/gap contract users
+                        # see: now, demo substitute, why, NOT equivalent,
+                        # later engineering, independent acceptance gate.
+                        first = page.locator("#acceptanceRows tr").first
+                        first.locator("summary").click()
+                        for phrase in ("实际已做：","当前替代：",
+                                       "为什么可用于演示：","不等同于：",
+                                       "后续实施：","正式验收证据："):
+                            expect(first).to_contain_text(phrase)
+                        assert first.locator("details").get_attribute("open") is not None
+                        page.locator(
+                            '#acceptanceRows tr[data-acceptance-status="missing"]'
+                        ).first.locator("summary").click()
+                        expect(page.locator(
+                            '#acceptanceRows tr[data-acceptance-status="missing"]'
+                        ).first).to_contain_text("没有有效替代")
                         page.screenshot(
                             path=str(OUT/"ui-excel-23-live-acceptance.png"),
                             full_page=True)

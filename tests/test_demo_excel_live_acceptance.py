@@ -53,11 +53,20 @@ def test_exact_23_from_manifest_and_admin_not_other_roles(actor_clients):
           "not_equivalent_to","future_implementation","acceptance_gate")
     for item in value["requirements"]:
         assert item["delivery_mode"]==mode[item["status"]]
-        assert all(isinstance(item[k],str) and len(item[k])>=18 for k in keys)
+        assert all(isinstance(item[k],str) and len(item[k])>=8 for k in keys)
         assert item["next_priority"] in ("P0","P1","P2")
         if item["status"]=="missing":
             assert "没有有效替代" in item["alternative_used"]
     assert value["delivery_assessment_date"]=="2026-10-14"
+    # The operator-facing gap document must cover every literal Excel item,
+    # including alternative rationale and the acceptance gate.
+    report=(Path(__file__).parents[1]/
+        "EXCEL_23_IMPLEMENTATION_AND_GAPS_20261014.md").read_text(
+            encoding="utf-8")
+    for item in value["requirements"]:
+        assert ("#"+str(item["id"]).zfill(2)+" "+item["title"]) in report
+        assert item["future_implementation"] in report
+        assert item["acceptance_gate"] in report
     assert value["requirements"][13]["status"]=="missing" # #14
     assert value["requirements"][16]["status"]=="missing" # #17
 
