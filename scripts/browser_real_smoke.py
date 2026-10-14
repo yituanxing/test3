@@ -27,6 +27,8 @@ def main():
             assert conn.execute("SELECT COUNT(*) FROM places").fetchone()[0] == 0
             root = conn.execute("SELECT id FROM regions WHERE level=1 LIMIT 1").fetchone()[0]
             access.create_user(conn, "ci_real_ui", "temporary-ci-ui-password-2026", root)
+            county = conn.execute("SELECT id FROM regions WHERE level=2 ORDER BY id LIMIT 1").fetchone()[0]
+            access.create_user(conn, "ci_county_ui", "temporary-county-ui-password-2026", county)
         with (OUT / "ui-real-server.log").open("w") as logfile:
             proc = subprocess.Popen(
                 [sys.executable, "-m", "uvicorn", "app.main:app", "--host",
@@ -52,6 +54,7 @@ def main():
                         page.on("pageerror", lambda e: errors.append(str(e)))
                         page.goto(base + "/portal")
                         expect(page).to_have_url(base + "/login")
+                        page.screenshot(path=str(OUT / "ui-page-login.png"), full_page=True)
                         page.locator('input[name="username"]').fill("ci_real_ui")
                         page.locator('input[name="password"]').fill("temporary-ci-ui-password-2026")
                         page.locator('button[type="submit"]').click()
@@ -62,8 +65,25 @@ def main():
                         page.screenshot(path=str(OUT / "ui-real-only-landing.png"), full_page=True)
                         page.goto(base + "/monitor")
                         assert page.locator('a[href="/business"]').count() == 0
+                        page.wait_for_timeout(500)
+                        page.screenshot(path=str(OUT / "ui-page-monitor-real.png"), full_page=True)
                         page.goto(base + "/cctv")
                         assert page.locator('a[href="/base"]').count() == 0
+                        page.wait_for_timeout(500)
+                        page.screenshot(path=str(OUT / "ui-page-cctv-research.png"), full_page=True)
+                        page.goto(base + "/admin")
+                        page.wait_for_timeout(500)
+                        page.screenshot(path=str(OUT / "ui-page-admin-regions-and-roles.png"), full_page=True)
+                        page.goto(base + "/real")
+                        page.locator("#logout").click()
+                        expect(page).to_have_url(base + "/login", timeout=10000)
+                        page.locator('input[name="username"]').fill("ci_county_ui")
+                        page.locator('input[name="password"]').fill("temporary-county-ui-password-2026")
+                        page.locator('button[type="submit"]').click()
+                        expect(page).to_have_url(base + "/real", timeout=12000)
+                        expect(page.locator("#researchActivity")).to_be_hidden(timeout=12000)
+                        expect(page.locator("#excelAcceptance")).to_be_hidden(timeout=12000)
+                        page.screenshot(path=str(OUT / "ui-page-county-limited-access.png"), full_page=True)
                         assert not errors, str(errors)
                     finally:
                         browser.close()
