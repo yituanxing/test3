@@ -5,6 +5,10 @@
 1. **业务Web平台**：`python -m uvicorn app.main:app --port 8001`。页面：`/admin`、`/business`、`/monitor`；行政区域、场所与设备管理、视频观测、合成规则、审核和纠错。
 2. **Frigate技术验收桥**：`python -m uvicorn app.bridge:app --port 8000`，供 Docker/RTSP/OpenVINO 实机验收使用。
 
+## 最终演示与页面验收（2026-10-14）
+
+登录后从 `/portal?tab=acceptance` 开始，按「真实匿名人体关联 → 合成人员底库 → 七类合成规则」顺序走读。Excel 23项真实状态仍是3项已验管理、10项合成、8项部分、2项缺失。详细可执行步骤和许可边界参见 [DEMO_FINAL_WALKTHROUGH_20261014.md](DEMO_FINAL_WALKTHROUGH_20261014.md)。界面支持状态/需求筛选、折叠详情、跨页匿名候选审核；这不是23项真实功能全部实现。
+
 ## 最终业务演示入口（V1.3）
 
 - `/login`：登录后进入 `/portal` 综合态势门户；包含授权辖区场所列表、场所真实匿名检测统计、合成预警中心、规则证据详情和州级复核。
