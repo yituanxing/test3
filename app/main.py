@@ -64,13 +64,11 @@ def db():
 
 
 def legacy_synthetic_tests_enabled() -> bool:
-    """Legacy synthetic regression fixtures are never available in a normal server.
+    """Explicit business demo opt-in; real-only remains the default.
 
-    The archived P### code stays testable under pytest, but launching the
-    application, browser, or local demo always defaults to REAL-ONLY.
+    P### synthetic persons never count as identified real persons.
     """
-    return (os.getenv("ZD_LEGACY_MODE") == "1"
-            and bool(os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules))
+    return os.getenv("ZD_LEGACY_MODE") == "1"
 
 
 def real_only_blocked(path: str) -> bool:
@@ -328,8 +326,7 @@ real_scene_aggregate.register(app)
 async def enforce_role_scope(request: Request, call_next):
     """Default-deny API gateway; region filters are additionally imposed by endpoints.
 
-    Old regression tests may explicitly enable the compatibility mode, which is
-    ONLY effective inside an active pytest test. Never used by the running server.
+    Real-only is the default. The localhost demo opts into isolated P### synthetic business pages.
     """
     path = request.url.path
     if not legacy_synthetic_tests_enabled() and real_only_blocked(path):
