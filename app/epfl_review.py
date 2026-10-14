@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request, Query
@@ -27,6 +28,9 @@ CAMERA_SHA256 = (
     "17e497340d92291793649dd378923c717eb2f7a0a419419041d9d9415f8b534f",
 )
 MAX_PAIR_DISTANCE = 25.0
+BUNDLED_CANDIDATES = (Path(__file__).resolve().parents[1] /
+                      "config" / "epfl6p_real_pair_candidates_v1.json")
+MAX_BUNDLE_BYTES = 1_048_576
 DATASET = "laboratory_six_person_four_synced_views"
 NOT_VERIFIED = ("研究视频同步几何匹配候选；仅人工研究质检，"
                 "不是现实个人身份、到访或自动预警。上传JSON的来源需单独核验。")
@@ -73,6 +77,12 @@ def initialize(c):
     CREATE INDEX IF NOT EXISTS epfl_review_by_candidate
        ON epfl_pair_reviews(candidate_key,id);
     """)
+    # Compatible with existing persistent databases from the manual-JSON
+    # release. The old SQLite trust_level CHECK remains unchanged.
+    if "origin" not in {r["name"] for r in c.execute(
+            "PRAGMA table_info(epfl_candidate_reports)")}:
+        c.execute("""ALTER TABLE epfl_candidate_reports ADD COLUMN origin
+                   TEXT NOT NULL DEFAULT 'uploaded_research_json'""")
 
 
 def register(app, db):
@@ -170,6 +180,53 @@ def _hash(records):
 
 @router.post("/api/research/epfl/import", status_code=201)
 def import_research_report(raw: dict, request: Request):
+    return _import(raw, request, "uploaded_research_json")
+
+
+def _bundle():
+    if not BUNDLED_CANDIDATES.is_file():
+        return None
+    if BUNDLED_CANDIDATES.stat().st_size > MAX_BUNDLE_BYTES:
+        raise HTTPException(409, "本机候选研究包超过大小限制")
+    try:
+        raw = json.loads(BUNDLED_CANDIDATES.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeError) as exc:
+        raise HTTPException(409, "本机研究样本损坏") from exc
+    # Must verify provenance metadata AND model/calibration/video hash contract.
+    if raw.get("schema_version") != "epfl6p_anonymous_candidate_bundle_v1" or (
+            raw.get("generated_from") != "real_video_owner_ci_detector_result"):
+        raise HTTPException(409, "这不是官方媒体CI生成的匿名候选格式")
+    _extract(raw)
+    return raw
+
+
+@router.get("/api/research/epfl/bundled")
+def bundled_availability(request: Request):
+    _admin(request)
+    raw = _bundle()
+    if raw is None:
+        return {"available": False, "candidate_count": 0,
+                "reason": "源码未包含研究数据；下载owner CI构建的正式演示ZIP，或手动导入CI报告",
+                "identity_verified": False, "feeds_real_alerts": False}
+    records = _extract(raw)
+    return {"available": True, "candidate_count": len(records),
+            "report_digest": _hash(records),
+            "source_ci_run_id": raw.get("source_ci_run_id"),
+            "real_person_identity_verified": False,
+            "feeds_roster": False, "feeds_real_alerts": False,
+            "note": NOT_VERIFIED}
+
+
+@router.post("/api/research/epfl/bundled/import", status_code=201)
+def import_bundled(request: Request):
+    _admin(request)
+    raw = _bundle()
+    if raw is None:
+        raise HTTPException(404, "没有可导入的研究样本，需从CI演示包获取")
+    return _import(raw, request, "ci_generated_research_bundle")
+
+
+def _import(raw: dict, request: Request, origin: str):
     actor = _admin(request)
     data = json.dumps(raw)
     if len(data.encode("utf-8")) > 1024 * 1024:
@@ -185,9 +242,9 @@ def import_research_report(raw: dict, request: Request):
             now = datetime.now(timezone.utc).isoformat()
             c.execute("""INSERT INTO epfl_candidate_reports
             (report_digest,video_sha0,video_sha1,candidate_count,
-             imported_by,imported_at,trust_level)
-            VALUES(?,?,?,?,?,?,'user_provided_research_report')""",
-            (digest, *CAMERA_SHA256, len(records), actor["id"], now))
+             imported_by,imported_at,trust_level,origin)
+            VALUES(?,?,?,?,?,?,'user_provided_research_report',?)""",
+            (digest, *CAMERA_SHA256, len(records), actor["id"], now,origin))
             for split, frame, a, b, dist in records:
                 key = sha256(
                     f"{digest}:{split}:{frame}:{a}:{b}:{dist}".encode()
@@ -199,10 +256,17 @@ def import_research_report(raw: dict, request: Request):
                  (key, digest, split, frame, a, b, dist))
             admin.audit(c,"research_epfl_candidate_import",
                         f"epfl-report:{digest}",None,
-                        {"count":len(records),"trust":"unverified_uploaded_report",
+                        {"count":len(records),"origin":origin,
+                         "trust":"research_candidate_not_real_identity",
                          "user":actor["id"]})
+        elif origin == "ci_generated_research_bundle":
+            # Same verified geometry, preserve old reviewer decisions and ID.
+            c.execute("""UPDATE epfl_candidate_reports SET origin=?
+                         WHERE report_digest=? AND origin<>?""",
+                      (origin,digest,origin))
     return {"report_digest":digest,"candidate_count":len(records),
-            "already_present":duplicate,"real_person_identity_verified":False,
+            "already_present":duplicate,"origin":origin,
+            "real_person_identity_verified":False,
             "feeds_roster":False,"feeds_real_alerts":False,"note":NOT_VERIFIED}
 
 
@@ -246,7 +310,8 @@ def candidates(request: Request,
                 "reviewed_count":reviewed,
                 "candidates":[dict(x) for x in rows[:limit]],
                 "next_offset":offset+limit if len(rows)>limit else None,
-                "review_source":"uploaded research report; not cryptographically authenticated",
+                "review_source":meta["origin"],
+                "source_video_has_official_gt": True,
                 "official_gt_ids_stored":False,
                 "verified_unique_people":False,
                 "feeds_roster":False,"feeds_real_alerts":False,

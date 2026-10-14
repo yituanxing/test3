@@ -83,8 +83,16 @@ def run():
                         expect(page).to_have_url(base+"/portal",timeout=15000)
                         page.goto(base+"/cctv")
                         expect(page.locator("#epflImportReport")).to_be_visible()
-                        # Genuine report generated from the two real downloaded
-                        # EPFL AVI camera streams, NOT a fabricated fixture.
+                        # Same owner job has just generated a GT-free manifest
+                        # from two official AVI streams and packaged it locally.
+                        expect(page.locator("#epflUseBundled")).to_be_enabled()
+                        page.locator("#epflUseBundled").click()
+                        expect(page.locator("#epflReviewStatus")).to_contain_text(
+                            "研究候选",timeout=15000)
+                        expect(page.locator("#epflReviewRows")).to_contain_text(
+                            "baseline",timeout=15000)
+                        # The full original proof still supports manual import;
+                        # same 119 pairs MUST remain idempotent.
                         page.locator("#epflReportInput").set_input_files(
                             str(REPORT))
                         expect(page.locator("#epflSummary")).to_contain_text(

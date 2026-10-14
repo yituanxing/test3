@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import defaultdict
 from hashlib import sha256
 import json
+import os
 import re
 import tempfile
 import urllib.parse
@@ -32,6 +33,7 @@ MAX_BYTES = 180 * 1024 * 1024
 WORLD_GT_DISTANCE = 30.0
 CROSS_CAMERA_DISTANCE = 25.0
 OUTPUT = Path("reports/verify-epfl-six-person-cross-camera.json")
+BUNDLED_CANDIDATES = Path("config/epfl6p_real_pair_candidates_v1.json")
 
 
 def download_official(url: str, target: Path) -> dict:
@@ -327,6 +329,49 @@ def _paired_preview(frame, image_by_camera, predictions, audit):
         raise RuntimeError("Failed to preserve research candidate screenshot")
     return str(output)
 
+def _write_candidate_bundle(evidence):
+    """Bundle only detector-derived candidate geometry, never EPFL ground truth.
+
+    Regenerated as part of the ACTUAL official-video owner job, then shipped
+    with the local demo ZIP. Does not contain licensed image pixels, 6p GT IDs,
+    faces, names, or production alerts; not a general ReID benchmark.
+    """
+    bundle = {
+        "schema_version": "epfl6p_anonymous_candidate_bundle_v1",
+        "dataset": evidence["dataset"],
+        "selected_cameras": [0, 1],
+        "model": evidence["model"],
+        "matching_algorithm": evidence["matching_algorithm"],
+        "matching_gt_is_never_input": True,
+        "production_real_roster_or_alerts": False,
+        "license": "EPFL research only; no original AVI or ground truth included",
+        "generated_from": "real_video_owner_ci_detector_result",
+        "source_ci_run_id": os.environ.get("GITHUB_RUN_ID"),
+        "per_camera": {str(i): {
+            "sha256": evidence["per_camera"][str(i)]["sha256"]
+        } for i in (0, 1)},
+    }
+    for key in ("frame_audits", "holdout_frame_audits"):
+        bundle[key] = [{
+            "frame_0_based": row["frame_0_based"],
+            "cross_camera_candidates": row["cross_camera_candidates"],
+            "candidate_evidence": [{
+                "cam0_model_box_index": p["cam0_model_box_index"],
+                "cam1_model_box_index": p["cam1_model_box_index"],
+                "calibration_distance": p["calibration_distance"],
+            } for p in row["candidate_evidence"]],
+        } for row in evidence[key]]
+    raw = json.dumps(bundle, ensure_ascii=False, separators=(",", ":"))
+    if "audit_gt_" in raw or '"ground_truth"' in raw:
+        raise AssertionError("Never package official 6p GT person IDs")
+    BUNDLED_CANDIDATES.parent.mkdir(parents=True, exist_ok=True)
+    BUNDLED_CANDIDATES.write_text(raw + "\n", encoding="utf-8")
+    return {"bundled_candidates": sum(
+        len(r["candidate_evidence"])
+        for key in ("frame_audits", "holdout_frame_audits")
+        for r in bundle[key]
+    ), "manifest_sha256": sha256(raw.encode()).hexdigest()}
+
 
 def main():
     from ultralytics import YOLO
@@ -397,10 +442,12 @@ def main():
     OUTPUT.parent.mkdir(exist_ok=True, parents=True)
     OUTPUT.write_text(json.dumps(evidence, ensure_ascii=False, indent=2),
                       encoding="utf-8")
+    bundled = _write_candidate_bundle(evidence)
     print(json.dumps({
         "dataset": evidence["dataset"], "cameras": evidence["selected_cameras"],
         "GT": info, "summary": evidence["summary"],
         "holdout_summary": evidence["holdout_summary"],
+        "packaged_research_candidates": bundled,
         "camera_detection_counts": {
             camera: evidence["per_camera"][str(camera)]["total_model_person_detections"]
             for camera in (0, 1)},

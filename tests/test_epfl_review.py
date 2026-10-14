@@ -101,6 +101,55 @@ def test_reviews_append_only_and_prohibit_identity_outcome(client_and_users):
     assert cli.get("/api/research/epfl/candidates",headers=root).json()["reviewed_count"]==1
 
 
+
+def test_bundled_real_media_format_is_one_click_idempotent_and_admin_only(
+        client_and_users, tmp_path, monkeypatch):
+    import json
+    from app import epfl_review
+    main,cli,root,county=client_and_users
+    bundle=sample()
+    bundle["schema_version"]="epfl6p_anonymous_candidate_bundle_v1"
+    bundle["generated_from"]="real_video_owner_ci_detector_result"
+    # No official labels may enter the deployed matching runtime.
+    for k in ("frame_audits","holdout_frame_audits"):
+        for row in bundle[k]:
+            for pair in row["candidate_evidence"]:
+                pair.pop("audit_gt_cam0",None)
+                pair.pop("audit_gt_cam1",None)
+    manifest=tmp_path/"ci-real-pairs.json"
+    manifest.write_text(json.dumps(bundle),encoding="utf-8")
+    monkeypatch.setattr(epfl_review,"BUNDLED_CANDIDATES",manifest)
+    path="/api/research/epfl/bundled"
+    assert cli.get(path).status_code==401
+    assert cli.get(path,headers=county).status_code==403
+    assert cli.get(path,headers=root).json()["candidate_count"]==2
+    assert cli.post(path+"/import",headers=county,json={}).status_code==403
+    inserted=cli.post(path+"/import",headers=root,json={})
+    assert inserted.status_code==201,inserted.text
+    assert inserted.json()["origin"]=="ci_generated_research_bundle"
+    duplicate=cli.post(path+"/import",headers=root,json={})
+    assert duplicate.json()["already_present"] is True
+    result=cli.get("/api/research/epfl/candidates",headers=root).json()
+    assert result["candidate_count"]==2
+    assert result["review_source"]=="ci_generated_research_bundle"
+    assert all("audit_gt_" not in str(x) for x in result["candidates"])
+    with main.db() as c:
+        assert c.execute("SELECT COUNT(*) FROM epfl_pair_candidates").fetchone()[0]==2
+        assert c.execute("SELECT COUNT(*) FROM epfl_pair_reviews").fetchone()[0]==0
+        assert c.execute("SELECT COUNT(*) FROM synthetic_registry_runs").fetchone()[0]==0
+
+
+def test_bundled_missing_does_not_fake_success(client_and_users,
+                                                 tmp_path,monkeypatch):
+    from app import epfl_review
+    _,cli,root,_=client_and_users
+    monkeypatch.setattr(epfl_review,"BUNDLED_CANDIDATES",tmp_path/"missing.json")
+    a=cli.get("/api/research/epfl/bundled",headers=root)
+    assert a.status_code==200 and a.json()["available"] is False
+    b=cli.post("/api/research/epfl/bundled/import",headers=root,json={})
+    assert b.status_code==404
+
+
 def test_reject_wrong_video_and_nonmatching_geometry(client_and_users):
     _,cli,root,_=client_and_users
     raw=sample();raw["per_camera"]["0"]["sha256"]="0"*64

@@ -95,6 +95,7 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <div class="row"><label>本地打开 CI 中的六人研究报告 JSON（不会上传服务器）
 <input type="file" id="epflReportInput" accept=".json,application/json"></label>
 <button type="button" class="secondary" id="epflClearReport">清空研究报告</button>
+<button type="button" id="epflUseBundled" hidden>一键载入交付包内置真实人体关联候选</button>
 <button type="button" id="epflImportReport" hidden>导入当前候选到已有审核库（研究专用）</button>
 <button type="button" class="secondary" id="epflRefreshCandidates" hidden>刷新已保存的候选</button>
 <a class="small" href="https://github.com/yituanxing/test3/actions/workflows/zd-frigate-real-person.yml" target="_blank" rel="noopener noreferrer">查看已有 CI 工件来源</a></div>
@@ -417,6 +418,20 @@ async function start(){
  const [p,,actor]=await Promise.all([api('/api/places'),api('/api/cctv/datasets'),api('/api/auth/me')]);
  $('researchPanel').hidden=actor.level!==1;
  $('epflImportReport').hidden=actor.level!==1;
+ $('epflUseBundled').hidden=actor.level!==1;
+ if(actor.level===1){
+  try{
+   const status=await api('/api/research/epfl/bundled');
+   $('epflUseBundled').disabled=!status.available;
+   $('epflUseBundled').title=status.available?
+    ('内置真实双机候选 '+status.candidate_count+' 条'):
+    (status.reason||'当前不是含研究结果的CI演示包');
+   if(status.available){
+    $('epflReportStatus').textContent='已包含真实EPFL双机匿名关联结果 '+status.candidate_count+
+     ' 条。点击“一键载入”即可进入审核，不需要另下载视频。';
+   }
+  }catch(e){$('epflUseBundled').disabled=true}
+ }
  $('epflRefreshCandidates').hidden=actor.level!==1;
  $('epflReviewPanel').hidden=actor.level!==1;
  if(actor.level===1)await loadEpflCandidates();
@@ -563,6 +578,20 @@ $('epflReviewRows').addEventListener('click',e=>{
  const b=e.target.closest('button[data-epfl-key]');
  if(b)saveEpflReview(b.dataset.epflKey,b.dataset.epflVerdict);
 });
+async function useBundledEpflCandidates(){
+ $('epflUseBundled').disabled=true;
+ try{
+  const result=await api('/api/research/epfl/bundled/import','POST',{});
+  epflCurrentReportDigest=result.report_digest;epflCandidateOffset=0;
+  $('epflSummary').innerHTML='<span class="badge">真实视频生成 '+result.candidate_count+
+   ' 条同步匿名候选</span><span class="badge yellow">不包含脸部身份或真实预警</span>';
+  await loadEpflCandidates();
+  $('epflReportStatus').textContent='已使用交付包内置CI研究候选，不需要重新下载或训练视频。'+
+    '原视频及GT不在包内，候选审核不是现实人物身份认证。';
+ }catch(e){$('epflReviewStatus').textContent='内置研究候选无法加载：'+e.message}
+ finally{$('epflUseBundled').disabled=false}
+}
+$('epflUseBundled').addEventListener('click',useBundledEpflCandidates);
 $('epflImportReport').addEventListener('click',importEpflResearchCandidates);
 $('epflRefreshCandidates').addEventListener('click',()=>{epflCandidateOffset=0;loadEpflCandidates()});
 $('epflLoadMore').addEventListener('click',()=>loadEpflCandidates(true));
