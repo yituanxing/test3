@@ -82,6 +82,9 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <button id="qaNext" class="secondary" disabled onclick="changeQualityPage(1)">下一页</button>
 <span id="qaPageStatus" class="small">匿名事件列表第一页，按权限分页而不是截断成最多200条</span></div>
 <p id="qaStatus" class="small">暂无可审核目标；此处不会制造虚构人员或自动身份。</p>
+<div class="row"><button class="secondary" id="qaModelPreviewButton" onclick="viewSelectedModelEvidence()">查看本次YOLO轨迹的真实模型框画面</button>
+<span id="qaModelPreviewStatus" class="small">需选择上方已实际保存的 YOLO+ByteTrack 局部事件；官方GT帧与模型预测不会混淆。</span></div>
+<div class="viewport" id="qaModelPreviewContainer" hidden><img id="qaModelPreview" alt="真实视频上叠加经过存证的自动检测模型框，蓝色框，非CAVIAR人工GT" loading="lazy"></div>
 <div class="scroller"><table><thead><tr><th>审核记录ID</th><th>结论</th><th>依据</th><th>证据摘要</th></tr></thead>
 <tbody id="qaHistory"><tr><td colspan="4">选择一条实际匿名事件</td></tr></tbody></table></div>
 </section>
@@ -110,6 +113,7 @@ const token=sessionStorage.getItem('zd_access_token');if(!token)location.replace
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let imported=[],lastImage=null,qaOffset=0,qaNextOffset=null,qaPageSize=200;
+let qaPageRecords=new Map(),qaModelBlobUrl=null;
 async function api(path,method='GET',body){const r=await fetch(path,{method,
  headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
  body:body===undefined?undefined:JSON.stringify(body)});
@@ -139,6 +143,7 @@ async function refreshQuality(){
       ' 页；本页 '+response.returned+' 条匿名局部事件'+
       (qaNextOffset===null?'（末页）':'（仍有下一页）');
    const saved=$('qaOccurrence').value;
+   qaPageRecords=new Map(response.occurrences.map(x=>[x.occurrence_key,x]));
    $('qaOccurrence').innerHTML=response.occurrences.map(x=>
      '<option value="'+x.occurrence_key+'">'+esc(x.provider)+' / '+esc(x.camera_key)+
      ' / '+esc(x.track_id)+
@@ -155,8 +160,29 @@ async function changeQualityPage(direction){
   else{qaOffset=Math.max(0,qaOffset-qaPageSize)}
   await refreshQuality();
 }
+async function viewSelectedModelEvidence(){
+ const record=qaPageRecords.get($('qaOccurrence').value);
+ if(!record||record.provider!=='yolo_bytetrack'||!record.run_key||!record.source_id){
+  $('qaModelPreviewStatus').textContent='请选择有模型运行哈希的真实YOLO本机目标；不能用官方人工GT替代模型预测。';
+  $('qaModelPreviewContainer').hidden=true;return;
+ }
+ const url='/api/cctv/sources/'+record.source_id+'/model-frame?run_key='+
+    encodeURIComponent(record.run_key)+'&frame='+encodeURIComponent(record.first_seen);
+ try{
+  const reply=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+  if(!reply.ok){const payload=await reply.json();throw Error(payload.detail||'模型证据无法读取')}
+  if(qaModelBlobUrl)URL.revokeObjectURL(qaModelBlobUrl);
+  qaModelBlobUrl=URL.createObjectURL(await reply.blob());
+  $('qaModelPreview').src=qaModelBlobUrl;
+  $('qaModelPreviewContainer').hidden=false;
+  $('qaModelPreviewStatus').textContent='已根据原视频SHA256和模型版本 '+record.run_key.slice(0,12)+
+    ' 读取第 '+record.first_seen+' 帧蓝色真实自动模型框。此画面不是CAVIAR绿色人工真值，更不是身份证明。';
+ }catch(e){$('qaModelPreviewContainer').hidden=true;
+   $('qaModelPreviewStatus').textContent='真实模型证据不可用：'+e.message}
+}
 async function loadOccurrenceQuality(){
  const key=$('qaOccurrence').value;if(!key)return;
+ $('qaModelPreviewContainer').hidden=true;
  try{
    const d=await api('/api/site/occurrences/'+key+'/quality');
    const latest=d.reviews.at(-1);
