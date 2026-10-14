@@ -36,7 +36,7 @@
   if(main)main.innerHTML='<section class="panel" style="max-width:760px;margin:36px auto;padding:24px">'+
    '<h2>当前账号仅能使用获授权的辖区功能</h2>'+
    '<p>「'+feature+'」是州级管理员的合成人员业务实验。当前账号无该页面的数据或操作权限。</p>'+
-   '<p><a href="/portal">返回综合工作台</a> · <a href="/insights">查看辖区态势</a></p></section>';
+   '<p><a href="/real">返回真实数据工作台</a></p></section>';
   return true;
  }
  window.zdApplyRoleNavigation=apply;
