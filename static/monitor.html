@@ -128,11 +128,17 @@ async function pageEvidence(delta){
  await reload();
 }
 async function reload(){try{
-let scope=$('scopeRegion'), chosen=scope.value;
-let [r,o,f,h,obs,actor,activityDetail,places,sources]=await Promise.all([api('/api/regions'),
+ // Consult the authenticated role BEFORE issuing status calls. The global
+ // upstream Frigate health endpoint is intentionally admin-only, while
+ // all subordinate levels may see their own scoped local observations.
+ const actor=await api('/api/auth/me');
+ zdApplyRoleNavigation(actor);
+ let scope=$('scopeRegion'), chosen=scope.value;
+ let [r,o,f,h,obs,activityDetail,places,sources]=await Promise.all([api('/api/regions'),
   api('/api/monitoring/overview?days='+$('days').value+(chosen?'&region_id='+encodeURIComponent(chosen):'')),
-  api('/api/frigate/events?limit=30'+(chosen?'&region_id='+encodeURIComponent(chosen):'')),api('/api/frigate/status'),
-  api(evidenceQuery(chosen)),api('/api/auth/me'),api('/api/monitoring/face-activity?limit=50&days='+$('days').value+(chosen?'&region_id='+encodeURIComponent(chosen):'')),api('/api/places'),api('/api/sources')]);
+  api('/api/frigate/events?limit=30'+(chosen?'&region_id='+encodeURIComponent(chosen):'')),
+  actor.level===1?api('/api/frigate/status'):Promise.resolve({connected:false,restricted:true}),
+  api(evidenceQuery(chosen)),api('/api/monitoring/face-activity?limit=50&days='+$('days').value+(chosen?'&region_id='+encodeURIComponent(chosen):'')),api('/api/places'),api('/api/sources')]);
 scope.innerHTML='<option value="">全部区域</option>'+r.map(x=>`<option value="${x.id}">${esc(x.path)}</option>`).join('');
 if ([...scope.options].some(x=>x.value===chosen))scope.value=chosen;
 for(const [input,items,label] of [
@@ -163,7 +169,7 @@ $('faceQualityTotals').textContent='全部历史范围：抽样记录 '+obs.qual
 ' 个）。上述质量总数覆盖授权源全部历史；下表只显示当前筛选匹配的 '+obs.observations.length+
 ' 条视频帧。框审核筛选选中的是帧，仍可查看该帧其他框。尚未排除不等于真正确认人脸。';
 $('faceEvidence').innerHTML=obs.observations.flatMap(s=>s.boxes.map(b=>`<tr><td>${esc(s.source_name)}</td><td>${s.frame_index}</td><td>${s.video_offset_ms==null?'直播时间未知':s.video_offset_ms+'ms'}</td><td>${b.x},${b.y},${b.w},${b.h}</td><td>${esc(b.quality_state)} · Laplacian ${b.sharpness}</td><td>${esc(({false_positive:'误检（人工）',plausible:'可能人脸（人工）',unreviewed:'待复核'})[b.review_decision]||'待复核')} ${reviewButtons(s.id,b.id,actor.level===1)}</td><td><button class="subtle" onclick="previewFrame(${s.id})">看示意帧</button></td></tr>`)).slice(0,30).join('')||'<tr><td colspan="7">没有已保存的人脸框；抽样视频可能不包含人脸。不会伪造“识别成功”。</td></tr>';
-let stage=[['本地业务数据库','数据读取成功',true],['视频检测数据','已抽样帧 '+o.counts.sampled_frames+' 条（非身份识别）',o.counts.sampled_frames>0],['Frigate HTTP 接口',h.connected?'连接成功：'+h.upstream_version:'暂不可达',h.connected],['Frigate 真实推理','仅HTTP连通不能验证检测结果',false]];
+let stage=[['本地业务数据库','数据读取成功',true],['视频检测数据','已抽样帧 '+o.counts.sampled_frames+' 条（非身份识别）',o.counts.sampled_frames>0],['Frigate HTTP 接口',h.restricted?'上游全局连接状态仅州级管理员可查看':(h.connected?'连接成功：'+h.upstream_version:'暂不可达'),h.connected],['Frigate 真实推理','仅HTTP连通不能验证检测结果',false]];
 $('stages').innerHTML=stage.map((x,i)=>`<div class="stage"><div><div class="stname">${esc(x[0])}</div><div class="stnote">${esc(x[1])}</div></div><span class="status ${x[2]?'good':'warn'}">${x[2]?'已就绪':'需验证'}</span></div>`).join('');}catch(e){toast('状态读取失败：'+e.message,true)}}
 function reviewButtons(sample,box,authorized){
   if(!authorized)return '';
