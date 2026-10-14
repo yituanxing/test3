@@ -90,7 +90,7 @@ def run():
                         # truthful empty state. A real remote pair is verified
                         # separately in the cctv-real labelled CI step.
                         page.goto(base+"/cctv")
-                        expect(page.get_by_role("heading",name="真实监控视频 · 固定摄像机验收")).to_be_visible()
+                        expect(page.get_by_role("heading",name="真实监控与人体关联 · 验收工作台")).to_be_visible()
                         expect(page.locator("#place")).to_contain_text("测试场所 A")
                         expect(page.locator("#sources")).to_contain_text(
                             "尚无研究监控视频", timeout=12000)
