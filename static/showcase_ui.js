@@ -30,6 +30,9 @@ sidebar.innerHTML=`<div class="zd-brand"><span class="zd-logo">ZD</span><span>�
  <button class="zd-nav" data-panel="alerts"><span>♧</span> 视频活动提醒</button>
  <button class="zd-nav zd-research-only" data-panel="acceptance"><span>☑</span> 需求验收</button>
  <div class="zd-sidebar-bottom"><span class="zd-status-light"></span> 本地运行 <a href="#" id="logout">退出</a></div>`;
+// Do not expose synthetic-business routes in real-only deployments.
+const withheldBusinessLinks=[...sidebar.querySelectorAll('a[href="/base"],a[href="/business"]')];
+withheldBusinessLinks.forEach(link=>link.remove());
 const work=document.createElement("div");work.className="zd-work";
 const top=document.createElement("div");top.className="zd-top";
 top.innerHTML='<strong id="moduleTopTitle">系统总览</strong><span>真实录像技术原型 · 本地访问</span>';
@@ -232,6 +235,19 @@ api("/api/auth/me").then(actor=>{
   byId("overviewKpis").innerHTML='<div><b>—</b><span>研究视频仅向研究管理员开放</span></div>';
   byId("overviewEvidenceStatus").textContent="当前账号仅显示授权辖区数据；可进入设备与采集页面。";
   showPanel("live",false);
- }else loadBundledClip();
+ }else{
+  loadBundledClip();
+  fetch("/api/insights/overview?days=7",{headers:{Authorization:"Bearer "+sessionStorage.getItem("zd_access_token")}})
+  .then(response=>{
+    if(response.ok){
+      const roster=withheldBusinessLinks.find(link=>link.getAttribute("href")==="/base");
+      const rules=withheldBusinessLinks.find(link=>link.getAttribute("href")==="/business");
+      if(roster)sidebar.querySelector('a[href="/portal?tab=alerts"]')?.before(roster);
+      if(rules)sidebar.querySelector('a[href="/cctv"]')?.before(rules);
+    }else if(response.status===410){
+      sidebar.querySelectorAll('a[href="/portal"],a[href="/portal?tab=alerts"],a[href="/insights"]').forEach(link=>link.remove());
+    }
+  }).catch(()=>{});
+ }
 }).catch(e=>{byId("overviewVideoState").textContent="会话检查失败，请重新登录"});
 })();
