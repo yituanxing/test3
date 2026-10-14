@@ -27,6 +27,37 @@ MODEL_LICENSE = "Ultralytics YOLO11n: AGPL-3.0 / Enterprise (review before comme
 _lock = Lock()
 
 
+def count_iou50_matches(predicted_xyxy, published_gt_xyxy):
+    """One-to-one frame-level COCO-person detection vs independently held GT.
+
+    Transparent evaluation bookkeeping; no tracker/detector/identity algorithm
+    here. Greedy descending IoU forbids one YOLO box crediting two people.
+    """
+    predictions=[tuple(float(v) for v in box) for box in predicted_xyxy]
+    truth=[tuple(float(v) for v in box) for box in published_gt_xyxy]
+    candidates=[]
+    for pi,p in enumerate(predictions):
+        for gi,g in enumerate(truth):
+            intersection_w=max(0.,min(p[2],g[2])-max(p[0],g[0]))
+            intersection_h=max(0.,min(p[3],g[3])-max(p[1],g[1]))
+            inter=intersection_w*intersection_h
+            area_p=max(0.,p[2]-p[0])*max(0.,p[3]-p[1])
+            area_g=max(0.,g[2]-g[0])*max(0.,g[3]-g[1])
+            union=area_p+area_g-inter
+            overlap=inter/union if union>0 else 0.
+            if overlap>=.5:
+                candidates.append((overlap,pi,gi))
+    used_p=set()
+    used_g=set()
+    for _,pi,gi in sorted(candidates,reverse=True):
+        if pi in used_p or gi in used_g:
+            continue
+        used_p.add(pi)
+        used_g.add(gi)
+    return {"tp":len(used_p),"fp":len(predictions)-len(used_p),
+            "fn":len(truth)-len(used_g)}
+
+
 @lru_cache(maxsize=1)
 def _model():
     try:
@@ -65,15 +96,22 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
         track_activation_threshold=activation_threshold,
         high_conf_det_threshold=activation_threshold)
     stop=min(max_frames,int(record["frames_available"]))
-    gt_counts=dict(c.execute("""SELECT frame_number,COUNT(*) FROM public_cctv_track_boxes
-        WHERE source_id=? AND frame_number<=? GROUP BY frame_number""",
-        (source_id,stop)).fetchall())
+    official_by_frame={}
+    for box in c.execute("""SELECT frame_number,x,y,width,height
+        FROM public_cctv_track_boxes WHERE source_id=? AND frame_number<=?""",
+        (source_id,stop)):
+        official_by_frame.setdefault(int(box["frame_number"]),[]).append(
+            [box["x"],box["y"],box["x"]+box["width"],box["y"]+box["height"]])
+    gt_counts={frame:len(boxes) for frame,boxes in official_by_frame.items()}
     cap=cv2.VideoCapture(str(file))
     if not cap.isOpened():
         raise HTTPException(409,"官方CAVIAR实视频无法打开")
     decoded=0
     sampled=0
     predicted=0
+    gt_tp=0
+    gt_fp=0
+    gt_fn=0
     tracked=0
     ids=set()
     frame_summaries=[]
@@ -94,6 +132,13 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
                 boxes=raw.boxes
                 coords=boxes.xyxy.cpu().numpy().astype(np.float32)
                 scores=boxes.conf.cpu().numpy().astype(np.float32)
+                # Published CVML rectangles are used ONLY after independent
+                # YOLO prediction as held-out spatial truth. Never detector input.
+                matched=count_iou50_matches(
+                    coords,official_by_frame.get(frame_num,[]))
+                gt_tp+=matched["tp"]
+                gt_fp+=matched["fp"]
+                gt_fn+=matched["fn"]
                 detector_input=sv.Detections(
                     xyxy=coords.reshape((-1,4)),
                     confidence=scores,
@@ -127,6 +172,9 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
                     "automatically_detected_person_boxes":len(scores),
                     "existing_tracker_assigned_boxes":len(actual_ids),
                     "official_manual_boxes_for_reference":gt_counts.get(frame_num,0),
+                    "detection_iou50_true_positives":matched["tp"],
+                    "detection_iou50_false_positives":matched["fp"],
+                    "detection_iou50_false_negatives":matched["fn"],
                 })
     finally:
         cap.release()
@@ -148,6 +196,19 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
         "camera_local_tracker_ids":len(ids),
         "published_gt_boxes_on_inferred_frames":sum(
             gt_counts.get(x["frame_number"],0) for x in frame_summaries),
+        "detection_evaluation":{
+            "method":"one_to_one_bbox_IoU_0.50_against_published_CAVIAR_CVML",
+            "evaluated_frames":sampled,
+            "true_positives":gt_tp,"false_positives":gt_fp,
+            "false_negatives":gt_fn,
+            "precision":round(gt_tp/(gt_tp+gt_fp),4) if gt_tp+gt_fp else None,
+            "recall":round(gt_tp/(gt_tp+gt_fn),4) if gt_tp+gt_fn else None,
+            "f1":round(2*gt_tp/(2*gt_tp+gt_fp+gt_fn),4)
+                 if 2*gt_tp+gt_fp+gt_fn else None,
+            "confidence_threshold":confidence,
+            "global_person_identity_evaluated":False,
+            "manual_ground_truth_used_as_detector_input":False,
+        },
         "frame_summaries":frame_summaries,
         "local_track_boxes":local_boxes,
         "model_run_recorded":False,
@@ -161,7 +222,8 @@ def run_real_person_detector(c,source_id:int,*,max_frames:int=32,
         "clock_basis":"archival_video_frame_index",
         "limitation":"这是现成YOLO11n在官方CAVIAR MPEG解码帧上的人员检测＋现成ByteTrack本机跟踪；"
                      "抽样步长会改变跟踪的帧间时间，官方框只作独立参考。"
-                     "没进行跨镜头同人识别、身份核验、精确率/召回率标定；模型适用性与AGPL授权需单独核验。",
+                     "仅量化与公开人工人体框的帧级IoU=0.50匹配精度，不是人物身份正确率。"
+                     "没进行跨镜头同人识别或身份核验；模型适用性、误检代价与AGPL授权仍需单独核验。",
     }
 
 
