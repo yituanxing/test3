@@ -389,7 +389,8 @@ def tracking_baseline(source_id:int,request:Request,
 def person_detector_baseline(source_id:int,request:Request,
                              max_frames:int=Query(32,ge=1,le=64),
                              sample_every:int=Query(1,ge=1,le=4),
-                             confidence:float=Query(.25,ge=.1,le=.9)):
+                             confidence:float=Query(.25,ge=.1,le=.9),
+                             image_size:int=Query(640,ge=640,le=960)):
     """Real pretrained YOLO + mature ByteTrack, NOT GT-injected tracking.
 
     Optional dependency; no user-defined model filename or arbitrary URL.
@@ -398,15 +399,20 @@ def person_detector_baseline(source_id:int,request:Request,
     from app.person_detection_adapter import run_real_person_detector
     with _db() as c:
         access.check_source(c,request,source_id)
-        return run_real_person_detector(c,source_id,max_frames=max_frames,
-                 sample_every=sample_every,confidence=confidence)
+        options={'max_frames':max_frames,'sample_every':sample_every,
+                 'confidence':confidence}
+        if image_size not in (640,960):
+            raise HTTPException(422,'研究模型输入尺度仅支持640或960')
+        if image_size!=640:options['image_size']=image_size
+        return run_real_person_detector(c,source_id,**options)
 
 
 @router.post('/api/cctv/sources/{source_id}/person-detector-run')
 def save_person_detector_evidence(source_id:int,request:Request,
                              max_frames:int=Query(32,ge=1,le=64),
                              sample_every:int=Query(1,ge=1,le=4),
-                             confidence:float=Query(.25,ge=.1,le=.9)):
+                             confidence:float=Query(.25,ge=.1,le=.9),
+                             image_size:int=Query(640,ge=640,le=960)):
     """Append proven YOLO+ByteTrack local boxes into canonical evidence index.
 
     The resulting records are archival frame-relative occurrences only,
@@ -417,8 +423,12 @@ def save_person_detector_evidence(source_id:int,request:Request,
         run_real_person_detector,persist_detection_run)
     with _db() as c:
         access.check_source(c,request,source_id)
-        result=run_real_person_detector(c,source_id,max_frames=max_frames,
-                sample_every=sample_every,confidence=confidence)
+        options={'max_frames':max_frames,'sample_every':sample_every,
+                 'confidence':confidence}
+        if image_size not in (640,960):
+            raise HTTPException(422,'研究模型输入尺度仅支持640或960')
+        if image_size!=640:options['image_size']=image_size
+        result=run_real_person_detector(c,source_id,**options)
         saved=persist_detection_run(c,result)
         admin.audit(c,"caviar_real_person_detector",
                     f"source:{source_id}",None,{
