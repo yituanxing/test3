@@ -27,7 +27,7 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <a href="/monitor">采集状态</a><a href="/admin">授权源配置</a>
 <a href="#" id="logout">退出</a></nav></header>
 <main><h1>仅真实视频 · 事件与证据</h1>
-<p class="small">真正由视频采集、Frigate 和真实录制素材支撑的数据；没有 P### 虚构到访，没有模拟预警。</p>
+<p class="small">视频检测、匹配及活动证据全部来自实际视频；活动告警只采用明确标记的 Demo 演示规则，不冒充真实风险。</p>
 <div class="caveat"><b>验收模式：不补造数据。</b>
 只有接入、解码、检测并保存真实事件后才会出现数值。
 摄像机内匿名目标事件不等于不同人数，同一人可能重复计数；两摄像机出现的目标不能自动合并为同一个人。
@@ -57,6 +57,14 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <div class="scroll"><table><thead><tr><th>片段编号</th><th>录像开始</th><th>录像结束</th><th>双机配对帧数</th><th>研究范围</th></tr></thead>
 <tbody id="activityTable"><tr><td colspan="5">未导入时不生成任何人员数据</td></tr></tbody></table></div>
 <p id="activityEvidence" class="small"></p>
+</section>
+<section class="box" id="demoAlerts">
+<h2>录像活动预警 · 明确标记为演示规则</h2>
+<p class="small"><b>真实输入：</b>EPFL 两路录制视频中的人体检测和跨时刻活动片段。<b>模拟部分：</b>触发规则由 Demo 设定，不代表现实违法、危险、实名身份，也不会向任何人发送告警。
+一条告警必须包含可追溯的真实匹配记录；跨时间关联若未通过核验则不产生对应告警。</p>
+<span id="demoAlertState" class="small">等待已验证的活动证据</span>
+<div class="scroll"><table><thead><tr><th>演示告警ID</th><th>规则</th><th>录像时间</th><th>来源</th><th>证据</th><th>性质</th></tr></thead>
+<tbody id="demoAlertRows"><tr><td colspan="6">暂无由真实视频活动触发的演示告警</td></tr></tbody></table></div>
 </section>
 <section class="box"><h2>真实研究视频的独立证据</h2>
 <div id="research">加载中</div><p class="small">这里展示官方公开片段的相机内轨迹标注，不代表已经自动完成跨机同人识别，也不是实时监控数据。</p>
@@ -130,8 +138,21 @@ async function loadActivity(){
     '跨帧关联未通过验证，只展示真实同帧双机活动')+'；不含合成人员';
   $('activityEvidence').textContent='视频源SHA256: '+response.camera_sha256.map(x=>x.slice(0,16)+'…').join(' / ')+
     '；片段V编号仅在本段录像内有效，不代表自然人身份、唯一人数或跨场所轨迹。';
+  await loadDemoAlerts();
  }catch(e){state.textContent='读取真实双机活动失败：'+e.message}
  finally{button.disabled=false}
+}
+async function loadDemoAlerts(){
+ try{
+  const data=await api('/api/real/demo-alerts');
+  $('demoAlertState').textContent=data.alerts.length+' 条演示规则触发，全部有真实录像证据；不是实际风险预警';
+  $('demoAlertRows').innerHTML=data.alerts.map(a=>
+   '<tr><td>'+esc(a.demo_alert_id)+'</td><td>'+esc(a.rule_name)+'</td><td>'+
+   esc(a.start_video_second)+'秒 → '+esc(a.end_video_second)+'秒</td><td>'+
+   esc(a.anonymous_fragment_id)+' / EPFL 两摄像机</td><td>'+
+   a.supporting_candidate_keys.length+'条源匹配</td><td>仅演示规则，非真实风险</td></tr>'
+  ).join('')||'<tr><td colspan="6">无经过视频证据支持的预警。不会制造假人员或假到访。</td></tr>';
+ }catch(e){$('demoAlertState').textContent='演示告警查询失败：'+e.message}
 }
 $('loadActivity').onclick=loadActivity;
 loadActivity();
