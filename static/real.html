@@ -21,56 +21,148 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 .scroll{overflow:auto}th{white-space:nowrap;color:#57718d}
 #message{color:#557395;font-size:12px}
 @media(max-width:800px){.cards{grid-template-columns:repeat(2,1fr)}main{padding:16px}header{padding:15px}}
+
+:root{--ink:#172942;--muted:#61718a;--line:#dfE6ef;--blue:#2862b2;--surface:#fff;--paper:#f5f7fb}
+html{scroll-behavior:smooth}
+body{background:var(--paper);font:15px/1.65 system-ui,"Microsoft YaHei",sans-serif}
+header{background:#142941;padding:14px max(24px,calc((100vw - 1240px)/2));gap:12px}
+header b{font-size:17px;letter-spacing:.3px}
+header nav{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+header nav a{font-size:13px;margin:0;padding:6px 10px;border-radius:6px}
+header nav a[aria-current="page"]{background:#244d78;color:white}
+main{max-width:1240px;padding:0 24px 75px}
+h1{font-size:34px;line-height:1.35;letter-spacing:-.025em}
+h2{font-size:21px;margin-bottom:10px;line-height:1.45}
+h3{font-size:16px}
+p{margin:8px 0 12px}
+button{background:#2862b2;border-color:#2862b2;border-radius:8px;font-weight:620}
+button:hover{background:#1b4b90}
+button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #83b8fb;outline-offset:3px}
+button:disabled{opacity:.55;cursor:wait}
+select{max-width:100%;background:white;color:#24364c}
+.box{margin-top:16px;box-shadow:0 1px 9px rgba(24,44,72,.04);border-radius:15px;padding:24px}
+.box .small{line-height:1.8}
+.cards{gap:10px}
+.card{border-radius:10px;background:#f5f8fc;padding:14px 16px;box-shadow:none}
+.card strong{font-size:30px;font-weight:760;line-height:1.4;color:#153d70}
+.card .small{line-height:1.45}
+.scroll{overflow:auto}
+table{width:100%;font-size:12px}
+td,th{padding:10px;border-color:#e7edf5}
+th{background:#f5f7fa}
+details{border-radius:10px}
+details>summary{cursor:pointer;color:#205a98;font-weight:650;list-style-position:inside}
+details>summary:hover{text-decoration:underline}
+.story-hero{color:#fff;background:linear-gradient(125deg,#122c50,#1b5686 70%,#227a98);border-radius:0 0 21px 21px;padding:34px 36px 28px;margin:0 -12px 22px}
+.story-hero h1{color:white;margin:6px 0 12px}
+.story-hero p{color:#dceaf4;max-width:780px;line-height:1.85}
+.story-hero .topline{color:#a5dff4;letter-spacing:.12em;font-size:12px;font-weight:700}
+.story-hero .hero-links{display:flex;flex-wrap:wrap;gap:9px;margin-top:22px}
+.story-hero .hero-links a{color:white;text-decoration:none;background:rgba(255,255,255,.12);border:1px solid #ffffff32;padding:9px 13px;border-radius:9px;font-weight:600}
+.story-hero .hero-links a:hover{background:rgba(255,255,255,.2)}
+.source-notice{background:#ebf3fc;border:1px solid #cbdced;border-radius:12px;padding:14px 18px;color:#284969;display:flex;gap:14px;align-items:flex-start;margin-bottom:24px}
+.source-notice strong{white-space:nowrap;color:#1e4b7c}
+.story-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:27px}
+.story-steps a{background:white;border:1px solid var(--line);border-radius:12px;padding:14px 15px;color:#263c59;text-decoration:none}
+.story-steps a:hover{border-color:#6398d3;box-shadow:0 3px 16px #2b4f7518}
+.story-steps small{display:block;color:#66839f;font-size:12px;margin-bottom:4px}
+.story-steps strong{font-size:16px}
+.story-steps span{display:block;font-size:12px;color:var(--muted)}
+.stage-head{display:flex;gap:15px;align-items:flex-start;scroll-margin-top:24px;margin:40px 0 8px}
+.stage-number{background:#244f80;color:#fff;width:36px;height:36px;display:grid;place-items:center;border-radius:11px;font-weight:800;flex:none}
+.stage-head h2{margin:0 0 3px;font-size:22px}
+.stage-head p{margin:0;color:var(--muted);font-size:13px}
+.section-source{font-size:12px;color:#53728d}
+.flow-guide{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+.flow-guide article{border-radius:11px;background:#f3f7fc;padding:16px;border:1px solid #dce7f1}
+.flow-guide article strong{display:block;margin-bottom:4px}
+.flow-guide article p{font-size:13px;color:var(--muted);margin:0}
+.focus-table{margin:14px 0 0}
+.focus-table summary{padding:9px 0}
+#researchActivity .cards{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:16px}
+#realSceneAggregation{padding:27px}
+#realSceneAggregation>div[style*="display:flex;gap:22px"]{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,.94fr);gap:32px!important}
+#realSceneAggregation>div[style*="display:flex;gap:22px"]>div:first-child{min-width:0!important;flex:initial!important}
+#realSceneAggregation>div[style*="display:flex;gap:22px"]>div:last-child{min-width:0!important;flex:initial!important}
+#realSceneAggregation div[style*="position:relative;width:min(100%,320px)"]{width:min(100%,440px)!important;margin:14px auto 20px}
+#realSceneAggregation label{display:inline-block;font-size:13px;font-weight:650;color:#405a78}
+#sceneHeatGrid{box-shadow:0 0 0 9px #f1f5fa;border-radius:9px!important}
+#sceneHeatGrid button{color:#285073}
+#sceneFrameCursor{accent-color:#2862b2;cursor:pointer;margin:12px 0}
+#sceneMetrics{grid-template-columns:repeat(4,minmax(0,1fr));margin:18px 0!important}
+#sceneZoneSummary{font-size:13px;padding:10px 13px;background:#f3f7fc;border-radius:8px}
+#sceneVirtualCrossSummary{font-size:13px;line-height:1.8}
+#sceneTrackSummary{font-size:13px;line-height:1.8}
+#sceneZoneRows,#sceneEventRows,#sceneTrackRows,#sceneVirtualCrossRows{font-size:12px}
+#demoAlerts .scroll{max-height:230px}
+#sceneZoneRows,#sceneEventRows{max-height:220px}
+.disclosure-card{background:white;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:12px 0}
+.disclosure-card>summary{font-size:14px}
+.operation-notice{padding:12px 15px;background:#fff8eb;border-left:3px solid #cb933a;border-radius:6px;color:#665332;font-size:13px;margin-top:12px}
+.system-footer{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0}
+.system-footer a{background:white;border:1px solid var(--line);border-radius:11px;padding:15px;text-decoration:none;color:#205184;font-weight:700}
+.system-footer a span{display:block;color:var(--muted);font-size:12px;font-weight:400}
+#technicalArea{margin-top:40px;padding-top:3px}
+#technicalArea .box{margin-top:12px}
+#excelAcceptance .cards{grid-template-columns:repeat(4,minmax(0,1fr))}
+#message{color:#315c88}
+@media(max-width:970px){
+ .story-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .flow-guide{grid-template-columns:1fr}
+ #realSceneAggregation>div[style*="display:flex;gap:22px"]{grid-template-columns:1fr!important}
+ #sceneMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .system-footer{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+ main{padding:0 15px 45px}header{padding:13px}
+ .story-hero{margin:0 -15px 18px;padding:25px 22px}
+ h1{font-size:27px}
+ .story-steps{gap:8px}
+ .story-steps a{padding:10px}
+ .source-notice{display:block}
+ .source-notice strong{display:block;margin-bottom:5px}
+ .box{padding:17px}
+ #researchActivity .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #realSceneAggregation{padding:17px}
+ .card strong{font-size:26px}
+ #excelAcceptance .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 </style></head><body>
-<header><b>ZD · 真实数据工作台</b><nav>
-<a href="/real">真实数据首页</a><a href="/cctv">真实视频与匿名轨迹</a>
-<a href="/monitor">采集状态</a><a href="/admin">授权源配置</a>
-<a href="#" id="logout">退出</a></nav></header>
-<main><h1>仅真实视频 · 事件与证据</h1>
-<p class="small">视频检测、匹配及活动证据全部来自实际视频；活动告警只采用明确标记的 Demo 演示规则，不冒充真实风险。</p>
-<div class="caveat"><b>验收模式：不补造数据。</b>
-只有接入、解码、检测并保存真实事件后才会出现数值。
-摄像机内匿名目标事件不等于不同人数，同一人可能重复计数；两摄像机出现的目标不能自动合并为同一个人。
-公开 CAVIAR 研究片段采用帧号时钟，不能计入当日实况。
-</div>
-<div class="box"><label>实况窗口（UTC）<select id="days"><option value="1">近1天</option>
-<option value="7" selected>近7天</option><option value="30">近30天</option></select></label>
-<button id="refresh">刷新真实证据</button> <span id="message">尚未加载</span></div>
-<div class="cards" style="margin-top:16px">
-<div class="card"><span class="small">实际 Frigate person 事件</span><strong id="realEvents">—</strong><span class="small">事件数，不是人数</span></div>
-<div class="card"><span class="small">实际视频抽样帧</span><strong id="frames">—</strong><span class="small">不含模拟观测</span></div>
-<div class="card"><span class="small">实际检测到的人脸框</span><strong id="faces">—</strong><span class="small">不代表身份识别</span></div>
-<div class="card"><span class="small">可信跨机身份</span><strong>未验证</strong><span class="small">不编造全球Person ID</span></div>
-</div>
-<section class="box"><h2>真实视频 · 按场所的证据统计</h2>
-<p class="small">仅返回当前账号授权辖区；无接入则显示0而不造事件。</p>
-<div class="scroll"><table><thead><tr><th>场所</th><th>真实目标事件</th><th>视频抽样帧</th><th>人脸候选框</th><th>已绑定Frigate摄像机</th></tr></thead><tbody id="places"><tr><td colspan="5">加载中</td></tr></tbody></table></div></section>
-<section class="box"><h2>可追溯的实际 Frigate 目标事件</h2>
-<p class="small">包含真实发生时间、摄像机、上游事件ID、检测评分。无真实事件不展示模拟记录。</p>
-<div class="scroll"><table><thead><tr><th>发生时间（UTC）</th><th>场所</th><th>摄像机</th><th>上游事件ID</th><th>检测置信度</th><th>结束时间</th></tr></thead>
-<tbody id="events"><tr><td colspan="6">加载中</td></tr></tbody></table></div><p id="tail" class="small"></p></section>
+<header><b>ZD · 视频活动分析</b><nav aria-label="主导航">
+<a href="/real" aria-current="page">演示首页</a><a href="/cctv">双机检测证据</a>
+<a href="/monitor">设备接入</a><a href="/admin">区域与权限</a>
+<a href="#" id="logout">退出登录</a></nav></header>
+<main>
+<section class="story-hero" id="introDemo">
+<div class="topline">ZD VIDEO ANALYTICS · 技术原型演示</div>
+<h1>从两路真实录像，看见人员活动</h1>
+<p>两台摄像机分别拍摄同一实验室。系统将真实检测结果对应起来，展示短时间活动、室内空间分布和可调整的演示提醒。按下面四步查看，不需要读懂后台算法。</p>
+<div class="hero-links"><a href="#researchActivity">开始演示 ↓</a><a href="#realSceneAggregation">查看空间活动</a><a href="#demoAlerts">查看提醒</a></div>
+</section>
+<div class="source-notice"><strong>数据来源：真实研究录像</strong><span>EPFL 同一实验室的两机同步录制视频，非你的实时摄像机。画面对应的配对、位置和短时间活动来自真实检测；区域划分和提醒阈值是演示规则，不代表风险。</span></div>
+<nav class="story-steps" aria-label="演示步骤">
+<a href="#researchActivity"><small>STEP 01 · 视频</small><strong>双机检测</strong><span>确认两路视频已经对应</span></a>
+<a href="#realSceneAggregation"><small>STEP 02 · 空间</small><strong>活动轨迹</strong><span>看短轨迹和虚拟跨区</span></a>
+<a href="#demoAlerts"><small>STEP 03 · 规则</small><strong>活动提醒</strong><span>修改区域和人数阈值</span></a>
+<a href="#technicalArea"><small>STEP 04 · 管理</small><strong>系统与验收</strong><span>查看设备、权限和Excel</span></a>
+</nav>
+<div class="stage-head"><span class="stage-number">1</span><div><h2>先确认：视频已经被识别</h2><p>看观测次数和匿名片段，点击一次即可导入包内的真实研究视频检测证据。</p></div></div>
 <section class="box" id="researchActivity">
-<h2>真实双摄像机 · 匿名人员活动</h2>
-<p class="small">EPFL 六人实验室，两路真实同步录像。位置标定与 YOLO 检测得到同一视频时刻的跨摄像机配对；跨帧关联必须另过真实标注验收，没通过就只展示同帧活动记录。这不是跨场所身份或今天的实况。</p>
+<h2>已检测的双摄像机录像</h2>
+<p class="small">使用两台摄像机拍摄的同一个真实实验室。程序会导入已经完成YOLO检测的录像证据；这里展示的是配对观测和短时匿名关联，<b>不是独立人数、实名身份或现场实时监控</b>。</p>
 <div><button id="loadActivity">导入真实双机研究证据</button> <span id="activityState" class="small">尚未读取证据</span></div>
 <div id="activityStats" class="cards" style="margin-top:14px"></div>
-<div class="scroll"><table><thead><tr><th>片段编号</th><th>录像开始</th><th>录像结束</th><th>双机配对帧数</th><th>研究范围</th></tr></thead>
-<tbody id="activityTable"><tr><td colspan="5">未导入时不生成任何人员数据</td></tr></tbody></table></div>
+<details class="focus-table"><summary>查看各条匿名检测片段的详细帧号</summary><div class="scroll"><table><thead><tr><th>片段编号</th><th>录像开始</th><th>录像结束</th><th>双机配对帧数</th><th>研究范围</th></tr></thead>
+<tbody id="activityTable"><tr><td colspan="5">未导入时不生成任何人员数据</td></tr></tbody></table></div></details>
 <p id="activityEvidence" class="small"></p>
 </section>
-<section class="box" id="demoAlerts">
-<h2>录像活动预警 · 明确标记为演示规则</h2>
-<p class="small"><b>真实输入：</b>EPFL 两路录制视频中的人体检测和跨时刻活动片段。<b>模拟部分：</b>触发规则由 Demo 设定，不代表现实违法、危险、实名身份，也不会向任何人发送告警。
-一条告警必须包含可追溯的真实匹配记录；跨时间关联若未通过核验则不产生对应告警。</p>
-<span id="demoAlertState" class="small">等待已验证的活动证据</span>
-<div class="scroll"><table><thead><tr><th>演示告警ID</th><th>规则</th><th>录像时间</th><th>来源</th><th>证据</th><th>性质</th></tr></thead>
-<tbody id="demoAlertRows"><tr><td colspan="6">暂无由真实视频活动触发的演示告警</td></tr></tbody></table></div>
-</section>
+
+<div class="stage-head"><span class="stage-number">2</span><div><h2>再看看：人在实验室里怎样活动</h2><p>这是本次演示的核心。左边可选短轨迹并拖动进度，右边按你的区域与阈值展示结果。</p></div></div>
 <section class="box" id="realSceneAggregation">
-<h2>双机真实录像 · 室内位置示意与区域活动规则</h2>
-<p class="small">直接读取EPFL两台真实摄像机的检测配对坐标，投影到<strong>8×8示意网格</strong>。
+<h2>观察人在空间中的活动</h2>
+<p class="small">下方格子来自两路真实录制视频的匿名检测位置。先选择短时片段，再拖动时间进度条；可点击格子设置区域，查看检测数量变化。
 可以逐个录像采样帧播放区域热度，查看场景内活动分布变化；<strong>颜色变化不等于同一个人的移动轨迹</strong>。
-网格不是实测建筑平面图、真实GPS或经纬度。红框是演示区域，点击格子可重新选择区域（固定2×2）。</p>
+网格不是实测建筑平面图、真实GPS或经纬度。红框代表你选择的演示区域，紫线是同一实验室的虚拟A/B分界。</p>
 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
 <label>同帧双机配对数阈值 <select id="sceneCountThreshold"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
 <button id="sceneRefresh">重新计算真实录像</button>
@@ -92,8 +184,8 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 两区只是同一个EPFL实验室内的演示分区，绝非两个真实场所。</div>
 <p id="sceneVirtualCrossSummary" class="small">等待真实录像核验。</p>
 <div class="scroll" style="max-height:140px"><table><thead><tr><th>短时匿名片段</th><th>真实观测帧</th><th>虚拟区域变化</th></tr></thead>
-<tbody id="sceneVirtualCrossRows"><tr><td colspan="3">未导入时不生成跨区记录</td></tr></tbody></table></div>
-<div class="scroll" style="max-height:180px"><table><thead><tr><th>匿名片段</th><th>真实录像帧</th><th>双摄像机来源</th></tr></thead><tbody id="sceneTrackRows"><tr><td colspan="3">尚无已验证短时片段</td></tr></tbody></table></div>
+<tbody id="sceneVirtualCrossRows"><tr><td colspan="3">未导入时不生成跨区记录</td></tr></tbody></table></div></details>
+<details class="focus-table"><summary>查看短轨迹的源视频帧号</summary><div class="scroll" style="max-height:180px"><table><thead><tr><th>匿名片段</th><th>真实录像帧</th><th>双摄像机来源</th></tr></thead><tbody id="sceneTrackRows"><tr><td colspan="3">尚无已验证短时片段</td></tr></tbody></table></div></details>
 <div style="margin-top:10px">
 <label>真实录像采样帧：<span id="sceneFrameLabel">汇总热度</span></label>
 <input type="range" id="sceneFrameCursor" min="0" max="0" value="0" style="width:100%">
@@ -104,26 +196,69 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <p id="sceneFrameInfo" class="small">选择采样帧，只显示该时刻落入各格子的双摄像机配对观测次数。</p>
 </div>
 <div style="flex:1;min-width:300px">
-<h3 style="margin:0 0 5px;font-size:15px">区域规则：真实视频活动进入红框</h3>
+<h3 style="margin:0 0 5px;font-size:17px">区域提醒：红框内出现了什么？</h3>
 <p id="sceneZoneSummary" class="small">视频加载后显示源帧号和观测数量；区域是人为指定的演示规则，不是实际警情。</p>
-<div class="scroll"><table><thead><tr><th>录像帧</th><th>区域配对观测</th><th>依据</th><th>性质</th></tr></thead>
-<tbody id="sceneZoneRows"><tr><td colspan="4">等待真实视频证据</td></tr></tbody></table></div>
-<h3 style="margin:16px 0 5px;font-size:15px">同帧检测数量阈值提醒</h3>
-<div class="scroll"><table><thead><tr><th>录像帧</th><th>配对观测</th><th>规则阈值</th></tr></thead>
-<tbody id="sceneEventRows"><tr><td colspan="3">等待真实视频证据</td></tr></tbody></table></div>
+<details class="focus-table"><summary>展开查看逐帧区域证据</summary><div class="scroll"><table><thead><tr><th>录像帧</th><th>区域配对观测</th><th>依据</th><th>性质</th></tr></thead>
+<tbody id="sceneZoneRows"><tr><td colspan="4">等待真实视频证据</td></tr></tbody></table></div></details>
+<h3 style="margin:16px 0 5px;font-size:17px">检测数量达到阈值的时刻</h3>
+<details class="focus-table"><summary>展开查看达到阈值的录像帧</summary><div class="scroll"><table><thead><tr><th>录像帧</th><th>配对观测</th><th>规则阈值</th></tr></thead>
+<tbody id="sceneEventRows"><tr><td colspan="3">等待真实视频证据</td></tr></tbody></table></div></details>
 </div></div>
 <p class="small"><strong>验收边界：</strong>这里的点位只在录像标定坐标系中有效，聚合观测次数不能当作独立人数。
 已验证的约1秒匿名跨帧片段在图上以短线段显示，支持查询来源帧及两机检测框索引；不会跨越没有被证实的时间间隔，也不代表人脸实名身份。
 **两机属于同一个实验室，因此这是跨摄像机/局部区域示意，绝不是跨真实场所或GPS路径。**</p>
 </section>
-<details class="box" id="excelRuleShowcase">
-<summary style="cursor:pointer;font-weight:600">仅供Excel算法技术核对：七类旧规则的虚构测试样本（默认不加载、不作为真实预警）</summary>
-<h2>旧版七类规则单独验算（不属于本真实视频链路）</h2>
-<p class="small"><b>注意：此区的人员 P###、到访和场所全部是明确虚构的规则样本。</b>它调用项目已实现的七种规则算法，
-不是硬编码警情，不读取或改写 EPFL 视频数据，不能把命中称为真实人员预警。</p>
-<button id="reloadExcelRules">核验七种原Excel规则</button> <span class="small" id="excelRuleStatus">未读取</span>
-<div class="scroll"><table><thead><tr><th>Excel条目</th><th>预警类型</th><th>模拟命中</th><th>示例命中与原始模拟观测</th></tr></thead>
-<tbody id="excelRuleRows"><tr><td colspan="4">仅按需手动运行模拟算法核对</td></tr></tbody></table></div>
+
+<div class="stage-head"><span class="stage-number">3</span><div><h2>最后观察：哪些活动触发提醒</h2><p>仅使用真实录像产生的观察记录，规则为演示用途，不产生真实警情。</p></div></div>
+<section class="box" id="demoAlerts">
+<h2>实际检测触发的演示提醒</h2>
+<p class="small"><b>真实输入：</b>EPFL 两路录制视频中的人体检测和跨时刻活动片段。<b>模拟部分：</b>触发规则由 Demo 设定，不代表现实违法、危险、实名身份，也不会向任何人发送告警。
+一条告警必须包含可追溯的真实匹配记录；跨时间关联若未通过核验则不产生对应告警。</p>
+<span id="demoAlertState" class="small">等待已验证的活动证据</span>
+<details class="focus-table"><summary>查看每条演示提醒的来源与录像时间</summary><div class="scroll"><table><thead><tr><th>演示告警ID</th><th>规则</th><th>录像时间</th><th>来源</th><th>证据</th><th>性质</th></tr></thead>
+<tbody id="demoAlertRows"><tr><td colspan="6">暂无由真实视频活动触发的演示告警</td></tr></tbody></table></div></details>
+</section>
+
+<div id="technicalArea">
+<div class="stage-head"><span class="stage-number">4</span><div><h2>管理、设备和需求验收</h2><p>上面的流程适合现场展示；下面才是管理员、技术人员需要检查的内容。</p></div></div>
+<div class="system-footer">
+<a href="/monitor">设备与采集状态 →<span>视频源 / RTSP / Frigate / 采集健康</span></a>
+<a href="/admin">场所与人员权限 →<span>四级区域结构、账号、授权范围</span></a>
+<a href="/cctv">查看原始研究证据 →<span>检测来源、研究关联和人工审核</span></a>
+</div>
+<details class="disclosure-card" id="liveEvidence"><summary>查看实际接入设备的事件（没有连接摄像机时显示0）</summary>
+<p class="operation-notice">这里是你自己设备的实时事件，和上方的EPFL历史研究录像是两条独立数据链。刚安装时为0是正确的，不会补造假数据。</p>
+<div class="box"><label>实况窗口（UTC）<select id="days"><option value="1">近1天</option>
+<option value="7" selected>近7天</option><option value="30">近30天</option></select></label>
+<button id="refresh">刷新真实证据</button> <span id="message">尚未加载</span></div>
+
+<div class="cards" style="margin-top:16px">
+<div class="card"><span class="small">实际 Frigate person 事件</span><strong id="realEvents">—</strong><span class="small">事件数，不是人数</span></div>
+<div class="card"><span class="small">实际视频抽样帧</span><strong id="frames">—</strong><span class="small">不含模拟观测</span></div>
+<div class="card"><span class="small">实际检测到的人脸框</span><strong id="faces">—</strong><span class="small">不代表身份识别</span></div>
+<div class="card"><span class="small">可信跨机身份</span><strong>未验证</strong><span class="small">不编造全球Person ID</span></div>
+</div>
+
+<section class="box"><h2>真实视频 · 按场所的证据统计</h2>
+<p class="small">仅返回当前账号授权辖区；无接入则显示0而不造事件。</p>
+<div class="scroll"><table><thead><tr><th>场所</th><th>真实目标事件</th><th>视频抽样帧</th><th>人脸候选框</th><th>已绑定Frigate摄像机</th></tr></thead><tbody id="places"><tr><td colspan="5">加载中</td></tr></tbody></table></div></section>
+
+<section class="box"><h2>可追溯的实际 Frigate 目标事件</h2>
+<p class="small">包含真实发生时间、摄像机、上游事件ID、检测评分。无真实事件不展示模拟记录。</p>
+<div class="scroll"><table><thead><tr><th>发生时间（UTC）</th><th>场所</th><th>摄像机</th><th>上游事件ID</th><th>检测置信度</th><th>结束时间</th></tr></thead>
+<tbody id="events"><tr><td colspan="6">加载中</td></tr></tbody></table></div><p id="tail" class="small"></p></section>
+
+</details>
+<details class="disclosure-card" id="researchAudit"><summary>研究证据来源和当前能力边界</summary>
+<section class="box"><h2>真实研究视频的独立证据</h2>
+<div id="research">加载中</div><p class="small">这里展示官方公开片段的相机内轨迹标注，不代表已经自动完成跨机同人识别，也不是实时监控数据。</p>
+<a href="/cctv">核对原片帧、人体框和关联研究 →</a></section>
+
+<section class="box"><h2>真实业务仍需解决的条件</h2>
+<p>多场所真实身份关联必须依赖经过验证的 ReID 或人工核实；目前不会将相机A与B的匿名轨迹自动合并为同一个人。</p>
+<p>没有可信身份时，可展示匿名目标事件、检测质量、来源摄像机和时间；不能生成“此人跨场所”“某人异常”的身份级结论。</p>
+<a href="/monitor">查看实际视频接入、RTSP/GB28181/Frigate运行状态 →</a></section>
+
 </details>
 <section class="box" id="excelAcceptance">
 <h2>原 Excel 23 项 · 严格验收与缺口</h2>
@@ -134,13 +269,18 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <tbody id="excelAcceptanceRows"><tr><td colspan="6">正在读取真实验收矩阵</td></tr></tbody></table></div>
 </details><p id="excelAcceptanceNote" class="small"></p>
 </section>
-<section class="box"><h2>真实研究视频的独立证据</h2>
-<div id="research">加载中</div><p class="small">这里展示官方公开片段的相机内轨迹标注，不代表已经自动完成跨机同人识别，也不是实时监控数据。</p>
-<a href="/cctv">核对原片帧、人体框和关联研究 →</a></section>
-<section class="box"><h2>真实业务仍需解决的条件</h2>
-<p>多场所真实身份关联必须依赖经过验证的 ReID 或人工核实；目前不会将相机A与B的匿名轨迹自动合并为同一个人。</p>
-<p>没有可信身份时，可展示匿名目标事件、检测质量、来源摄像机和时间；不能生成“此人跨场所”“某人异常”的身份级结论。</p>
-<a href="/monitor">查看实际视频接入、RTSP/GB28181/Frigate运行状态 →</a></section>
+
+<details class="box" id="excelRuleShowcase">
+<summary style="cursor:pointer;font-weight:600">仅供Excel算法技术核对：七类旧规则的虚构测试样本（默认不加载、不作为真实预警）</summary>
+<h2>旧版七类规则单独验算（不属于本真实视频链路）</h2>
+<p class="small"><b>注意：此区的人员 P###、到访和场所全部是明确虚构的规则样本。</b>它调用项目已实现的七种规则算法，
+不是硬编码警情，不读取或改写 EPFL 视频数据，不能把命中称为真实人员预警。</p>
+<button id="reloadExcelRules">核验七种原Excel规则</button> <span class="small" id="excelRuleStatus">未读取</span>
+<div class="scroll"><table><thead><tr><th>Excel条目</th><th>预警类型</th><th>模拟命中</th><th>示例命中与原始模拟观测</th></tr></thead>
+<tbody id="excelRuleRows"><tr><td colspan="4">仅按需手动运行模拟算法核对</td></tr></tbody></table></div>
+</details>
+
+</div>
 </main>
 <script>
 const $=id=>document.getElementById(id);
@@ -188,10 +328,10 @@ async function loadActivity(){
   }
   if(!response.ready)throw Error('导入成功前没有可显示的数据');
   const cards=[
-   ['两摄像机同帧配对',response.matched_pair_observations],
-   ['真实录像采样时刻',response.sampled_video_instants],
-   ['匿名活动片段（非人数）',response.anonymous_activity_fragments],
-   ['跨多个时刻的片段',response.multi_instant_fragments]
+   ['双机匹配观测（非人数）',response.matched_pair_observations],
+   ['有检测的录像时刻',response.sampled_video_instants],
+   ['匿名活动片段',response.anonymous_activity_fragments],
+   ['已核验短时关联',response.multi_instant_fragments]
   ];
   $('activityStats').innerHTML=cards.map(x=>'<div class="card"><span class="small">'+esc(x[0])+
    '</span><strong>'+x[1]+'</strong></div>').join('');
@@ -411,6 +551,7 @@ async function initializeResearchMode(){
  try{
   const me=await api('/api/auth/me');
   if(me.level!==1){
+   $('introDemo').hidden=true;
    for(const id of ['researchActivity','demoAlerts','realSceneAggregation',
                     'excelRuleShowcase','excelAcceptance']){
     $(id).hidden=true;
@@ -418,7 +559,7 @@ async function initializeResearchMode(){
    const hint=document.createElement('div');
    hint.className='caveat';
    hint.textContent='当前登录辖区仅可查看授权范围内真实视频事件。EPFL研究配对、室内研究热区和Excel全局验收仅州级管理员可访问。';
-   document.querySelector('main').insertBefore(hint,$('researchActivity'));
+   document.querySelector('main').prepend(hint);
    return;
   }
   // Real-only screen never automatically calls the synthetic P### generator.
