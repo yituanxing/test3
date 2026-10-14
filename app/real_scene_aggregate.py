@@ -38,6 +38,11 @@ def summarize_scene(activity, *, minimum_observations=3,
         "short_anonymous_tracklets_verified":False,
         "short_anonymous_tracklets":[],
         "short_tracklets_excluded_from_map":0,
+        "virtual_zone_division":{"axis":"projected_y","threshold":150.0,
+             "above":"室内虚拟A区","below":"室内虚拟B区",
+             "true_different_sites":False},
+        "short_virtual_zone_crossings":[],
+        "short_virtual_zone_crossing_count":0,
         "short_time_linkage_separately_qualified":bool(
             activity.get("cross_time_temporal_linkage_verified")),
         "source_video_is_real":bool(activity.get("ready")),
@@ -149,6 +154,29 @@ def summarize_scene(activity, *, minimum_observations=3,
             any(p["x"]<0 or p["x"]>=320 or p["y"]<0 or p["y"]>=320
                 for p in line["points"])
             for line in eligible)
+        # A/B are explicitly VIRTUAL areas within ONE EPFL laboratory.
+        # Coordinates and matches are actual YOLO/geometry-derived video
+        # observations; the split line is merely a demonstrative rule.
+        crossings=[]
+        for segment in eligible:
+            for a,b in zip(segment["points"],segment["points"][1:]):
+                from_a=a["y"]<150.0
+                to_a=b["y"]<150.0
+                if from_a==to_a:
+                    continue
+                crossings.append({
+                    "fragment_id":segment["fragment_id"],
+                    "from_virtual_area":"室内虚拟A区" if from_a else "室内虚拟B区",
+                    "to_virtual_area":"室内虚拟A区" if to_a else "室内虚拟B区",
+                    "source_frames":[a["video_frame"],b["video_frame"]],
+                    "source_candidate_keys":[a["candidate_key"],b["candidate_key"]],
+                    "real_video_evidence":True,
+                    "virtual_area_rule_only":True,
+                    "different_real_world_sites_verified":False,
+                    "gps_track":False,
+                })
+        result["short_virtual_zone_crossings"]=crossings
+        result["short_virtual_zone_crossing_count"]=len(crossings)
     result["total_observations"]=sum(frame_counts.values())
     result["observations_outside_coarse_grid"]=out_of_grid
     return result
