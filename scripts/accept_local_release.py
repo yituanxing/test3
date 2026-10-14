@@ -126,6 +126,14 @@ def main():
             assert indoor["zone"]=={"x_bin":2,"y_bin":3,
                                     "width_cells":2,"height_cells":2}
             assert indoor["individual_trajectory_available"] is False
+            assert indoor["short_anonymous_tracklets_verified"] is True
+            assert len(indoor["short_anonymous_tracklets"])==14
+            assert all(t["site_kind"]=="same_real_laboratory_two_views"
+                       and not t["real_geographic_journey"]
+                       and not t["identity_verified"]
+                       and all(b["video_frame"]-a["video_frame"]==25
+                               for a,b in zip(t["points"],t["points"][1:]))
+                       for t in indoor["short_anonymous_tracklets"])
             other_zone=_request(base,"/api/real/scene-aggregate?zone_x_bin=6"
                                 "&zone_y_bin=5",token)
             assert other_zone["total_observations"]==119
@@ -154,6 +162,9 @@ def main():
                 "actual_video_scene_sampled_frames":len(indoor["frame_cells"]),
                 "video_derived_default_zone_event_instants":len(indoor["demo_zone_events"]),
                 "projected_zone_adjustment_real_media_based":True,
+                "verified_local_camera_tracklets_in_distributed_zip":len(
+                    indoor["short_anonymous_tracklets"]),
+                "no_external_site_or_gps_claim":True,
                 "gps_or_person_geolocation_asserted":False,
                 "simulated_excel_rule_types":7,
                 "simulated_rules_separate_from_actual_video":True,
