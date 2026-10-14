@@ -281,6 +281,12 @@ async function evaluateRealPersonDetector(){
     '；模型产生本机轨迹：'+r.camera_local_tracker_ids+
     '；已存证据框：'+r.stored_local_boxes+'；记录版本：'+r.run_key+
     '\n同帧官方人工框（独立参考，绝未喂给YOLO）：'+r.published_gt_boxes_on_inferred_frames+
+    '\n独立检测质量（对官方人工框 IoU≥0.50）：TP '+r.detection_evaluation.true_positives+
+    ' / FP '+r.detection_evaluation.false_positives+' / FN '+r.detection_evaluation.false_negatives+
+    '；帧级精确率 '+(r.detection_evaluation.precision??'未定义')+
+    '；召回率 '+(r.detection_evaluation.recall??'未定义')+
+    '；本机轨迹覆盖率 '+(r.tracker_assignment_coverage_of_yolo_detections??'未定义')+
+    '\n上述数据是人体框检测质量，不是跨机位身份准确率。'+
     '\n原始模型目标已进入统一匿名事件、来源与人工QA；没有跨机身份识别或真实到访。许可：'+r.model_license;
   await refreshOccurrences();await refreshQuality();
   const marker=r.run_key.slice(0,12);
