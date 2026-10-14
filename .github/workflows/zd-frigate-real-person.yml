@@ -73,6 +73,9 @@ jobs:
         if: contains(github.event.pull_request.labels.*.name, 'cctv-real')
         run: |
           python -m pytest -q tests/test_cctv_dataset.py
+          # SciPy exists only after optional tracking dependencies are installed.
+          # Run negative-identity cases here rather than let importorskip hide them.
+          python -m pytest -q -rs tests/test_epfl_six_person_geometry.py
           python -m scripts.verify_caviar_public_footage
           python -m scripts.assess_real_person_readiness --input reports/verify-caviar-fixed-cctv.json --output reports/real-person-identity-readiness.json
       # A/B candidate only: EPFL synchronized laboratory pair. Do not replace
