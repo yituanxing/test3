@@ -22,7 +22,7 @@ from app.media_probe import probe_video
 from app.frigate_bridge import parse_person_event
 from app.business import analyze, DEFAULT_CONFIG, RULE_NAMES
 from app.monitoring import overview as monitoring_overview, face_activity_details
-from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology, cctv_dataset, site_model, occurrences, occurrence_reviews, research_linkage, epfl_review, geo_demo, face_photo_lab, real_evidence, real_activity
+from app import admin, base_registry, insights, access, gb28181, continuous_capture, rule_instances, anime_scenes, anime_ontology, cctv_dataset, site_model, occurrences, occurrence_reviews, research_linkage, epfl_review, geo_demo, face_photo_lab, real_evidence, real_activity, demo_excel_alerts
 import httpx
 from pydantic import BaseModel, Field
 
@@ -320,6 +320,7 @@ geo_demo.register(app,db,lambda c: _analyze_synthetic(c))
 face_photo_lab.register(app)
 real_evidence.register(app,db)
 real_activity.register(app,db)
+demo_excel_alerts.register(app)
 
 
 @app.middleware('http')
