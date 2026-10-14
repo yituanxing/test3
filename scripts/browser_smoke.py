@@ -239,7 +239,10 @@ def run():
                         expect(page.locator('#mapFallback svg')).to_be_visible(timeout=12000)
                         expect(page.locator('#trackSummary')).to_contain_text('合成到访',timeout=12000)
                         expect(page.locator('#events .event').first).to_be_visible(timeout=12000)
-                        assert page.locator('#placeRows tr').count()>=3
+                        # The fresh browser fixture has only sites A/B;
+                        # extra sites are created by separate tests, not here.
+                        assert page.locator('#placeRows tr').count()>=2
+                        expect(page.locator('#placeRows')).to_contain_text('虚构坐标')
                         page.screenshot(path=str(OUT/'ui-geo-fictional-track.png'),full_page=True)
                         checks.append('offline_geographic_map_real_browser_synthetic_visits_and_coordinates')
                         # #14: face-photo similarity is off until the operator
