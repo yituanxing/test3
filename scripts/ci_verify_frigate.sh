@@ -95,6 +95,38 @@ echo "::endgroup::"
 echo "::group::Start upstream services"
 docker compose -f "$COMPOSE" pull
 docker compose -f "$COMPOSE" up -d mediamtx
+
+# Create real camera->place provenance BEFORE the FFmpeg publisher and Frigate
+# can generate any event. It is incorrect to attach previously recorded events
+# to a place based on a new binding made after their timestamps.
+export ZD_DATA_DIR="$PWD/.ci-data/web"
+mkdir -p "$ZD_DATA_DIR"
+python - <<'PY'
+import secrets
+from fastapi.testclient import TestClient
+from app import main, access, admin
+
+main.setup_db()
+username = 'ci_pre_capture_provenance'
+password = secrets.token_urlsafe(32)
+with main.db() as conn:
+    root = conn.execute('SELECT id FROM regions WHERE level=1 ORDER BY id LIMIT 1').fetchone()
+    assert root, 'region root missing'
+    access.create_user(conn, username, password, root['id'])
+    leaf = admin.demo_leaf(conn)
+with TestClient(main.app) as client:
+    login = client.post('/api/auth/login', json={'username':username,'password':password})
+    assert login.status_code == 200, login.text
+    headers = {'Authorization':'Bearer '+login.json()['access_token']}
+    place = client.post('/api/places', headers=headers, json={
+        'name':'授权公开视频RTSP验收场所（非现场）', 'region_id':leaf})
+    assert place.status_code == 200, place.text
+    binding = client.post('/api/frigate/cameras', headers=headers, json={
+        'camera':'demo','place_id':place.json()['id']})
+    assert binding.status_code == 200, binding.text
+    assert binding.json()['place_id'] == place.json()['id']
+print('Real-only CI camera/site binding committed BEFORE publishing video')
+PY
 for i in $(seq 1 25); do
   if bash -c 'echo >/dev/tcp/127.0.0.1/8554' 2>/dev/null; then break; fi
   sleep 1
