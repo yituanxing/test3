@@ -78,6 +78,9 @@ def run():
                         page.locator('input[name="password"]').fill(
                             "epfl-browser-password-2026")
                         page.locator('button[type="submit"]').click()
+                        # Login POST and sessionStorage access-token commit are
+                        # asynchronous. A premature navigation loses the login.
+                        expect(page).to_have_url(base+"/portal",timeout=15000)
                         page.goto(base+"/cctv")
                         expect(page.locator("#epflImportReport")).to_be_visible()
                         # Genuine report generated from the two real downloaded
