@@ -68,9 +68,13 @@ def test_seed_idempotent_and_persistent_human_override(case):
     assert now['geo']['lat']==setval['lat'] and now['geo']['lon']==setval['lon']
     assert now['geo']['note']==setval['note']
     for invalid in ({'lat':91,'lon':88,'note':'太远'},
-                    {'lat':41,'lon':181,'note':'太远'},
-                    {'lat':41,'lon':float('inf'),'note':'非法'}):
+                    {'lat':41,'lon':181,'note':'太远'}):
         assert c.put(f'/api/geo/places/{pid}',headers=h,json=invalid).status_code==422
+    # JSONEncoder refuses infinity itself; use an HTTP JSON number with an
+    # overflowing exponent to exercise the actual Pydantic finite check.
+    assert c.put(f'/api/geo/places/{pid}',headers={
+        **h,'Content-Type':'application/json'},
+        content='{"lat":41,"lon":1e999,"note":"非法无限大"}').status_code==422
     with m.db() as d:
         assert d.execute("SELECT COUNT(*) FROM demo_geo_audit").fetchone()[0]>=3
 

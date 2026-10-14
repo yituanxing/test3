@@ -155,10 +155,10 @@ function startMap(){
   }catch(e){map=null;offline();}
  };
  document.head.appendChild(js);
- setTimeout(()=>{if(!done&&!map)offline()},7000);
+ setTimeout(()=>{if(!done){if(map){try{map.remove()}catch(_){}map=null}offline()}},7000);
 }
-function renderTimeline(){
- stop();$('prev').disabled=chosen<=0;$('next').disabled=chosen>=events.length-1||!events.length;
+function renderTimeline(keepPlaying=false){
+ if(!keepPlaying)stop();$('prev').disabled=chosen<=0;$('next').disabled=chosen>=events.length-1||!events.length;
  $('play').disabled=events.length===0;
  $('events').innerHTML=events.map((e,i)=>
   '<button class="event '+(i===chosen?'on':'')+'" data-index="'+i+'">'+
@@ -225,7 +225,7 @@ $('prev').onclick=()=>{if(chosen>0){chosen--;renderTimeline()}};
 $('next').onclick=()=>{if(chosen<events.length-1){chosen++;renderTimeline()}};
 $('stop').onclick=stop;
 $('play').onclick=()=>{stop();if(!events.length)return;playing=setInterval(()=>{
- if(chosen<events.length-1){chosen++;renderTimeline();$('play').disabled=true;}
+ if(chosen<events.length-1){chosen++;renderTimeline(true);$('play').disabled=true;}
  else stop();
  },1100);$('play').disabled=true;};
 (async()=>{
