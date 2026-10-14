@@ -456,7 +456,7 @@ async function loadDemoAlerts(){
    '<tr><td>'+esc(a.demo_alert_id)+'</td><td>'+esc(a.rule_name)+'</td><td>'+
    esc(a.start_video_second)+'秒 → '+esc(a.end_video_second)+'秒</td><td>'+
    esc(a.anonymous_fragment_id)+' / EPFL 两摄像机</td><td>'+
-   a.supporting_candidate_keys.length+'条源匹配</td><td>仅演示规则，非真实风险</td></tr>'
+   a.supporting_candidate_keys.length+'条源匹配 <button type="button" data-evidence-frame="'+a.start_video_frame+'">看源帧</button></td><td>演示规则，非真实警情</td></tr>'
   ).join('')||'<tr><td colspan="6">无经过视频证据支持的预警。不会制造假人员或假到访。</td></tr>';
  }catch(e){$('demoAlertState').textContent='演示告警查询失败：'+e.message}
 }
@@ -477,12 +477,12 @@ function sceneTracksPaint(){
  $('sceneVirtualCrossRows').innerHTML=transitions.map(t=>
   '<tr><td>'+esc(t.fragment_id)+'</td><td>'+
   esc(t.source_frames.join(' → '))+'</td><td>'+
-  esc(t.from_virtual_area)+' → '+esc(t.to_virtual_area)+'</td></tr>'
+  esc(t.from_virtual_area)+' → '+esc(t.to_virtual_area)+' <button type="button" data-evidence-frame="'+t.source_frames[0]+'">看源帧</button></td></tr>'
  ).join('')||'<tr><td colspan="3">没有真实录像证据触发的虚拟A/B跨区示意</td></tr>';
  $('sceneTrackRows').innerHTML=items.map(t=>
   '<tr><td>'+esc(t.fragment_id)+'</td><td>'+
   esc(t.points.map(p=>p.video_frame).join(' → '))+
-  '</td><td>'+esc(t.camera_pair.join(' / '))+'</td></tr>'
+  '</td><td>'+esc(t.camera_pair.join(' / '))+' <button type="button" data-evidence-frame="'+t.points[0].video_frame+'">看源帧</button></td></tr>'
  ).join('')||'<tr><td colspan="3">无可独立核验的短时关联，未生成轨迹</td></tr>';
  $('sceneTrackSelect').innerHTML='<option value="">显示全部短片段</option>'+
  items.map(t=>'<option value="'+esc(t.fragment_id)+'">'+esc(t.fragment_id)+
@@ -514,7 +514,7 @@ function sceneTracksDraw(){
  }
  overlay.innerHTML=html;
 }
-$('sceneTrackSelect').onchange=sceneTracksDraw;
+$('sceneTrackSelect').onchange=()=>{sceneTracksDraw();const t=sceneData?.short_anonymous_tracklets?.find(x=>x.fragment_id===$('sceneTrackSelect').value);if(t?.points?.length)jumpEvidenceFrame(t.points[0].video_frame);};
 function sceneStop(){if(sceneTimer){clearInterval(sceneTimer);sceneTimer=null}$('scenePlay').textContent='▶ 逐个采样时刻'}
 function scenePaint(){
  if(!sceneData)return;
@@ -570,11 +570,11 @@ async function loadSceneAggregate(){
    '</span><strong>'+a[1]+'</strong></div>').join('');
   $('sceneZoneRows').innerHTML=data.demo_zone_events.slice(0,24).map(e=>
    '<tr><td>第'+e.video_frame+'帧</td><td>'+e.paired_detection_count_in_zone+
-   '</td><td>真实视频投影检测</td><td>演示区域规则</td></tr>').join('')||
+   '</td><td>真实视频投影检测</td><td>演示区域规则 <button type="button" data-evidence-frame="'+e.video_frame+'">看源帧</button></td></tr>').join('')||
    '<tr><td colspan="4">当前区域无真实观测，未生成演示提醒</td></tr>';
   $('sceneEventRows').innerHTML=data.demo_scene_events.slice(0,24).map(e=>
    '<tr><td>第'+e.video_frame+'帧</td><td>'+e.paired_detection_count+
-   '</td><td>≥'+e.threshold+'（演示）</td></tr>').join('')||
+   '</td><td>≥'+e.threshold+'（演示） <button type="button" data-evidence-frame="'+e.video_frame+'">看源帧</button></td></tr>').join('')||
    '<tr><td colspan="3">没有达到当前阈值的真实录像时刻</td></tr>';
   $('sceneZoneSummary').textContent='红框区域从 ('+sceneZoneX+','+sceneZoneY+
    ') 开始，覆盖2×2格；真实视频命中 '+data.demo_zone_events.length+
