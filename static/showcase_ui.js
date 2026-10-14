@@ -120,15 +120,8 @@ function showPanel(name,writeHash){
  if(writeHash)history.replaceState(null,"","#"+id);
  if(id!=="overview")byId("overviewVideo").pause();
  if(id!=="video")byId("videoClip").pause();
- if(id==="video"){
-  const clip=byId("videoClip");
-  // Decode an actual video frame on panel entry; a gray player is not a proof.
-  if(clip && clip.src && clip.readyState>=1){
-   if(clip.currentTime<1)clip.currentTime=12;
-   clip.muted=true;
-   clip.play().then(()=>setTimeout(()=>clip.pause(),450)).catch(()=>{});
-  }
- }
+ // Each native player uses an authenticated poster decoded from the real MP4.
+ // Do not auto-seek on panel change; that hides the still frame before decode.
  scrollTo({top:0,behavior:"instant"});
 }
 window.zdShowPanel=showPanel;
@@ -217,8 +210,17 @@ async function loadBundledClip(){
    byId("overviewVideoState").textContent="未安装连续录像。请在‘视频与检测’选择随包附带的38秒双机MP4。";
    return;
   }
-  const response=await fetch("/api/real/showcase-media/video",{headers:{Authorization:"Bearer "+sessionStorage.getItem("zd_access_token")}});
+  const h={Authorization:"Bearer "+sessionStorage.getItem("zd_access_token")};
+  const [response,cover]=await Promise.all([
+    fetch("/api/real/showcase-media/video",{headers:h}),
+    fetch("/api/real/showcase-media/poster",{headers:h})
+  ]);
   if(!response.ok)throw Error("视频请求 HTTP "+response.status);
+  if(cover.ok){
+    const posterURL=URL.createObjectURL(await cover.blob());
+    byId("overviewVideo").poster=posterURL;
+    byId("videoClip").poster=posterURL;
+  }
   attachClipBlob(await response.blob());
  }catch(e){
   byId("overviewVideoState").textContent="录像加载失败："+e.message+"。可在视频分析页手动选择MP4。";
