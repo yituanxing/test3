@@ -1,0 +1,127 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZD · 授权照片相似度实验</title>
+<style>
+:root{--bg:#f2f5fa;--ink:#16304d;--blue:#2464b8;--muted:#617890;--line:#dce5f0}
+*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;color:var(--ink);background:var(--bg);font:14px/1.65 system-ui,'Microsoft YaHei',sans-serif}
+header{background:#122e50;color:#fff;padding:15px max(20px,calc((100vw - 1210px)/2));display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+header nav{display:flex;flex-wrap:wrap;gap:15px}header a{color:#d5e5f8;text-decoration:none}
+main{max-width:1210px;margin:auto;padding:26px 20px 45px}
+h1{font-size:26px;margin:0}h2{font-size:17px;margin:0 0 9px}.muted{color:var(--muted);font-size:13px;margin:4px 0 17px}
+.warning{border:1px solid #efc98e;background:#fff5df;color:#75501f;padding:15px 18px;border-radius:11px;margin:17px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}.panel{background:#fff;border-radius:12px;padding:22px;border:1px solid var(--line);box-shadow:0 4px 16px #3459780b}
+.full{grid-column:1/-1}label{display:grid;gap:7px;font-size:13px;color:#4b617c;margin:12px 0}input{font:inherit;border:1px solid #ccd6e3;border-radius:8px;padding:9px 11px;max-width:100%;background:#fff}
+input[type=file]{padding:8px;width:100%}input[type=checkbox]{margin-right:8px;vertical-align:middle}
+.controls{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:12px 0}
+button{font:inherit;border:0;background:var(--blue);color:#fff;border-radius:8px;padding:10px 13px;cursor:pointer}button.secondary{color:#2459a8;background:#eaf0fb}button.danger{background:#c84c4c}button:disabled{opacity:.45;cursor:not-allowed}
+#status,#output{white-space:pre-wrap;overflow-wrap:anywhere;color:#456889;font-size:13px}
+.pill{display:inline-block;background:#e5f0ff;border-radius:30px;padding:3px 11px;color:#275aa0;font-size:12px}
+.pill.bad{background:#ffe8e8;color:#a43737}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e7ecf5;padding:10px 9px;text-align:left;font-size:13px}
+small{display:block;color:#647a96}.result{border:1px solid #dce5f1;background:#f8fbff;border-radius:8px;padding:12px;margin-top:10px}
+@media(max-width:840px){.grid{grid-template-columns:1fr}main{padding:18px}}
+</style></head>
+<body><header><strong>ZD · 照片相似度检索实验（非监控身份识别）</strong>
+<nav><a href="/portal">综合工作台</a><a href="/geo">地图示意</a><a href="/insights">活动分析</a><a href="/portal?tab=acceptance">Excel验收</a><a href="#" id="logout">退出</a></nav></header>
+<main><h1>已授权照片的临时相似度检索</h1>
+<p class="muted">原 Excel 第14项的有限技术实验；独立于实际监控、EPFL研究视频以及P###模拟人员。</p>
+<div class="warning"><b>用途和数据边界：</b>只能上传本人或明确授权用于本次实验的照片。采用YuNet检测单张人脸、SFace生成特征，仅返回相似度排序；<b>不确认真人身份、不执行风险预警、不自动从监控中收集人脸。</b>
+图库只在当前登录令牌对应的服务器内存中临时存在，最多16份样本，15分钟过期；照片原件不落盘。退出前请主动清空图库。SFace模型需自行安装，模型权属与商业分发仍需另行核验。<b>Excel #14原文仍未完成。</b></div>
+<div class="panel full" id="modelPanel"><h2>00 · 模型与授权环境检查</h2><span id="modelBadge" class="pill bad">正在检查…</span>
+<div id="status" role="status">读取状态中…</div>
+<details><summary>离线操作说明：安装模型并启用实验</summary>
+<p>在项目根目录运行（只安装授权测试模型，不分发图片或生物特征）：</p>
+<pre>bash scripts/start_local_demo.sh
+# 停止服务后，运行：
+.venv/bin/python -m scripts.install_yunet
+.venv/bin/python -m scripts.install_sface
+# 本地运行前临时设置：
+ZD_FACE_LAB_ENABLE=1 bash scripts/start_local_demo.sh</pre>
+<p>模型权属及训练数据来源应另行确认；本功能不适合生产身份判断。</p></details>
+</div>
+<div class="grid" style="margin-top:15px">
+<section class="panel"><h2>01 · 临时添加授权照片</h2>
+<p class="muted">一次添加一张、恰好检测到一张人脸。样本码只允许 S 开头的匿名编号，不录入真实姓名。</p>
+<label>匿名样本码<input id="sample" placeholder="S01" maxlength="16" value="S01" pattern="S[A-Za-z0-9_-]{1,15}"></label>
+<label>授权照片文件（≤2MB）<input id="enrollFile" type="file" accept="image/jpeg,image/png"></label>
+<button id="enroll" disabled>加入临时图库</button>
+<div class="result" id="gallery" role="status">图库尚未准备。</div></section>
+<section class="panel"><h2>02 · 用授权照片查询</h2>
+<p class="muted">上传一张新照片，从本会话图库检索相似排序，不显示自动“同一人”结论。</p>
+<label>待查询照片（≤2MB）<input id="queryFile" type="file" accept="image/jpeg,image/png"></label>
+<button id="search" disabled>检索相似照片</button>
+<div id="output" class="result" role="status">未运行。</div>
+</section>
+<section class="panel full">
+<div class="controls"><label style="margin:0"><input id="consent" type="checkbox">
+我确认仅上传本人或已经明确授权用于本次短时人脸技术实验的照片，不用于识别监控对象</label></div>
+<div class="controls"><button class="secondary" id="refresh">刷新临时图库状态</button>
+<button class="danger" id="clear">删除本会话的全部临时特征</button></div>
+<p class="muted">查询列表仅包含匿名样本码、余弦相似度；不返回人脸特征、照片或身份证明。不允许用相似度评分代替人工核实身份。</p>
+</section></div></main>
+<script>
+'use strict';const $=id=>document.getElementById(id);
+let token=sessionStorage.getItem('zd_access_token');if(!token)location.replace('/login');
+let ready=false;
+async function api(url,method='GET',file){
+ const headers={'Authorization':'Bearer '+token};
+ if(file){headers['Content-Type']=file.type;headers['X-Lab-Consent']='yes'}
+ const resp=await fetch(url,{method,headers,body:file});
+ if(resp.status===401){sessionStorage.removeItem('zd_access_token');location.replace('/login');throw Error('登录已失效')}
+ const data=await resp.json();if(!resp.ok)throw Error(typeof data.detail==='string'?data.detail:JSON.stringify(data.detail));
+ return data;
+}
+function checkFile(file){
+ if(!file)throw Error('请先选择照片');
+ if(!['image/jpeg','image/png'].includes(file.type))throw Error('只支持JPEG/PNG');
+ if(file.size>2000000)throw Error('照片超过2MB');
+ if(!$('consent').checked)throw Error('请先勾选确认拥有照片使用授权');
+}
+async function refresh(){
+ try{
+  const s=await api('/api/face-lab/status');
+  ready=!!s.ready;$('enroll').disabled=!ready;$('search').disabled=!ready;
+  $('modelBadge').className='pill '+(ready?'':'bad');
+  $('modelBadge').textContent=ready?'授权照片实验可运行':'暂不可运行：缺少配置或模型';
+  $('status').textContent='显式开关：'+(s.enabled?'已开启':'关闭')+
+   '；YuNet：'+(s.has_yunet?'可用':'未安装')+
+   '；SFace：'+(s.has_sface?'可用':'未安装')+
+   '；最大样本：'+s.max_samples+'；自动到期：15分钟。';
+  $('gallery').textContent='临时样本 '+s.count+' 个：'+(s.sample_codes.join('、')||'空')+
+    '。不保存上传图像。';
+ }catch(e){ready=false;$('enroll').disabled=true;$('search').disabled=true;
+  $('modelBadge').textContent='当前账户不可操作';$('status').textContent=e.message}
+}
+async function submit(url,file,display){
+ try{
+  checkFile(file);const btn=url.includes('/enroll')?$('enroll'):$('search');btn.disabled=true;
+  display.textContent='本地模型处理中…';
+  const r=await api(url,'POST',file);
+  if(url.includes('/enroll')){
+    display.textContent='匿名样本 '+r.sample_code+' 已进入当前短时内存图库；不是已确认身份。';
+    await refresh();
+  }else{
+   display.textContent=r.ranked_candidates.length?
+    '相似度排序（不是同一人结论）：\n'+r.ranked_candidates.map((v,i)=>
+    (i+1)+' · '+v.sample_code+'  余弦值 '+v.cosine_similarity.toFixed(5)).join('\n'):
+    '图库没有样本，请先添加授权照片。';
+  }
+ }catch(e){display.textContent='操作失败：'+e.message}
+ finally{$('enroll').disabled=!ready;$('search').disabled=!ready}
+}
+$('enroll').onclick=()=>{
+ const code=$('sample').value.trim();
+ if(!/^S[A-Za-z0-9_-]{1,15}$/.test(code)){$('gallery').textContent='匿名编号须以S开头，长度2–16，不能填写实名';return}
+ submit('/api/face-lab/enroll?code='+encodeURIComponent(code),$('enrollFile').files[0],$('gallery'));
+};
+$('search').onclick=()=>submit('/api/face-lab/search',$('queryFile').files[0],$('output'));
+$('refresh').onclick=refresh;
+$('clear').onclick=async()=>{
+ if(!confirm('立即清除本次登录的所有临时人脸特征？'))return;
+ try{const result=await api('/api/face-lab/clear','POST');
+  $('output').textContent='已清除 '+result.cleared_temporary_embeddings+' 个临时特征。';
+  await refresh();}catch(e){$('output').textContent=e.message}
+};
+$('logout').onclick=async e=>{e.preventDefault();await api('/api/face-lab/clear','POST').catch(()=>{});
+ await api('/api/auth/logout','POST').catch(()=>{});sessionStorage.removeItem('zd_access_token');location.replace('/login')};
+refresh();
+</script></body></html>
