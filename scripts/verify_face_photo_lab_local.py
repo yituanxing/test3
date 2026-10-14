@@ -14,14 +14,23 @@ from fastapi import HTTPException
 from app import face_photo_lab
 
 ROOT=Path(__file__).resolve().parents[1]
-SOURCE=ROOT/'samples'/'astronaut-public-domain.png'
+SOURCE=ROOT/'samples'/'astronaut-face-test.mp4'
 REPORT=ROOT/'reports'/'verify-face-photo-lab-local.json'
 
 
 def run():
     if not SOURCE.is_file():raise RuntimeError('Public-domain astronaut sample unavailable')
     if not face_photo_lab._ready():raise RuntimeError('SFace & YuNet not opt-in installed')
-    data=SOURCE.read_bytes()
+    video=cv2.VideoCapture(str(SOURCE))
+    try:
+        ok,frame=video.read()
+    finally:
+        video.release()
+    if not ok or frame is None:
+        raise RuntimeError('Public-domain astronaut video did not decode')
+    ok,png=cv2.imencode('.png',frame)
+    if not ok:raise RuntimeError('Failed to encode first astronaut frame')
+    data=png.tobytes()
     feature1=face_photo_lab._feature(data)
     feature2=face_photo_lab._feature(data)
     same=float(np.dot(feature1,feature2))

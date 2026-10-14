@@ -11,7 +11,7 @@ import os
 import tempfile
 
 DEST=Path(__file__).resolve().parents[1]/'models'/'face_recognition_sface_2021dec.onnx'
-URL=('https://raw.githubusercontent.com/opencv/opencv_zoo/main/'
+URL=('https://huggingface.co/opencv/opencv_zoo/resolve/main/'
      'models/face_recognition_sface/face_recognition_sface_2021dec.onnx')
 EXPECTED_SHA256='0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79'
 
@@ -23,7 +23,7 @@ def install():
         return
     with urlopen(URL,timeout=65) as response:
         model=response.read(40_000_000)
-    if len(model)>40_000_000 or sha256(model).hexdigest()!=EXPECTED_SHA256:
+    if len(model)!=38_696_353 or sha256(model).hexdigest()!=EXPECTED_SHA256:
         raise RuntimeError('Unexpected SFace model SHA256; refusing to use untrusted download')
     with tempfile.NamedTemporaryFile(dir=DEST.parent, suffix='.onnx',delete=False) as tmp:
         tmp.write(model)
