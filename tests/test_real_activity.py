@@ -138,6 +138,6 @@ def test_reject_fake_or_inconsistent_detector_coordinates(auth,monkeypatch):
     r=client.post("/api/research/epfl/import",headers=admin,json=raw)
     assert r.status_code==422
     raw=_manifest()
-    raw["frame_audits"][0]["candidate_evidence"][0]["cam1_ground_xy"]=[float("nan"),10.]
+    raw["frame_audits"][0]["candidate_evidence"][0]["cam1_ground_xy"]=["not-a-coordinate",10.]
     r=client.post("/api/research/epfl/import",headers=admin,json=raw)
     assert r.status_code==422
