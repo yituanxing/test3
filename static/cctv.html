@@ -18,17 +18,41 @@ button:disabled{opacity:.5}button.secondary{background:#e9f1ff;color:var(--accen
 table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;border-bottom:1px solid #e7ecf3}th{background:#f4f7fc}
 .scroller{overflow:auto}.scroller table{min-width:560px}.badge{display:inline-block;background:#e5f5ee;color:#12805d;padding:3px 10px;border-radius:20px}
 .badge.yellow{background:#fff0d9;color:#95620e}
+.jumpnav{display:flex;gap:8px;flex-wrap:wrap;padding:12px;background:#fff;border:1px solid var(--line);border-radius:12px;margin:12px 0}
+.jumpnav a{font-size:13px;color:#315f9c;text-decoration:none;border:1px solid #d7e6f7;border-radius:8px;padding:9px 12px;background:#f5f9ff;font-weight:650}
+.jumpnav a:hover{background:#e6f1ff}#epflResearchPanel,#qualityPanel,#researchPanel,#caviarImport{scroll-margin-top:12px}
+#epflResearchPanel{border:2px solid #bed6f4;box-shadow:0 8px 30px #1d487013}
+#epflResearchPanel h2{color:#1b4e91}#epflReviewPanel{border-top:1px solid var(--line);padding-top:14px;margin-top:12px}
+#epflReviewPanel .scroller{max-height:560px;overflow:auto}#epflReviewPanel table{min-width:850px}
+#epflReviewPanel th{position:sticky;top:0;z-index:1}#epflReviewPanel tr:nth-child(even){background:#f8faff}
+#epflReviewStatus{max-width:900px;overflow-wrap:anywhere}
+.flowsteps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}
+.flowsteps div{border:1px solid #e0e8f6;border-radius:9px;background:#f6faff;padding:11px 13px}
+.flowsteps b{display:block;margin-bottom:4px}.flowsteps small{color:#5d7288;font-size:12px}
+.advanced-evidence summary{cursor:pointer;color:#2a5dae;font-weight:700;font-size:13px}
+.advanced-evidence .scroller{max-height:290px;overflow:auto;margin:10px 0}
+.nav-pager{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+@media(max-width:780px){.flowsteps{grid-template-columns:1fr}.jumpnav a{padding:7px 9px}}
 @media(max-width:780px){.grid{grid-template-columns:1fr}}
 </style></head><body>
-<header><h1>真实监控视频 · 固定摄像机验收</h1><p>原 Excel 场所模型优先：同一场所绑定多路固定摄像机，真实视频帧与公开标注分开展示</p>
-<nav><a href="/portal">综合工作台</a><a href="/monitor">视频运行</a><a href="/insights">统计分析</a><a href="/business">合成业务规则</a><a href="/admin">摄像机/场所管理</a><a href="/anime-scenes">旧动画场景实验</a></nav></header>
-<main><section class="panel notice">
-<b>此页使用爱丁堡大学 CAVIAR 的公开研究视频，不是模拟画面。</b>
+<header><h1>真实监控与人体关联 · 验收工作台</h1><p>真实视频、匿名人体检测、跨机位候选与人工审核分别存证</p>
+<nav><a href="/portal?tab=acceptance">← Excel 23项验收</a><a href="/portal">综合工作台</a><a href="/monitor">视频运行</a><a href="/insights">统计分析</a><a href="/business">合成业务规则</a><a href="/admin">摄像机/场所管理</a><a href="/anime-scenes">旧动画场景实验</a></nav></header>
+<main>
+<div class="jumpnav" aria-label="工作区快速导航">
+<a href="#epflResearchPanel">① 实际人体跨机匹配</a>
+<a href="#caviarImport">② CAVIAR研究原片</a>
+<a href="#qualityPanel">③ 本机目标审核</a>
+<a href="#researchPanel">④ UTC人工研究标签</a>
+<a href="/base">合成人员底库 →</a><a href="/business">模拟七类预警 →</a>
+</div>
+<section class="panel notice">
+<b>此页同时包含CAVIAR原片和EPFL研究双摄像机候选，数据彼此独立。</b>
+CAVIAR验证局部轨迹，EPFL评估同步几何人体配对。两者都不代表跨场所真人身份识别。
 两台固定摄像机拍摄的是<b>同一条商场走廊</b>，因此应绑定同一个场所。CAVIAR 的 XML 是人工标注的人体框和<b>各机位局部轨迹 ID</b>；
 此页不会将两个摄像机局部 ID 自动识别为同一自然人，也不能据此声称跨场所身份匹配或人脸识别成功。
 <p class="small">素材：EC Funded CAVIAR project / IST 2001 37540；CC BY-SA。官方下载并保存在本地 data 目录，不进 Git 和演示源码包。需要联网下载。</p>
 </section>
-<section class="panel"><h2>① 绑定场所、导入两路真实监控</h2>
+<section class="panel" id="caviarImport"><h2>CAVIAR · 绑定场所、导入两路真实监控</h2>
 <p>先选择一个 Excel 意义上的业务场所。走廊和正向视角是<b>两路摄像机</b>，不是“场所A/场所B”。演示默认固定场所归属，无需动漫镜头分场景。</p>
 <div class="row"><label>真实视频所属于哪一个管理场所<select id="place"></select></label>
 <button id="loadPair">导入同一场所的两路 CAVIAR 视频</button>
@@ -57,7 +81,7 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 </div>
 <div class="panel"><h2>⑤ 实际视频解码与人员检测分开验收</h2>
 <p>第一条链路：从官方素材读取视频帧。第二条链路：CAVIAR 官方人体框帮助验证目标出现。第三条链路：我们自己的模型检测与跟踪必须单独评估。</p>
-<div class="row"><button id="process" class="secondary">运行已有匿名人脸检测</button>
+<div class="row"><button id="process" class="secondary">当前帧人脸候选框（不识别身份）</button>
 <label>成熟跟踪算法<select id="trackerAlgorithm"><option value="bytetrack">ByteTrack</option><option value="ocsort">OC-SORT</option></select></label>
 <button id="benchmarkTracker" class="secondary">验证现成算法的本机跟踪</button>
 <button id="benchmarkPair" class="secondary">双摄像机×ByteTrack/OC-SORT联合验证</button>
@@ -90,7 +114,12 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <tbody id="qaHistory"><tr><td colspan="4">选择一条实际匿名事件</td></tr></tbody></table></div>
 </section>
 <section class="panel" id="epflResearchPanel">
-<h2>⑥B EPFL 六人双摄像机 · 自动候选关联的真值审计</h2>
+<h2>EPFL · 双摄像机匿名人体关联与人工审核</h2>
+<div class="flowsteps">
+<div><b>01 · 加载候选</b><small>CI真实视频的同步人体配对，交付包只附匿名数据。</small></div>
+<div><b>02 · 核对证据</b><small>检测框编号、同步帧及空间距离；对应视频证据在CI工件。</small></div>
+<div><b>03 · 人工复核</b><small>合理、误配、待复核；不确认自然人身份。</small></div>
+</div>
 <p class="warning">这是<b>研究数据上的候选配对审查</b>，不是现实身份识别、跨场所到访或七类预警。与上面的 CAVIAR 场所数据、下方 Frigate 人工研究关联互不混合。配对方法使用同步固定机位与地面单应矩阵；官方六人真值仅用于计算核验结果。</p>
 <div class="row"><label>本地打开 CI 中的六人研究报告 JSON（不会上传服务器）
 <input type="file" id="epflReportInput" accept=".json,application/json"></label>
@@ -101,17 +130,20 @@ table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;bor
 <a class="small" href="https://github.com/yituanxing/test3/actions/workflows/zd-frigate-real-person.yml" target="_blank" rel="noopener noreferrer">查看已有 CI 工件来源</a></div>
 <p class="small" id="epflReportStatus">请选择 CI 工件内 verify-epfl-six-person-cross-camera.json。只读、浏览器本地核对，文件本身不能代替 GitHub CI 与媒体 SHA256 的可信来源验证。配对截图在同一 CI 工件中。</p>
 <div class="row" id="epflSummary"></div>
+<details class="advanced-evidence"><summary>按需展开离线官方GT逐帧评估明细（高级研究数据）</summary>
 <div class="scroller"><table><thead><tr><th>时间帧（从0开始）</th><th>测试集</th><th>模型框（0 / 1）</th><th>自动配对</th><th>官方真值同人</th><th>错配 / 无法核验</th></tr></thead>
-<tbody id="epflAuditRows"><tr><td colspan="6">尚未导入研究报告；默认不把匿名检测结果解释为真实人员身份。</td></tr></tbody></table></div>
+<tbody id="epflAuditRows"><tr><td colspan="6">尚未导入研究报告；默认不把匿名检测结果解释为真实人员身份。</td></tr></tbody></table></div></details>
 <div id="epflReviewPanel" hidden>
 <p class="small">下面是持久化到同一个SQLite的匿名配对候选，具有管理员权限、追加式人工复核和审计。<b>导入者提交的研究JSON并非服务器自动认证的官方结果；禁止直接晋升到真实身份、底库或预警。</b></p>
 <div class="row"><label>人工复核理由<input id="epflReviewReason" maxlength="500" style="min-width:340px" value="对照原始同步研究视频及配对证据进行匿名目标审核"></label>
 <span id="epflReviewStatus" class="small">尚无候选审核记录</span></div>
 <div class="scroller"><table><thead><tr><th>研究帧</th><th>测试集</th><th>摄像机0/1检测框序号</th><th>投影距离</th><th>当前审核</th><th>操作（不认证真人身份）</th></tr></thead>
 <tbody id="epflReviewRows"><tr><td colspan="6">需要州级管理员导入报告</td></tr></tbody></table></div>
-<div class="row"><button type="button" class="secondary" id="epflLoadMore" hidden>下一页候选</button></div>
+<div class="row nav-pager"><button type="button" class="secondary" id="epflPrevPage" hidden>上一页</button>
+<button type="button" class="secondary" id="epflLoadMore" hidden>下一页</button>
+<span id="epflPageNote" class="small">每页12条审核候选</span></div>
 </div>
-<p class="small">每行是<b>一个同步帧时刻</b>，同一人可在多个时间点被重复计入。百分比是“两个机位均检测并且可用官方标注核验”的条件关联指标，不是个人识别准确率。选择报告仅更新这个浏览器视图，不保存关系、不提交审核、更不修改 P### 底库。</p>
+<p class="small">每行是<b>一个同步帧时刻</b>，同一人可在多个时间点被重复计入。百分比是“两个机位均检测并且可用官方标注核验”的条件关联指标，不是个人识别准确率。选择文件仅在浏览器核验离线GT结果；点击「导入当前候选」或「一键载入」会将匿名配对存入研究审核SQLite，但绝不修改P###底库。</p>
 </section>
 <section class="panel" id="researchPanel" hidden>
 <h2>⑦ 研究样本匿名轨迹 · 人工关联与候选到访</h2>
@@ -140,6 +172,7 @@ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 let imported=[],lastImage=null,qaOffset=0,qaNextOffset=null,qaPageSize=200;
 let qaPageRecords=new Map(),qaModelBlobUrl=null;
 let epflPendingReport=null,epflCurrentReportDigest=null,epflCandidateOffset=0;
+const EPFL_PAGE_SIZE=12;
 async function api(path,method='GET',body){const r=await fetch(path,{method,
  headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
  body:body===undefined?undefined:JSON.stringify(body)});
@@ -538,13 +571,15 @@ async function importEpflResearchCandidates(){
  }catch(e){$('epflReviewStatus').textContent='研究导入失败：'+e.message}
  finally{$('epflImportReport').disabled=false}
 }
-async function loadEpflCandidates(next=false){
+async function loadEpflCandidates(next=false,previous=false){
  try{
-   if(next)epflCandidateOffset+=40;
-   const query='?limit=40&offset='+epflCandidateOffset+
+   const requestOffset=next?epflCandidateOffset+EPFL_PAGE_SIZE:
+     (previous?Math.max(0,epflCandidateOffset-EPFL_PAGE_SIZE):epflCandidateOffset);
+   const query='?limit='+EPFL_PAGE_SIZE+'&offset='+requestOffset+
        (epflCurrentReportDigest?'&report_digest='+encodeURIComponent(epflCurrentReportDigest):'');
    const result=await api('/api/research/epfl/candidates'+query);
    epflCurrentReportDigest=result.report_digest;
+   epflCandidateOffset=requestOffset;
    $('epflReviewPanel').hidden=false;
    $('epflReviewRows').innerHTML=result.candidates.map(x=>
     '<tr><td>'+x.frame_0_based+'</td><td>'+esc(x.eval_split)+'</td><td>'+
@@ -559,8 +594,12 @@ async function loadEpflCandidates(next=false){
     '" data-epfl-verdict="needs_review">待复核</button></td></tr>'
    ).join('')||'<tr><td colspan="6">该报告没有本页候选，未产生任何身份</td></tr>';
    $('epflReviewStatus').textContent='研究候选 '+result.candidate_count+
-     '，已人工复核 '+result.reviewed_count+'；当前页偏移 '+epflCandidateOffset+
-     '。JSON来源仍需核验，不进入人员底库及真实预警。';
+     '，已复核 '+result.reviewed_count+
+     '。无法核实原视频的候选请标记「待复核」，不进入真实人员底库。';
+   $('epflPageNote').textContent='第 '+(Math.floor(epflCandidateOffset/EPFL_PAGE_SIZE)+1)+
+     ' 页，显示 '+(result.candidates.length?epflCandidateOffset+1:0)+'–'+
+     (epflCandidateOffset+result.candidates.length)+' / '+result.candidate_count+' 条';
+   $('epflPrevPage').hidden=epflCandidateOffset===0;
    $('epflLoadMore').hidden=result.next_offset===null;
  }catch(e){$('epflReviewStatus').textContent='无法读取研究候选：'+e.message}
 }
@@ -595,6 +634,7 @@ $('epflUseBundled').addEventListener('click',useBundledEpflCandidates);
 $('epflImportReport').addEventListener('click',importEpflResearchCandidates);
 $('epflRefreshCandidates').addEventListener('click',()=>{epflCandidateOffset=0;loadEpflCandidates()});
 $('epflLoadMore').addEventListener('click',()=>loadEpflCandidates(true));
+$('epflPrevPage').addEventListener('click',()=>loadEpflCandidates(false,true));
 $('epflReportInput').addEventListener('change',openEpflResearchReport);
 $('epflClearReport').addEventListener('click',clearEpflResearchReport);
 
