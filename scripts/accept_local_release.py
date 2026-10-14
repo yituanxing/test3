@@ -128,6 +128,11 @@ def main():
             assert indoor["individual_trajectory_available"] is False
             assert indoor["short_anonymous_tracklets_verified"] is True
             assert len(indoor["short_anonymous_tracklets"])==14
+            assert indoor["short_virtual_zone_crossing_count"]==4
+            assert len(indoor["short_virtual_zone_crossings"])==4
+            assert all(not c["different_real_world_sites_verified"]
+                       and c["real_video_evidence"]
+                       for c in indoor["short_virtual_zone_crossings"])
             assert all(t["site_kind"]=="same_real_laboratory_two_views"
                        and not t["real_geographic_journey"]
                        and not t["identity_verified"]
@@ -165,6 +170,7 @@ def main():
                 "verified_local_camera_tracklets_in_distributed_zip":len(
                     indoor["short_anonymous_tracklets"]),
                 "no_external_site_or_gps_claim":True,
+                "derived_virtual_area_crossings":len(indoor["short_virtual_zone_crossings"]),
                 "gps_or_person_geolocation_asserted":False,
                 "simulated_excel_rule_types":7,
                 "simulated_rules_separate_from_actual_video":True,
