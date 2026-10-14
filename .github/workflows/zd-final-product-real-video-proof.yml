@@ -1,0 +1,58 @@
+name: ZD Final Product Real Video Screen Proof
+on:
+  push:
+    branches:
+      - agent/continuous-capture-mvp-v1
+    paths:
+      - .github/workflows/zd-final-product-real-video-proof.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  browser-on-shipped-licensed-video:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download previous verified real-video research excerpts
+        uses: actions/download-artifact@v4
+        with:
+          name: zd-licensed-epfl-real-continuous-38-second-research-clips
+          run-id: 38585465839
+          github-token: ${{ github.token }}
+          path: /tmp/zd-authorized-research
+      - name: Install exact approved video in app media path
+        shell: bash
+        run: |
+          set -euo pipefail
+          find /tmp/zd-authorized-research -maxdepth 3 -type f
+          mkdir -p samples/demo-media
+          file="$(find /tmp/zd-authorized-research -name '真实原片连续双机画面_38秒.mp4' -type f -print -quit)"
+          test -n "$file"
+          cp "$file" samples/demo-media/epfl-dual-60-98.mp4
+          test "$(stat -c%s samples/demo-media/epfl-dual-60-98.mp4)" -gt 1000000
+      - name: Install application and Chromium
+        shell: bash
+        run: |
+          python -m pip install -q -r requirements.txt -r requirements-business.txt
+          python -m pip install -q playwright
+          python -m playwright install --with-deps chromium
+      - name: Verify real original video renders on home and every site module works
+        shell: bash
+        run: |
+          mkdir -p reports
+          python scripts/browser_operational_site_with_video.py
+      - name: Publish ACTUAL authenticated browser proof screenshots (not source AVI)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zd-real-video-product-browser-evidence
+          path: |
+            reports/ui-shipped-real-*.png
+            reports/actual-product-server.log
+          retention-days: 2
+          if-no-files-found: warn
