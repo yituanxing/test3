@@ -4,6 +4,13 @@
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 60% -30%,#1b4168,transparent 45%),var(--bg);font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:var(--text)}
 a{color:var(--blue);text-decoration:none}button,select,input{font:inherit}button{background:#2877cc;color:white;border:0;border-radius:9px;padding:10px 15px;cursor:pointer;font-weight:600}button:hover{filter:brightness(1.12)}button:disabled{opacity:.48;cursor:not-allowed}.subtle{background:var(--panel2);border:1px solid var(--border);color:var(--text)}.wrap{max-width:1320px;margin:auto;padding:26px 28px 58px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-weight:800;font-size:18px}.badge{padding:4px 10px;border-radius:999px;background:#203952;color:#8ec5fa;font-size:12px;margin-left:10px}.tabs{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.tabs a{color:#b9cae0}.tabs a.active{color:white;border-bottom:2px solid var(--blue);padding-bottom:7px}.hero{margin:35px 0 22px;display:flex;justify-content:space-between;gap:30px;align-items:center}.hero h1{font-size:30px;line-height:1.24;margin:0 0 9px;letter-spacing:-.8px}.hero p{margin:0;color:var(--muted);max-width:800px}.hero .actions{display:flex;flex-wrap:wrap;gap:10px}.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}.kpi{padding:20px 22px;background:var(--panel);border:1px solid var(--border);border-radius:15px}.kpi label{display:block;color:var(--muted);font-size:12px}.kpi strong{display:block;font-size:31px;margin:6px 0 3px}.kpi small{color:var(--muted)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:17px}.card{min-width:0;padding:20px;background:var(--panel);border:1px solid var(--border);border-radius:15px}.wide{grid-column:1/-1}.card h2{font-size:16px;margin:0 0 7px}.hint{color:var(--muted);font-size:12px;margin:0 0 15px}.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.inline{display:flex;gap:9px;align-items:center;flex-wrap:wrap}select{background:var(--panel2);color:var(--text);padding:9px 12px;border:1px solid var(--border);border-radius:9px;min-width:100px}.stage{padding:14px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}.stage:last-child{border-bottom:none}.stname{font-weight:650}.stnote{font-size:12px;color:var(--muted)}.status{display:inline-block;white-space:nowrap;border-radius:50px;padding:5px 10px;font-size:12px;background:#243a54;color:#b9d5f8}.status.good{background:#163d3b;color:#78e4bd}.status.warn{background:#4c3a28;color:#ffcc84}.status.bad{background:#4b282c;color:#ffadad}.scroll{max-height:280px;overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}th{text-align:left;font-size:12px;color:#aabbd2;font-weight:600;background:#1a2a42;position:sticky;top:0}th,td{padding:10px;border-bottom:1px solid #263853}tr:hover td{background:#182741}.bars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));align-items:end;gap:12px;height:175px;margin-top:22px}.bar-wrap{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:7px}.bar{width:54%;min-height:3px;background:linear-gradient(0deg,#2468a9,#65b8fc);border-radius:6px 6px 0 0;transition:height .3s}.bdate{font-size:11px;color:var(--muted)}.legend{font-size:12px;color:var(--muted)}.code{font-family:ui-monospace,monospace;color:#9bc5f0}.note{border-left:3px solid var(--orange);padding:10px 14px;background:#3e3223;color:#f4d8af;border-radius:5px;margin-top:18px}.error{color:#ffabab;white-space:pre-wrap;font-size:12px}#toast{position:fixed;right:20px;bottom:20px;padding:13px 18px;background:#153b33;border:1px solid #337e66;border-radius:10px;display:none;max-width:450px;box-shadow:0 20px 40px #0005}#toast.err{background:#4e2629;border-color:#a44949}footer{margin-top:25px;color:var(--muted);font-size:12px}
 @media(max-width:900px){.grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.wide{grid-column:1}.hero{display:block}.hero .actions{margin-top:15px}.top{align-items:start;flex-direction:column}.wrap{padding:16px}}@media(max-width:480px){.metrics{grid-template-columns:1fr 1fr}.kpi{padding:13px}.kpi strong{font-size:24px}}
+
+/* Fail closed: global upstream sync/processing buttons are displayed only
+   after the server authenticated a state-level operator. Legacy CSS [hidden]
+   and async role-check timings cannot leak unusable privileged controls. */
+#videoButton,#syncButton{display:none!important}
+body[data-state-ui="yes"] #videoButton,
+body[data-state-ui="yes"] #syncButton{display:inline-block!important}
 </style><script src="/ui/role-navigation.js"></script><script>
 (function(){
 const token=sessionStorage.getItem('zd_access_token');
@@ -32,6 +39,7 @@ window.addEventListener('load',async()=>{
     const r=await fetch('/api/auth/me');
     if(!r.ok)return;
     const user=await r.json();
+    document.body.dataset.stateUi=user.level===1?'yes':'no';
     zdApplyRoleNavigation(user);
     const badge=document.createElement('div');badge.style.cssText='position:fixed;right:12px;top:6px;z-index:500;background:#132c4a;color:#fff;border-radius:8px;padding:5px 12px;font:12px system-ui';
     badge.textContent=user.username+' · '+user.region_name+' · '+user.role+'　';
@@ -132,6 +140,7 @@ async function reload(){try{
  // upstream Frigate health endpoint is intentionally admin-only, while
  // all subordinate levels may see their own scoped local observations.
  const actor=await api('/api/auth/me');
+ document.body.dataset.stateUi=actor.level===1?'yes':'no';
  zdApplyRoleNavigation(actor);
  let scope=$('scopeRegion'), chosen=scope.value;
  let [r,o,f,h,obs,activityDetail,places,sources]=await Promise.all([api('/api/regions'),
