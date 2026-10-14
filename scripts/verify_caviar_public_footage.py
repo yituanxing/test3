@@ -153,6 +153,36 @@ def main():
                     assert qa.status_code==201,qa.text[:600]
                     assert qa.json()['provider']=='yolo_bytetrack'
                     detector_metrics['first_local_track_quality_id']=qa.json()['created_review_id']
+                if view=='front':
+                    # The first 24 real 384×288 front-view frames yielded
+                    # recall 2/47 at IoU .50 for default 640 input. A bounded
+                    # high-resolution experiment tests an EXISTING pretrained
+                    # YOLO setting, rather than inventing a tracker or tuning
+                    # by manufactured same-person IDs. No claim of improvement
+                    # is made until actual measured metrics are available.
+                    better=client.get(
+                        f"/api/cctv/sources/{got['source_id']}/person-detector-baseline",
+                        headers=auth,params={
+                            'max_frames':24,'sample_every':1,'image_size':960})
+                    assert better.status_code==200,better.text[:700]
+                    hi=better.json()
+                    assert hi['video_sha256']==detector_metrics['video_sha256']
+                    assert hi['detector_image_size']==960
+                    assert hi['model_weights_sha256']==detector_metrics['model_weights_sha256']
+                    assert hi['predicted_person_boxes']==(
+                        hi['detection_evaluation']['true_positives']+
+                        hi['detection_evaluation']['false_positives'])
+                    report['front_input_size_ab_test']={
+                        'same_original_video_and_pretrained_weights':True,
+                        'model_boxes_are_not_gt':True,
+                        'auto_cross_camera_identity_evaluated':False,
+                        'size_640':{'detections':detector_metrics['predicted_person_boxes'],
+                                    'tracked':detector_metrics['tracker_assigned_boxes'],
+                                    'detection':detector_metrics['detection_evaluation']},
+                        'size_960':{'detections':hi['predicted_person_boxes'],
+                                    'tracked':hi['tracker_assigned_boxes'],
+                                    'detection':hi['detection_evaluation']},
+                    }
                 report['verified_cameras'].append({
                     'real_yolo_person_detector_to_existing_bytetrack':detector_metrics,
 
