@@ -51,7 +51,12 @@ def main():
                         page.locator('input[name="username"]').fill("ci_video_site")
                         page.locator('input[name="password"]').fill("ci-video-demo-2026-password")
                         page.locator('button[type="submit"]').click()
-                        expect(page).to_have_url(base+"/real",timeout=15000)
+                        expect(page).to_have_url(base+"/portal",timeout=15000)
+                        expect(page.locator("#navigation")).to_be_visible()
+                        # Business-first landing, with authentic video and explicit data provenance.
+                        expect(page.locator("#portalResearchClip")).to_be_visible()
+                        page.screenshot(path=str(OUT/"ui-shipped-business-first-login.png"),full_page=True)
+                        page.goto(base+"/real")
                         expect(page.locator(".zd-sidebar")).to_be_visible()
                         expect(page.locator(".zd-panel[data-view=overview]")).to_be_visible()
                         expect(page.locator("#overviewKpis")).to_contain_text("119",timeout=25000)
