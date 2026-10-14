@@ -293,6 +293,20 @@ def run():
                             "14条",timeout=15000)
                         page.locator("#sceneTrackSelect").select_option(
                             spatial['short_anonymous_tracklets'][0]['fragment_id'])
+                        page.locator("#sceneOverview").click()
+                        expect(page.locator("#sceneTrackOverlay line")).to_have_count(
+                            1,timeout=15000)
+                        # The SVG is derived from two GT-gated real video
+                        # sample locations; not a decorative always-on path.
+                        first_points=spatial['short_anonymous_tracklets'][0]['points']
+                        line=page.locator("#sceneTrackOverlay line")
+                        assert abs(float(line.get_attribute("x1"))-
+                                   first_points[0]["x"])<0.01
+                        assert abs(float(line.get_attribute("y2"))-
+                                   first_points[1]["y"])<0.01
+                        page.screenshot(
+                            path=str(OUT/"ui-epfl-one-second-real-tracklets.png"),
+                            full_page=True)
                         expect(page.locator("#sceneTrackRows")).to_contain_text(
                             spatial['short_anonymous_tracklets'][0]['fragment_id'])
                         assert all('candidate_key' not in json.dumps(f)
@@ -363,6 +377,7 @@ def run():
                 "video_derived_default_zone_sampled_instants":len(spatial['demo_zone_events']),
                 "coarse_scene_scrubber_verified_in_browser":True,
                 "verified_short_local_link_segments_shown":len(spatial['short_anonymous_tracklets']),
+                "browser_svg_track_coordinates_match_source":True,
                 "synthetic_excel_not_auto_loaded_in_real_ui":True,
                 "video_derived_zone_rule_reposition_verified_in_browser":True,
                 "gps_or_real_cross_place_tracking_claimed":False,
