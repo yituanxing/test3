@@ -241,7 +241,7 @@ def run():
                             full_page=True)
                         # Real VIDEO-DERIVED aggregated scene rules, not
                         # pre-filled fictional people, WGS84 points or maps.
-                        expect(page.locator("#sceneHeatGrid > div")).to_have_count(
+                        expect(page.locator("#sceneHeatGrid > button")).to_have_count(
                             64,timeout=15000)
                         expect(page.locator("#sceneEventRows")).to_contain_text(
                             "仅演示",timeout=15000)
