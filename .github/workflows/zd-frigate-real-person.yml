@@ -25,6 +25,7 @@ name: ZD Frigate Real Person CI
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: zd-frigate-real-person-${{ github.ref }}
@@ -43,6 +44,33 @@ jobs:
           cache: pip
       - name: Install backend dependencies
         run: python -m pip install -r requirements.txt -r requirements-business.txt
+      # Fast feedback by default. Full expensive CAVIAR/EPFL is automatic
+      # when its owner inputs change, or opt-in with [cctv-full] on a commit.
+      # PR checkout is a merge commit (HEAD^1 = PR base); fail closed to
+      # full testing if the merge/base cannot be inspected.
+      - name: Classify changed paths for targeted media validation
+        id: media_scope
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_HEAD_MESSAGE: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          run_full=false
+          if ! git rev-parse HEAD^1 >/dev/null 2>&1; then
+            run_full=true
+          else
+            git diff --name-only HEAD^1 HEAD > /tmp/zd_changed_files
+            cat /tmp/zd_changed_files
+            # Only owner input/output changes require expensive real footage
+            # downloads and pretrained model dependencies.
+            if grep -Eq '^(app/(cctv_dataset|epfl_review|occurrences|research_linkage|site_model)\.py|scripts/(verify_caviar_public_footage|verify_epfl_six_person_ground_truth|verify_epfl_alternative_cameras|browser_epfl_six_person_review|assess_real_person_readiness)\.py|tests/(test_cctv_dataset|test_epfl_six_person_geometry|test_epfl_review)\.py|requirements-(tracking|person-detection)\.txt|samples/)' /tmp/zd_changed_files; then
+              run_full=true
+            fi
+          fi
+          git log -1 --format=%s | grep -q '\[cctv-full\]' && run_full=true || true
+          echo "run=$run_full" >> "$GITHUB_OUTPUT"
+          echo "Targeted full public-media run: $run_full"
       - name: Python compilation and isolated regression suite
         run: |
           python -m compileall -q app tests
@@ -65,13 +93,38 @@ jobs:
             reports/ui-*.png
             reports/ui-server.log
           if-no-files-found: warn
+      # Restore a fixed, previously verified (GT-free) EPFL bundle on fast
+      # UI-only PRs. Do not claim this as a new real-video inference result.
+      # The hash/model/dataset contract is still enforced by the importer.
+      - name: Restore EPFL candidate artifact from validated owner CI
+        if: steps.media_scope.outputs.run != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: zd-p0-excel-demo-source
+          run-id: 38515621715
+          github-token: ${{ github.token }}
+          path: .ci-restored-epfl
+      - name: Verify restored research evidence is separate from runtime GT
+        if: steps.media_scope.outputs.run != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -p .ci-restored-epfl/zd-demo-local-source.zip \
+            zd-demo/config/epfl6p_real_pair_candidates_v1.json \
+            > config/epfl6p_real_pair_candidates_v1.json
+          python - <<'PY'
+          from app.epfl_review import _bundled_records
+          records=_bundled_records()
+          assert len(records)==119, len(records)
+          print('RESTORED_FROM_VALIDATED_OWNER_RUN=38515621715; pairs=119; NOT newly inferred')
+          PY
       # Explicit, short opt-in: verify actual Edinburgh CAVIAR files, not mocks.
       # Does not repeat the heavyweight GB28181/Frigate Docker integration.
       - name: Install existing Roboflow tracking + pretrained person detector for real CCTV owner
-        if: contains(github.event.pull_request.labels.*.name, 'cctv-real')
+        if: steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         run: python -m pip install -r requirements-person-detection.txt
       - name: Validate real public CAVIAR two-camera media and existing ByteTrack
-        if: contains(github.event.pull_request.labels.*.name, 'cctv-real')
+        if: steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         run: |
           python -m pytest -q tests/test_cctv_dataset.py
           # SciPy exists only after optional tracking dependencies are installed.
@@ -82,13 +135,13 @@ jobs:
       # A/B candidate only: EPFL synchronized laboratory pair. Do not replace
       # accepted CAVIAR source until manual image review approves it.
       - name: Evaluate EPFL six-person official GT and real two-camera tracking
-        if: contains(github.event.pull_request.labels.*.name, 'cctv-real')
+        if: steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         run: python -m scripts.verify_epfl_six_person_ground_truth
       - name: Full browser EPFL real-video candidate import and audit closure
-        if: contains(github.event.pull_request.labels.*.name, 'cctv-real')
+        if: steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         run: python -m scripts.browser_epfl_six_person_review
       - name: Preserve real public CCTV evidence (no raw licensed videos)
-        if: always() && contains(github.event.pull_request.labels.*.name, 'cctv-real')
+        if: always() && steps.media_scope.outputs.run == 'true' && contains(github.event.pull_request.labels.*.name, 'cctv-real')
         uses: actions/upload-artifact@v4
         with:
           name: public-caviar-actual-video-proof
