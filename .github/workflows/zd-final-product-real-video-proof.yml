@@ -65,6 +65,8 @@ jobs:
           python -m pip install -q -r requirements.txt -r requirements-business.txt
           python -m pip install -q playwright
           python -m playwright install --with-deps chromium
+      - name: Verify first-run demo is populated and real-only data stays untouched
+        run: python -m pytest -q tests/test_demo_first_run_ready.py tests/test_real_only_runtime.py
       - name: Verify real original video renders on home and every site module works
         shell: bash
         run: |
