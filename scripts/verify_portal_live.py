@@ -80,10 +80,15 @@ def run(args):
                         'name': '授权公开视频RTSP验收场所（非现场）',
                         'region_id': leaf['id']})
             assert place['active'] is True
-            binding = request(client, 'POST', args.backend + '/api/frigate/cameras',
-                headers=headers, json={'camera': args.camera, 'place_id': place['id']})
-            assert binding['place_id'] == place['id']
-            report['checks']['camera_place_binding'] = 'PASS'
+            # Binding must already exist BEFORE Frigate recorded its events.
+            # Never rebind retroactively after inference: that makes event-time
+            # ownership unknown and the API correctly skips the old events.
+            bindings = request(client, 'GET', args.backend + '/api/frigate/cameras',
+                               headers=headers)
+            binding = next((b for b in bindings if b['camera'] == args.camera), None)
+            assert binding is not None, 'Missing pre-capture camera/place binding'
+            assert binding['place_id'] == place['id'], 'Camera was pre-bound to another place'
+            report['checks']['binding_created_before_video_capture'] = 'PASS'
 
             upstream = request(client, 'GET', args.frigate + '/api/events',
                                params={'camera': args.camera, 'label': 'person', 'limit': 200})
