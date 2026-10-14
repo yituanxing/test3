@@ -486,6 +486,116 @@ def compare_caviar_pair(source_id:int,request:Request,
         }
 
 
+@router.get('/api/cctv/sources/{source_id}/model-frame')
+def model_detection_frame(source_id:int,request:Request,
+                          run_key:str=Query(pattern=r'^[0-9a-f]{32}
+def annotated_frame(source_id:int,request:Request,
+                    frame:int=Query(1,ge=1,le=25000)):
+    """Actual decoded MPEG picture plus ORIGINAL manual CVML boxes.
+
+    Labels are camera-local tracking IDs. No HOG/YOLO/face recognition
+    is claimed here; manual bounding boxes are original published truth.
+    """
+    with _db() as c:
+        access.check_source(c,request,source_id)
+        row=c.execute('''SELECT i.frames_available,s.uri FROM public_cctv_imports i
+          JOIN sources s ON s.id=i.source_id WHERE i.source_id=?''',
+          (source_id,)).fetchone()
+        if not row:
+            raise HTTPException(404,'该源不存在公开CAVIAR视频版本')
+        if frame>row['frames_available']:
+            raise HTTPException(422,'帧号超出该视频标注范围')
+        boxes=[dict(x) for x in c.execute('''SELECT camera_local_track_id,x,y,width,height
+            FROM public_cctv_track_boxes WHERE source_id=? AND frame_number=?
+            ORDER BY camera_local_track_id''',(source_id,frame))]
+    capture=cv2.VideoCapture(row['uri'])
+    try:
+        if not capture.isOpened():
+            raise HTTPException(409,'已登记CAVIAR视频文件目前不可读')
+        # MPEG2 random-access frame indexes may be unreliable, too.
+        # On the bounded tiny proof clip, decoding sequentially is exact.
+        picture=None
+        for index in range(frame):
+            ok,picture=capture.read()
+            if not ok:
+                raise HTTPException(409,'指定的监控帧目前无法解码')
+        if picture is None:
+            raise HTTPException(409,'指定的监控帧目前无法解码')
+        for box in boxes:
+            x,y,w,h=box['x'],box['y'],box['width'],box['height']
+            cv2.rectangle(picture,(x,y),(x+w,y+h),(40,235,100),2)
+            cv2.putText(picture,'local#'+box['camera_local_track_id'],
+                        (x,max(11,y-4)),cv2.FONT_HERSHEY_SIMPLEX,
+                        0.35,(30,235,100),1,cv2.LINE_AA)
+        # This watermark is in the output and cannot be mistaken for an
+        # inference result or a named physical-world identity.
+        cv2.rectangle(picture,(0,0),(picture.shape[1],24),(22,22,22),-1)
+        cv2.putText(picture,'CAVIAR GT annotated / camera-local IDs',
+                    (3,16),cv2.FONT_HERSHEY_SIMPLEX,0.37,(255,255,255),1)
+        ok,jpg=cv2.imencode('.jpg',picture,[cv2.IMWRITE_JPEG_QUALITY,82])
+        if not ok:
+            raise HTTPException(500,'当前监控帧 JPEG 编码失败')
+        return Response(content=jpg.tobytes(),media_type='image/jpeg',
+                headers={'Cache-Control':'no-store',
+                    'X-Annotations':'CAVIAR manual ground truth',
+                    'X-Camera-Local-Boxes':str(len(boxes))})
+    finally:
+        capture.release()
+),
+                          frame:int=Query(1,ge=1,le=600)):
+    """Actual licensed MPEG image with STORED YOLO+ByteTrack predictions.
+
+    Explicitly separate the blue model boxes from the official GT boxes and
+    reject content changes or a run_key from another source before decoding.
+    """
+    with _db() as c:
+        access.check_source(c,request,source_id)
+        record=c.execute("""SELECT run.frames_decoded,run.video_sha256,
+             run.model_name,run.tracker_name,s.uri
+             FROM model_track_runs run JOIN sources s ON s.id=run.source_id
+             WHERE run.run_key=? AND run.source_id=?""",(run_key,source_id)).fetchone()
+        if record is None:
+            raise HTTPException(404,'本源无此版本的真实模型推理证据')
+        if frame>record['frames_decoded']:
+            raise HTTPException(422,'帧号超出该次真实模型运行范围')
+        boxes=[dict(r) for r in c.execute("""SELECT local_track_id,x,y,width,height
+             FROM model_track_boxes WHERE run_key=? AND frame_number=?
+             ORDER BY local_track_id""",(run_key,frame))]
+        official=c.execute("""SELECT video_sha256 FROM public_cctv_imports
+             WHERE source_id=?""",(source_id,)).fetchone()
+    file=Path(record['uri'])
+    if (official is None or official['video_sha256']!=record['video_sha256']
+        or not file.is_file() or
+        hashlib.sha256(file.read_bytes()).hexdigest()!=record['video_sha256']):
+        raise HTTPException(409,'本地研究视频内容或模型运行来源已改变，拒绝展示无效证据')
+    cap=cv2.VideoCapture(str(file))
+    try:
+        if not cap.isOpened():
+            raise HTTPException(409,'研究视频无法打开')
+        picture=None
+        for _ in range(frame):
+            ok,picture=cap.read()
+            if not ok:
+                raise HTTPException(409,'模型对应帧无法解码')
+        for box in boxes:
+            x,y,w,h=box['x'],box['y'],box['width'],box['height']
+            cv2.rectangle(picture,(x,y),(x+w,y+h),(235,120,25),2)
+            cv2.putText(picture,'model-local#'+str(box['local_track_id']),
+                       (max(0,x),max(38,y-5)),cv2.FONT_HERSHEY_SIMPLEX,
+                       0.39,(235,120,25),1,cv2.LINE_AA)
+        cv2.rectangle(picture,(0,0),(picture.shape[1],24),(22,22,22),-1)
+        cv2.putText(picture,'YOLO11n+ByteTrack MODEL boxes; NOT GT or ID',
+                    (3,16),cv2.FONT_HERSHEY_SIMPLEX,.33,(255,255,255),1)
+        ok,jpg=cv2.imencode('.jpg',picture,[cv2.IMWRITE_JPEG_QUALITY,83])
+        if not ok:
+            raise HTTPException(500,'推理证据JPEG编码失败')
+        return Response(content=jpg.tobytes(),media_type='image/jpeg',headers={
+            'Cache-Control':'private, no-store','X-Annotations':'YOLO model local tracks, not ground truth',
+            'X-Run-Key':run_key,'X-Model-Boxes':str(len(boxes))})
+    finally:
+        cap.release()
+
+
 @router.get('/api/cctv/sources/{source_id}/frame')
 def annotated_frame(source_id:int,request:Request,
                     frame:int=Query(1,ge=1,le=25000)):
