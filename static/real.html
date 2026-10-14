@@ -144,6 +144,83 @@ details>summary:hover{text-decoration:underline}
 .video-proof .frame-status{background:#e9f0fc;padding:10px 12px;border-radius:8px;font-size:13px;margin:9px 0;color:#163b65}
 button[data-evidence-frame]{font-size:12px;padding:3px 7px;background:#e3effc;border-color:#a2c2e6;color:#124777}
 button[data-evidence-frame]:hover{background:#c5e0fa}
+
+/* ZD operational application shell; views are independent, not stacked. */
+body{margin:0;background:#f4f7fb!important;color:#1b304a;font:14px/1.55 "Segoe UI","Microsoft YaHei",Arial,sans-serif}
+body>header{display:none!important}
+.zd-shell{display:grid;grid-template-columns:235px minmax(0,1fr);min-height:100vh}
+.zd-sidebar{position:sticky;top:0;left:0;height:100vh;background:#122d49;color:#f2f6fa;padding:24px 13px;display:flex;flex-direction:column;z-index:15}
+.zd-brand{font-size:17px;font-weight:800;display:flex;align-items:center;gap:11px;padding:0 10px 31px}
+.zd-logo{width:43px;height:43px;border-radius:13px;background:#418fe0;display:grid;place-items:center;color:white;font-weight:850;letter-spacing:.1em}
+.zd-brand small{display:block;color:#9eb9d1;font-size:11px;font-weight:400}
+.zd-menu-heading{padding:8px 14px;font-size:11px;letter-spacing:.12em;color:#7895ae;margin:11px 0 4px}
+.zd-sidebar .zd-nav{width:100%;font:500 14px/1.4 "Segoe UI","Microsoft YaHei",sans-serif;text-decoration:none;text-align:left;display:flex;align-items:center;gap:13px;color:#cfdeed;background:transparent;border:0;border-radius:9px;padding:13px 15px;margin:2px 0;cursor:pointer}
+.zd-sidebar .zd-nav span{font-size:17px;width:22px;text-align:center}
+.zd-sidebar .zd-nav:hover,.zd-sidebar .zd-nav.selected{background:#245274;color:white}
+.zd-sidebar .zd-nav.selected{font-weight:750;box-shadow:inset 3px 0 0 #65b5fa}
+.zd-sidebar-bottom{font-size:12px;color:#b0c7d6;border-top:1px solid #35556c;padding:16px 10px;margin-top:auto}
+.zd-sidebar-bottom a{color:#e0eefb;float:right;text-decoration:none}
+.zd-status-light{display:inline-block;background:#43c19a;width:8px;height:8px;border-radius:50%;margin-right:7px}
+.zd-work{min-width:0;max-width:100%}
+.zd-top{height:69px;background:#fff;border-bottom:1px solid #e0e9f1;display:flex;justify-content:space-between;align-items:center;padding:0 37px;color:#1a3854}
+.zd-top strong{font-size:16px}
+.zd-top span{font-size:12px;color:#8090a0}
+.zd-work main{max-width:1320px;margin:0 auto;padding:27px 38px 60px!important}
+.zd-panel[hidden],.zd-sidebar .zd-nav[hidden]{display:none!important}
+.zd-panel{animation:zd-appear .16s ease}
+@keyframes zd-appear{from{opacity:.6;transform:translateY(3px)}to{opacity:1;transform:none}}
+.zd-welcome{background:linear-gradient(120deg,#153f65,#246d9f);color:white;border-radius:17px;padding:29px 36px;margin-bottom:23px}
+.zd-welcome .zd-eyebrow{color:#bddcee;letter-spacing:.07em;font-weight:700;font-size:12px}
+.zd-welcome h1{font-size:29px;color:white;margin:6px 0 12px}
+.zd-welcome p{color:#dfedfa;font-size:14px;max-width:780px;line-height:1.9}
+.zd-welcome-actions{margin-top:20px;display:flex;gap:12px}
+.zd-welcome-actions button,.zd-primary-action{padding:11px 19px;border-radius:9px;color:#17496e!important;background:white!important;border:1px solid white!important;font-weight:750}
+.zd-welcome-actions .zd-ghost{background:transparent!important;color:white!important;border-color:#ffffff88!important}
+.zd-main-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(300px,.85fr);gap:18px}
+.zd-primary-card,.zd-summary-card{background:#fff;border:1px solid #dce7ef;border-radius:15px;padding:20px;box-shadow:0 4px 15px #182f4a08}
+.zd-card-title{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:13px}
+.zd-card-title b{font-size:17px}
+.zd-card-title span{font-size:11px;color:#8096aa}
+#overviewVideo{background:#081521;border-radius:11px;width:100%;min-height:260px;aspect-ratio:16/9;object-fit:contain;display:block}
+.zd-media-status{padding:13px 0;font-size:12px;color:#537b91}
+.zd-live-caption{border-radius:8px;padding:12px 14px;background:#ecf5fc;font-size:13px;color:#23557b}
+.zd-summary-card h2{font-size:20px;margin:0 0 8px}
+.zd-summary-card p{color:#75899a;font-size:13px}
+.zd-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:16px 0}
+.zd-summary-grid>div{padding:16px 12px;background:#f3f8fc;border:1px solid #e5edf3;border-radius:10px}
+.zd-summary-grid b{display:block;color:#195985;font-size:29px}
+.zd-summary-grid span{font-size:11px;color:#6b7d8d}
+.zd-success-note{background:#edf8f2;color:#3b7556;border-radius:8px;font-size:12px;padding:11px;margin-bottom:10px}
+.zd-inline-link{background:none!important;color:#21639a!important;padding:5px 0!important;border:none!important;box-shadow:none;text-align:left;font-weight:650}
+.zd-section-label{font-weight:800;margin:27px 0 12px;color:#2f455c;font-size:16px}
+.zd-action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.zd-action-grid>button{display:flex;flex-direction:column;align-items:flex-start;gap:7px;border:1px solid #dce6ee!important;color:#1a3b56!important;background:#fff!important;box-shadow:0 2px 10px #1529420a;padding:20px!important;border-radius:13px}
+.zd-action-grid>button:hover{border-color:#7ab1d5!important;transform:translateY(-1px)}
+.zd-step{font-size:12px;color:#4386ac}
+.zd-action-grid b{font-size:19px}
+.zd-action-grid small{color:#8090a1;font-size:12px;text-align:left}
+.zd-action-grid em{font-style:normal;color:#2678b1;margin-top:5px}
+.zd-bottom-info{font-size:12px;color:#8393a1;margin:24px 0}
+.zd-module-header{margin:5px 0 20px}
+.zd-module-header .zd-eyebrow{color:#2880ab;letter-spacing:.1em;font-size:12px;font-weight:800}
+.zd-module-header h1{font-size:29px;margin:6px 0}
+.zd-module-header p{color:#6c7d8e;font-size:14px;max-width:850px}
+.zd-panel .box{box-shadow:0 3px 18px #15294208!important;border-radius:13px}
+.zd-panel .story-hero,.zd-panel .story-steps,.zd-panel .stage-head{display:none!important}
+.zd-panel #videoEvidence{margin:14px 0!important}
+.zd-panel #researchActivity{margin:0!important}
+.zd-panel #realSceneAggregation{margin:0!important}
+.zd-panel #demoAlerts{margin:0!important}
+.zd-panel #excelRuleShowcase{margin:16px 0!important}
+.zd-panel details{max-width:100%}
+.zd-panel .video-proof h3{font-size:17px}
+.zd-panel .box h2{margin-top:0}
+#liveEvidence{display:block!important}
+#liveEvidence>summary{display:none}
+#liveEvidence:not([open])>*:not(summary){display:none!important}
+@media(max-width:1000px){.zd-shell{grid-template-columns:200px minmax(0,1fr)}.zd-main-grid{grid-template-columns:1fr}.zd-action-grid{grid-template-columns:1fr 1fr}.zd-work main{padding:23px!important}}
+@media(max-width:670px){.zd-shell{display:block}.zd-sidebar{height:auto;position:static;padding:12px;display:flex;flex-direction:row;flex-wrap:wrap;gap:2px}.zd-brand{width:100%;padding:4px 8px 10px}.zd-menu-heading,.zd-sidebar-bottom{display:none}.zd-sidebar .zd-nav{width:auto;font-size:12px;padding:8px 9px}.zd-sidebar .zd-nav span{display:none}.zd-top{height:48px;padding:0 16px}.zd-top span{display:none}.zd-work main{padding:15px!important}.zd-welcome{padding:20px}.zd-welcome h1{font-size:22px}.zd-main-grid,.zd-action-grid{grid-template-columns:1fr}.zd-summary-grid{grid-template-columns:repeat(2,1fr)}}
+
 </style></head><body>
 <header><b>ZD · 视频活动分析</b><nav aria-label="主导航">
 <a href="/real" aria-current="page">演示首页</a><a href="/cctv">双机检测证据</a>
@@ -649,9 +726,9 @@ async function initializeResearchMode(){
  try{
   const me=await api('/api/auth/me');
   if(me.level!==1){
-   $('introDemo').hidden=true;
-   $('localVideoPlayback').hidden=true;
-   document.querySelector('.story-steps').hidden=true;
+   if($('introDemo'))$('introDemo').hidden=true;
+   if($('localVideoPlayback'))$('localVideoPlayback').hidden=true;
+   if(document.querySelector('.story-steps'))document.querySelector('.story-steps').hidden=true;
    document.querySelectorAll('.stage-head').forEach(el=>el.hidden=true);
    $('liveEvidence').open=true;
    for(const id of ['researchActivity','demoAlerts','realSceneAggregation',
@@ -696,4 +773,6 @@ initializeResearchMode();
 $('days').onchange=reload;$('refresh').onclick=reload;
 $('logout').onclick=async ev=>{ev.preventDefault();await api('/api/auth/logout','POST').catch(()=>{});sessionStorage.removeItem('zd_access_token');location.replace('/login')};
 reload();
-</script></body></html>
+</script>
+<script src="/ui/showcase.js"></script>
+</body></html>
