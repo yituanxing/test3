@@ -304,7 +304,7 @@ function showAlert(key){
  '<div class="statline"><span>规则候选</span><b>'+esc(a.title)+'</b></div>'+
  '<div class="statline"><span>涉及场所</span><b>'+sites+'</b></div>'+
  '<div class="statline"><span>虚构标识</span><b>'+people+'</b></div>'+
- '<div class="statline"><span>当前复核状态</span><b>'+esc(a.status||'待复核')+'</b></div>'+
+ '<div class="statline"><span>当前复核状态</span><b>'+esc(({needs_review:'待复核',confirmed:'已核实',false_positive:'误报已排除'})[a.status]||a.status||'待复核')+'</b></div>'+
  '<h2>触发口径</h2><p>'+esc(a.detail||'请核对合成规则阈值和源数据。')+'</p>'+
  '<h2>原始模拟观测证据 ID</h2><div class="code">'+esc((a.observation_ids||[]).join(', ')||'—')+'</div><p class="smallnote">ID 对应合成观测；未附真实照片，也不表明真实身份匹配。</p></section>'+
  '<section class="panel"><h2>人工核查记录</h2>'+
