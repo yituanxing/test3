@@ -17,11 +17,12 @@ from app import epfl_review
 router = APIRouter()
 _db = None
 
-# Fixed, conservative association gates in EPFL common ground-grid units.
-# Uncertain/ambiguous movement causes a NEW fragment, not an identity merge.
-MAX_GAP_FRAMES = 150
-MAX_MOVEMENT_PER_125_FRAMES = 40.0
-AMBIGUITY_MARGIN = 8.0
+# Dataset-scoped EPFL research parameters. No real identity or general ReID.
+# Link ONLY immediate 25-frame neighbors (~1s) with mutual-nearest position,
+# 30 grid-unit displacement and >=35-unit separation to the next alternative.
+TEMPORAL_GAP_FRAMES = 25
+TEMPORAL_MAX_DISTANCE = 30.0
+TEMPORAL_ISOLATION_MARGIN = 35.0
 
 
 def _center(row):
@@ -35,62 +36,79 @@ def _center(row):
 
 
 def track_fragments(rows, allow_temporal=True):
-    """Associate different TIMESTAMPS without GT. No cross-site ReID.
+    """Bounded tracklets across the two *real* EPFL synchronized views.
 
-    A pair already refers to the same time in two calibrated cameras.
-    The temporal association is separate and only accepted on unambiguous
-    mutual-nearest ground plane positions. Return abstention by fragmentation.
+    Uses detector-derived ground points only, never official person identity.
+    Refuses to connect when either side has another reasonably close option.
+    Only the exact adjacent 25-frame pair is eligible; missed detections
+    terminate the fragment rather than guessing identity through a long gap.
     """
-    ordered = sorted((dict(x) for x in rows),
-                     key=lambda x: (x["frame_0_based"], x["candidate_key"]))
+    ordered = sorted((dict(r) for r in rows),
+                     key=lambda r: (r["frame_0_based"], r["candidate_key"]))
+    frames = sorted({r["frame_0_based"] for r in ordered})
     fragments = []
-    for frame in sorted({r["frame_0_based"] for r in ordered}):
+    last_frame = {}
+    for frame in frames:
         current = [r for r in ordered if r["frame_0_based"] == frame]
-        eligible = []
-        for index, row in enumerate(current):
+        for row in current:
             xy = _center(row)
-            row["ground_xy"] = list(xy) if xy else None
-            if xy is None or not allow_temporal:
-                continue
-            for fidx, track in enumerate(fragments):
-                gap = frame - track["end_frame"]
-                if not 0 < gap <= MAX_GAP_FRAMES:
+            row["ground_xy"] = list(xy) if xy is not None else None
+
+        prev_tracks = last_frame.get(frame - TEMPORAL_GAP_FRAMES, [])
+        positions = [(idx, fragments[ti]["ground_xy"])
+                     for idx, ti in enumerate(prev_tracks)
+                     if fragments[ti]["ground_xy"] is not None]
+        edges = []
+        if allow_temporal:
+            for curidx, cur in enumerate(current):
+                if cur["ground_xy"] is None:
                     continue
-                dist = hypot(xy[0] - track["ground_xy"][0],
-                             xy[1] - track["ground_xy"][1])
-                gate = MAX_MOVEMENT_PER_125_FRAMES * gap / 125.0
-                if dist <= gate:
-                    eligible.append((dist, index, fidx))
-        # A match is accepted only if mutual nearest and both its alternative
-        # candidates are farther by the fixed ambiguity margin.
+                for prev_idx, xy in positions:
+                    distance = hypot(cur["ground_xy"][0] - xy[0],
+                                     cur["ground_xy"][1] - xy[1])
+                    edges.append((distance, curidx, prev_idx))
         picked = []
-        for dist, idx, fidx in sorted(eligible):
-            competitor_row = [d for d, i, f in eligible if i == idx and f != fidx]
-            competitor_track = [d for d, i, f in eligible if f == fidx and i != idx]
-            if ((not competitor_row or min(competitor_row) - dist >= AMBIGUITY_MARGIN)
-                and (not competitor_track or
-                     min(competitor_track) - dist >= AMBIGUITY_MARGIN)):
-                picked.append((dist, idx, fidx))
-        used_rows, used_tracks = set(), set()
-        for dist, idx, fidx in picked:
-            if idx in used_rows or fidx in used_tracks:
+        for distance, ci, pi in sorted(edges):
+            if distance > TEMPORAL_MAX_DISTANCE:
                 continue
-            track = fragments[fidx]
-            row = current[idx]
-            track["end_frame"] = frame
-            track["ground_xy"] = row["ground_xy"]
-            track["observations"].append(row)
-            used_rows.add(idx)
-            used_tracks.add(fidx)
+            # Compare ALL alternatives (not only other candidates inside the
+            # distance gate), otherwise a nearby second person is ignored.
+            others_cur = [d for d, i, j in edges if i == ci and j != pi]
+            others_prev = [d for d, i, j in edges if j == pi and i != ci]
+            if (others_cur and min(others_cur) - distance <
+                    TEMPORAL_ISOLATION_MARGIN):
+                continue
+            if (others_prev and min(others_prev) - distance <
+                    TEMPORAL_ISOLATION_MARGIN):
+                continue
+            picked.append((distance, ci, pi))
+
+        by_current = {}
+        used_previous = set()
+        for distance, ci, pi in picked:
+            if ci in by_current or pi in used_previous:
+                continue
+            by_current[ci] = prev_tracks[pi]
+            used_previous.add(pi)
+
+        current_fragments = []
         for idx, row in enumerate(current):
-            if idx in used_rows:
-                continue
-            key = "V%03d" % (len(fragments) + 1)
-            fragments.append({
-                "fragment_id": key, "start_frame": frame,
-                "end_frame": frame, "ground_xy": row["ground_xy"],
-                "observations": [row],
-            })
+            if idx in by_current:
+                trackid = by_current[idx]
+                item = fragments[trackid]
+                item["end_frame"] = frame
+                item["ground_xy"] = row["ground_xy"]
+                item["observations"].append(row)
+            else:
+                trackid = len(fragments)
+                fragments.append({
+                    "fragment_id": "V%03d" % (trackid + 1),
+                    "start_frame": frame, "end_frame": frame,
+                    "ground_xy": row["ground_xy"],
+                    "observations": [row],
+                })
+            current_fragments.append(trackid)
+        last_frame[frame] = current_fragments
     return fragments
 
 
