@@ -210,3 +210,52 @@ def test_simulated_excel_alerts_are_admin_only_and_not_written_to_db(auth):
         assert c.execute('SELECT COUNT(*) FROM synthetic_observations').fetchone()[0]==0
         assert c.execute('SELECT COUNT(*) FROM synthetic_alert_reviews').fetchone()[0]==0
 
+
+
+def test_real_video_scene_aggregate_is_anonymous_and_has_no_fake_gps():
+    from app.real_scene_aggregate import summarize_scene
+    # These values are a deterministic UNIT fixture, not actual EPFL media.
+    rows=[_row("a",500,120,150,122,150),
+          _row("b",500,180,110,182,110),
+          _row("c",500,240,210,242,210),
+          _row("d",525,140,180,142,180)]
+    facts=real_activity.activity_summary(rows,25.,temporal_verified=False)
+    result=summarize_scene({"ready":True,**facts},minimum_observations=3)
+    assert result["total_observations"]==4
+    assert len(result["demo_scene_events"])==1
+    assert result["demo_scene_events"][0]["video_frame"]==500
+    assert result["demo_scene_events"][0]["paired_detection_count"]==3
+    assert sum(x["paired_detection_count"] for x in result["heat_cells"])==4
+    assert result["wgs84_available"] is False
+    assert result["real_cross_location_identity_available"] is False
+    assert result["geographic_trajectory_available"] is False
+    assert result["warning_is_confirmed_risk"] is False
+    assert "candidate_key" not in json.dumps(result)
+    assert "anonymous_fragment_id" not in json.dumps(result)
+    assert "latitude" not in json.dumps(result)
+
+
+def test_real_video_scene_aggregate_requires_real_import_and_admin(auth,monkeypatch):
+    from app.real_scene_aggregate import summarize_scene
+    main,epfl,client,admin,county,tmp_path=auth
+    assert client.get("/api/real/scene-aggregate").status_code==401
+    assert client.get("/api/real/scene-aggregate",headers=county).status_code==403
+    empty=client.get("/api/real/scene-aggregate",headers=admin).json()
+    assert not empty["ready"] and empty["total_observations"]==0
+    assert not empty["demo_scene_events"]
+    raw=_manifest()
+    package=tmp_path/"from-real-footage-ci-bundle.json"
+    package.write_text(json.dumps(raw),encoding="utf-8")
+    monkeypatch.setattr(epfl,"BUNDLED_CANDIDATES",package)
+    r=client.post("/api/research/epfl/bundled/import",headers=admin,json={})
+    assert r.status_code==201
+    result=client.get("/api/real/scene-aggregate?minimum_observations=1",
+                      headers=admin).json()
+    assert result["ready"] and result["total_observations"]==2
+    assert len(result["demo_scene_events"])==2
+    assert len(result["heat_cells"])>=1
+    assert client.get("/api/real/scene-aggregate?minimum_observations=11",
+                      headers=admin).status_code==422
+    with main.db() as db:
+        assert db.execute("SELECT COUNT(*) FROM synthetic_observations").fetchone()[0]==0
+        assert db.execute("SELECT COUNT(*) FROM synthetic_alert_reviews").fetchone()[0]==0
