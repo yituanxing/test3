@@ -147,6 +147,14 @@ def run():
                         # read model, rather than 119 candidates trapped inside
                         # the research QA page or synthetic P### business.
                         page.goto(base+"/real")
+                        expect(page.locator('.zd-panel[data-view="overview"]')).to_be_visible()
+                        expect(page.locator('.zd-panel[data-view="video"]')).to_be_hidden()
+                        assert page.locator('.zd-nav[href="/admin"]').count()==1
+                        assert page.locator('.zd-nav[href="/monitor"]').count()==1
+                        page.screenshot(path=str(OUT/"ui-product-home-overview.png"),full_page=True)
+                        page.locator('.zd-nav[data-panel="video"]').click()
+                        expect(page.locator("#researchActivity")).to_be_visible()
+                        expect(page.locator('.zd-panel[data-view="space"]')).to_be_hidden()
                         expect(page.locator("#activityStats")).to_contain_text(
                             "119", timeout=15000)
                         expect(page.locator("#activityTable")).to_contain_text(
@@ -196,8 +204,13 @@ def run():
                                    and a['source_evidence_is_real_video']
                                    and len(a['supporting_candidate_keys'])>=2
                                    for a in alert_facts['alerts'])
+                        page.locator('.zd-nav[data-panel="alerts"]').click()
+                        expect(page.locator("#demoAlerts")).to_be_visible()
                         expect(page.locator("#demoAlertRows")).to_contain_text(
                             "EPFL-DEMO",timeout=15000)
+                        page.screenshot(path=str(OUT/"ui-product-activity-alerts.png"),full_page=True)
+                        page.locator('.zd-nav[data-panel="acceptance"]').click()
+                        expect(page.locator("#excelRuleShowcase")).to_be_visible()
                         # Synthetic P### rule rows must NOT be loaded by
                         # default on real-video dashboard. Only explicit,
                         # separately labeled manual Excel algorithm checks.
@@ -248,6 +261,10 @@ def run():
                             full_page=True)
                         # Real VIDEO-DERIVED aggregated scene rules, not
                         # pre-filled fictional people, WGS84 points or maps.
+                        page.locator('.zd-nav[data-panel="space"]').click()
+                        expect(page.locator("#realSceneAggregation")).to_be_visible()
+                        expect(page.locator("#excelRuleShowcase")).to_be_hidden()
+                        page.screenshot(path=str(OUT/"ui-product-space-module.png"),full_page=True)
                         expect(page.locator("#sceneHeatGrid > button")).to_have_count(
                             64,timeout=15000)
                         expect(page.locator("#sceneEventRows")).to_contain_text(
