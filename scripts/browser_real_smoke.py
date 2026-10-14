@@ -1,0 +1,77 @@
+"""Chromium smoke for the real-only UI; no fake camera event is generated."""
+import os
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+from urllib.request import urlopen
+
+from playwright.sync_api import sync_playwright, expect
+
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / "reports"
+
+
+def main():
+    OUT.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory() as directory:
+        env = dict(os.environ, ZD_DATA_DIR=directory, ZD_LEGACY_MODE="0")
+        env.pop("PYTEST_CURRENT_TEST", None)
+        env.pop("ZD_AUTH_TEST_COMPAT", None)
+        os.environ["ZD_DATA_DIR"] = directory
+        os.environ["ZD_LEGACY_MODE"] = "0"
+        from app import main as backend, access
+        backend.setup_db()
+        with backend.db() as conn:
+            assert conn.execute("SELECT COUNT(*) FROM places").fetchone()[0] == 0
+            root = conn.execute("SELECT id FROM regions WHERE level=1 LIMIT 1").fetchone()[0]
+            access.create_user(conn, "ci_real_ui", "temporary-ci-ui-password-2026", root)
+        with (OUT / "ui-real-server.log").open("w") as logfile:
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "uvicorn", "app.main:app", "--host",
+                 "127.0.0.1", "--port", "8094"], cwd=ROOT, env=env,
+                stdout=logfile, stderr=subprocess.STDOUT)
+            try:
+                base = "http://127.0.0.1:8094"
+                for _ in range(90):
+                    if proc.poll() is not None:
+                        raise RuntimeError("server exited")
+                    try:
+                        with urlopen(base + "/api/health", timeout=1):
+                            break
+                    except OSError:
+                        time.sleep(0.25)
+                else:
+                    raise RuntimeError("server startup timed out")
+                with sync_playwright() as playwright:
+                    browser = playwright.chromium.launch(headless=True, args=["--no-sandbox"])
+                    try:
+                        page = browser.new_page(viewport={"width": 1280, "height": 900})
+                        errors = []
+                        page.on("pageerror", lambda e: errors.append(str(e)))
+                        page.goto(base + "/portal")
+                        expect(page).to_have_url(base + "/login")
+                        page.locator('input[name="username"]').fill("ci_real_ui")
+                        page.locator('input[name="password"]').fill("temporary-ci-ui-password-2026")
+                        page.locator('button[type="submit"]').click()
+                        expect(page).to_have_url(base + "/real", timeout=12000)
+                        expect(page.locator("#realEvents")).to_have_text("0", timeout=12000)
+                        expect(page.locator("#places")).to_contain_text("本辖区尚无场所")
+                        assert page.locator('a[href="/business"]').count() == 0
+                        page.screenshot(path=str(OUT / "ui-real-only-landing.png"), full_page=True)
+                        page.goto(base + "/monitor")
+                        assert page.locator('a[href="/business"]').count() == 0
+                        page.goto(base + "/cctv")
+                        assert page.locator('a[href="/base"]').count() == 0
+                        assert not errors, str(errors)
+                    finally:
+                        browser.close()
+            finally:
+                proc.terminate()
+                proc.wait(timeout=15)
+    print("REAL_ONLY_BROWSER_PASS; no synthetic seed or camera event")
+
+
+if __name__ == "__main__":
+    main()
