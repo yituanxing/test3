@@ -4,6 +4,7 @@ Identity recognition and cross-person tracking are deliberately out of scope her
 Demo records are always clearly labeled as simulated.
 """
 import os
+import sys
 import json
 import sqlite3
 import hashlib
@@ -15,7 +16,6 @@ from contextlib import asynccontextmanager
 import cv2
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse, Response, JSONResponse, RedirectResponse
 from app.detector import choose_detector, detector_info, box_quality
 from app.media_probe import probe_video
@@ -70,7 +70,7 @@ def legacy_synthetic_tests_enabled() -> bool:
     application, browser, or local demo always defaults to REAL-ONLY.
     """
     return (os.getenv("ZD_LEGACY_MODE") == "1"
-            and bool(os.getenv("PYTEST_CURRENT_TEST")))
+            and bool(os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules))
 
 
 def real_only_blocked(path: str) -> bool:
