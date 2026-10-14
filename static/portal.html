@@ -29,6 +29,17 @@ main{min-width:0}.top{height:76px;background:#fff;display:flex;align-items:cente
 .panel h2{margin:0 0 6px;font-size:17px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .pill{border-radius:20px;padding:4px 9px;background:#eaf1ff;color:#385daa;font-size:12px}
 .pill.real{background:#e4f5f2;color:#107b6b}.pill.demo{background:#fff4e2;color:#92621d}
+.pill.partial{background:#fff3db;color:#965b0b}.pill.missing{background:#ffe7e7;color:#a93636}
+.accept-tools{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:15px 0}
+.accept-tools label{display:grid;gap:5px;font-size:12px;color:#536d88}
+.accept-tools input,.accept-tools select{border:1px solid var(--border);border-radius:9px;padding:10px 12px;min-width:160px;font:inherit}
+.accept-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:17px 0}
+.accept-steps a{display:block;padding:17px;background:#f6f9fe;border:1px solid #d7e4f5;border-radius:10px}
+.accept-steps a:hover{border-color:#4a76c7}.accept-steps strong{display:block;margin-bottom:6px;color:#244c89}
+.accept-steps span{display:block;font-size:12px;color:#657b94}.accept-detail summary{cursor:pointer;color:#2c5eae;margin-top:7px;font-weight:650}
+.accept-detail p{line-height:1.6;margin:8px 0}.accept-table td:last-child{white-space:nowrap}
+#acceptVisibleCount{font-size:12px;color:#607692}
+@media(max-width:850px){.accept-steps{grid-template-columns:1fr}.accept-table{min-width:760px}}
 .items{display:grid;gap:10px;margin-top:15px}.item{padding:14px;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .item:hover{background:#f8faff}.item b{display:block}.item small{display:block;color:var(--muted);margin-top:3px}
 table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:#657791;background:#f5f8fd;font-weight:650}td,th{padding:12px 10px;border-bottom:1px solid #edf1f7;vertical-align:top}td:last-child{text-align:right}
@@ -59,7 +70,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
     <a data-tab="alerts" href="/portal?tab=alerts">◇ &nbsp;预警中心</a>
     <a class="state-only" data-tab="acceptance" href="/portal?tab=acceptance">✓ &nbsp;Excel 23项验收</a>
     <a href="/monitor">◷ &nbsp;视频监测</a>
-    <a href="/cctv">◉ &nbsp;真实监控样本</a>
+    <a href="/cctv#epflResearchPanel">◉ &nbsp;人体关联审核</a>
     <a href="/insights">↗ &nbsp;智能分析</a>
     <a class="state-only" href="/base">▤ &nbsp;模拟人员底库</a>
     <a class="state-only" href="/business">⚙ &nbsp;规则与复核</a>
@@ -137,7 +148,7 @@ function acceptancePage(){
  const a=state.excel, review=state.epflAudit,
   names={verified_real:'已验证管理功能',synthetic_only:'仅合成人员业务',
          partial:'部分实现',missing:'缺失'}, labels={verified_real:'real',
-         synthetic_only:'demo',partial:'demo',missing:'demo'};
+         synthetic_only:'demo',partial:'partial',missing:'missing'};
  const cards='<div class="cards">'+Object.keys(names).map(k=>
     stat(names[k],a.counts[k],k==='verified_real'?
       '真实管理/授权接口':'不能宣称真实身份能力')).join('')+'</div>';
@@ -152,26 +163,52 @@ function acceptancePage(){
    '<p class="smallnote">这不是独立人数；审核结论不能验证自然人身份。报告来源：'+
     esc(review.origin||'未知')+'。</p>':
    '<div class="empty">尚未导入研究人体关联候选。由州级管理员从 /cctv 一键载入CI内置报告。</div>';
- const body=a.requirements.map(x=>'<tr><td>#'+x.id+'</td><td><b>'+
-    esc(x.title)+'</b></td><td><span class="pill '+labels[x.status]+'">'+
-    esc(names[x.status])+'</span></td><td><div>'+
-    esc(x.verified_scope)+'</div><p class="smallnote">未完成：'+
-    esc(x.remaining_gap)+'</p></td><td><a class="arrow" href="'+
-    esc(x.demo_url)+'">打开原有功能 →</a></td></tr>').join('');
+ const body=a.requirements.map(x=>'<tr data-acceptance-status="'+esc(x.status)+'"><td>#'+x.id+
+   '</td><td><b>'+esc(x.title)+'</b></td><td><span class="pill '+labels[x.status]+'">'+
+   esc(names[x.status])+'</span></td><td><div class="smallnote">'+
+   esc(x.verified_scope.length>64?x.verified_scope.slice(0,64)+'…':x.verified_scope)+
+   '</div><details class="accept-detail"><summary>展开实证范围与待补缺口</summary>'+
+   '<p><b>已有：</b>'+esc(x.verified_scope)+'</p><p><b>尚缺：</b>'+esc(x.remaining_gap)+
+   '</p><p class="smallnote"><b>回归：</b>'+esc(x.evidence_files.join('、'))+
+   '</p></details></td><td>'+(x.status==='missing'?
+   '<span class="pill missing">暂无已验功能</span>':
+   '<a class="arrow" href="'+esc(x.demo_url)+'">'+
+   (x.status==='verified_real'?'进入已验功能 →':'查看已有部分演示 →')+'</a>')+
+   '</td></tr>').join('');
  return title('EXCEL · DELIVERY','原Excel 23项逐项核对')+
   '<p class="sub">唯一来源：'+esc(a.source_file)+'，工作表“'+
    esc(a.source_worksheet)+'”。每一项对应现有页面与可核查缺口，不为验收造新身份数据。</p>'+
   '<div class="banner"><strong>验收边界：</strong>'+esc(a.warning)+'</div>'+
   cards+
+  '<section class="panel"><h2>演示顺序 · 复用现有系统，两条数据链路互不混合</h2>'+
+  '<div class="accept-steps"><a href="/cctv#epflResearchPanel"><strong>01 · 真实视频人体关联</strong><span>匿名跨机配对、证据审核，不确认身份。</span></a>'+
+  '<a href="/base"><strong>02 · 合成人员底库</strong><span>P###生成、归并、矫正、发布。</span></a>'+
+  '<a href="/business"><strong>03 · 七类模拟预警</strong><span>规则命中、审核，再到态势分析。</span></a></div>'+
+  '<p class="smallnote">先操作三条演示入口，再在下表按Excel逐项验收；不能把人体匹配转为真人身份。</p></section>'+
   '<section class="panel"><div class="row"><h2>真实双机人体关联 · 独立研究轨道</h2>'+
   '<a class="arrow" href="/cctv#epflResearchPanel">查看并审核候选 →</a></div>'+
   research+'<div class="toolbar"><a href="/monitor">查看真实检测帧 →</a>'+
   '<a href="/base">打开合成P###底库 →</a><a href="/business">查看七类规则 →</a>'+
   '<a href="/insights">统计与检索 →</a><a href="/admin">场所与账号 →</a></div></section>'+
   '<section class="panel"><h2>原始23项：状态、已实证能力与待补缺口</h2>'+
-  '<div class="scroller"><table><thead><tr><th>编号</th><th>需求名称</th>'+
+  '<div class="accept-tools"><label>验收状态<select id="acceptStatusFilter"><option value="all">全部23项</option>'+
+  Object.keys(names).map(k=>'<option value="'+k+'">'+esc(names[k])+' · '+a.counts[k]+'项</option>').join('')+
+  '</select></label><label>搜索需求<input id="acceptSearch" placeholder="17 / 轨迹 / 底库" autocomplete="off"></label>'+
+  '<span id="acceptVisibleCount" role="status">显示 23 / 23 项</span></div>'+
+  '<div class="scroller"><table class="accept-table"><thead><tr><th>编号</th><th>需求名称</th>'+
   '<th>严格状态</th><th>实际能力与缺口</th><th>演示入口</th>'+
-  '</tr></thead><tbody>'+body+'</tbody></table></div></section>';
+  '</tr></thead><tbody id="acceptanceRows">'+body+'</tbody></table></div></section>';
+}
+function applyAcceptanceFilter(){
+ const tbody=$('acceptanceRows');if(!tbody)return;
+ const filter=$('acceptStatusFilter').value,query=$('acceptSearch').value.trim().toLowerCase();
+ let count=0;
+ for(const row of tbody.querySelectorAll('tr[data-acceptance-status]')){
+  row.hidden=!( (filter==='all'||row.dataset.acceptanceStatus===filter) &&
+                (!query||row.textContent.toLowerCase().includes(query)));
+  if(!row.hidden)count++;
+ }
+ $('acceptVisibleCount').textContent='显示 '+count+' / 23 项';
 }
 async function loadAcceptance(){
  if(!state.user || state.user.level!==1)return;
@@ -247,6 +284,10 @@ function render(){
  else if(tab==='acceptance')page=acceptancePage();
  else page=summary();
  $('view').innerHTML=page;
+ if(tab==='acceptance'&&!q.has('place')&&!q.has('alert')){
+  $('acceptStatusFilter')?.addEventListener('change',applyAcceptanceFilter);
+  $('acceptSearch')?.addEventListener('input',applyAcceptanceFilter);
+ }
  const seed=$('seed');if(seed)seed.onclick=async()=>{
   seed.disabled=true;try{await api('/api/business/seed',{method:'POST'});toast('已准备合成演示场景');await loadData();render();}
   catch(e){toast(e.message);}finally{seed.disabled=false;}
