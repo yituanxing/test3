@@ -147,6 +147,11 @@ function summary(){
  '<div class="statline"><span>人脸候选框</span><b>'+real.counts.face_detections+'</b></div>'+
  '<p class="smallnote">这三项均来自媒体实际处理，不是合成人员或身份匹配成功率。</p>'+
  '<a class="arrow" href="/real">检查证据和UTC时间 →</a></section></div>'+
+ (state.user.level===1?
+ '<section class="panel" aria-label="双机真实录像"><div class="row"><h2>真实录像概览（独立研究素材）</h2><a class="arrow" href="/real#video">查看检测帧和研究证据 →</a></div>'+
+ '<p class="smallnote">38秒 EPFL 同一实验室双机研究录像；不能证明真人跨场所识别，也不计入上方Frigate现场统计。</p>'+
+ '<video id="portalResearchClip" controls playsinline preload="metadata" style="display:block;width:100%;max-width:790px;aspect-ratio:16/9;background:#152c45;border-radius:10px"></video>'+
+ '<div id="portalResearchStatus" class="smallnote">正在检查真实研究录像…</div></section>':'')+
  '<section class="panel"><div class="row"><h2>业务操作入口</h2><span class="smallnote">按原Excel的业务链路组织，页面共用已有数据库和接口。</span></div>'+
  '<div class="toolbar"><a href="/real">① 真实视频与检测 →</a><a href="/portal?tab=places">② 场所与辖区 →</a><a href="/portal?tab=alerts">③ 预警与复核 →</a><a href="/insights">④ 智能检索 →</a></div>'+
  '<p class="smallnote">真人跨场所身份尚未验收；人员底库与七类规则的演示数据独立于真实视频。</p></section>'+
@@ -318,6 +323,21 @@ function render(){
  else if(tab==='acceptance')page=acceptancePage();
  else page=summary();
  $('view').innerHTML=page;
+ const clip=$('portalResearchClip'),status=$('portalResearchStatus');
+ if(clip&&status){
+  (async()=>{
+   try{
+    const available=await api('/api/real/showcase-media/status');
+    if(!available.ready){status.textContent='未安装研究录像，视频监控页可查看来源。';return;}
+    const response=await fetch('/api/real/showcase-media/video',{headers:h});
+    if(!response.ok)throw Error('HTTP '+response.status);
+    const blob=await response.blob();
+    if(!clip.isConnected)return;
+    clip.src=URL.createObjectURL(blob);clip.load();
+    status.textContent='已加载真实38秒历史双机录像；身份及预警未经过真人验证。';
+   }catch(error){status.textContent='研究录像暂不可用：'+error.message}
+  })();
+ }
  if(tab==='acceptance'&&!q.has('place')&&!q.has('alert')){
   $('acceptStatusFilter')?.addEventListener('change',applyAcceptanceFilter);
   $('acceptSearch')?.addEventListener('input',applyAcceptanceFilter);
