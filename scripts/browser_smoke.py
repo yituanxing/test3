@@ -582,11 +582,15 @@ def run():
                                   '/api/research/epfl/candidates',
                                   '/api/base/active','/api/business/analysis'];
                               const out={};
+                              // portal.html does not globally patch fetch;
+                              // use the same Bearer session as its api() helper.
+                              const bearer='Bearer '+sessionStorage.getItem('zd_access_token');
+                              const headers={'Authorization':bearer};
                               for(const url of urls)
-                                  out[url]=(await fetch(url)).status;
+                                  out[url]=(await fetch(url,{headers})).status;
                               out['/api/base/generate']=(await fetch(
                                   '/api/base/generate',{method:'POST',
-                                  headers:{'Content-Type':'application/json'},
+                                  headers:{...headers,'Content-Type':'application/json'},
                                   body:JSON.stringify({days:7,strategy:'earliest',
                                      correction_mode:'rebuild'})})).status;
                               return out;
@@ -594,7 +598,10 @@ def run():
                             assert set(protected.values())=={403},(
                                 username,protected)
                             places_scoped=page.evaluate("""async()=> (
-                                await (await fetch('/api/places')).json())""")
+                                await (await fetch('/api/places',{headers:{
+                                  Authorization:'Bearer '+
+                                    sessionStorage.getItem('zd_access_token')
+                                }})).json())""")
                             assert any(p['name']=='测试场所 A'
                                 for p in places_scoped),places_scoped
                             assert not any(p['name']=='验收外县专属场所'
