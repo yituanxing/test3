@@ -91,6 +91,7 @@ jobs:
             reports/caviar-*-yolo.jpg
             reports/verify-epfl-alternative-cameras.json
             reports/epfl-lab-camera*-yolo-contact.jpg
+            reports/epfl-lab-camera*-bytetrack-contiguous.jpg
           if-no-files-found: warn
       - name: Build auditable local demo ZIP
         run: python -m scripts.package_local_demo
