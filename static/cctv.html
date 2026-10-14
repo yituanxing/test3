@@ -544,20 +544,24 @@ async function openEpflResearchReport(event){
     matching_gt_is_never_input:report.matching_gt_is_never_input,
     production_real_roster_or_alerts:report.production_real_roster_or_alerts,
     selected_cameras:report.selected_cameras,
-    per_camera:{'0':{sha256:report.per_camera['0'].sha256},
-                '1':{sha256:report.per_camera['1'].sha256}},
+    per_camera:{'0':{sha256:report.per_camera['0'].sha256,fps:report.per_camera['0'].fps},
+                '1':{sha256:report.per_camera['1'].sha256,fps:report.per_camera['1'].fps}},
     frame_audits:report.frame_audits.map(x=>({
      frame_0_based:x.frame_0_based,cross_camera_candidates:x.cross_camera_candidates,
      candidate_evidence:x.candidate_evidence.map(c=>({
        cam0_model_box_index:c.cam0_model_box_index,
        cam1_model_box_index:c.cam1_model_box_index,
-       calibration_distance:c.calibration_distance}))})),
+       calibration_distance:c.calibration_distance,
+       cam0_ground_xy:c.cam0_ground_xy,
+       cam1_ground_xy:c.cam1_ground_xy}))})),
     holdout_frame_audits:report.holdout_frame_audits.map(x=>({
      frame_0_based:x.frame_0_based,cross_camera_candidates:x.cross_camera_candidates,
      candidate_evidence:x.candidate_evidence.map(c=>({
        cam0_model_box_index:c.cam0_model_box_index,
        cam1_model_box_index:c.cam1_model_box_index,
-       calibration_distance:c.calibration_distance}))}))
+       calibration_distance:c.calibration_distance,
+       cam0_ground_xy:c.cam0_ground_xy,
+       cam1_ground_xy:c.cam1_ground_xy}))}))
    };
   $('epflReportStatus').textContent='本地研究文件：'+file.name+
    '。官方6人标签只用于审计。视频摘要：cam0 '+
