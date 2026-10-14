@@ -25,7 +25,7 @@ def request(client, method, url, **kwargs):
 
 def run(args):
     report = {
-        'pipeline': 'RTSP/MediaMTX -> Frigate OpenVINO -> app.main -> SQLite -> authorized portal APIs',
+        'pipeline': 'LICENSED PUBLIC CLIP -> RTSP/MediaMTX -> Frigate OpenVINO -> SQLite -> /real',
         'time_utc': datetime.now(timezone.utc).isoformat(),
         'mode': 'real_anonymous_detection',
         'actual_unique_people_verified': False,
@@ -52,10 +52,15 @@ def run(args):
                     time.sleep(2)
             assert ready, 'Main business server failed to start'
             report['checks']['main_web_health'] = 'PASS'
-            html = client.get(args.backend + '/portal')
-            html.raise_for_status()
-            assert '重点场所智能预警分析平台' in html.text
-            report['checks']['portal_served'] = 'PASS'
+            # Operational landing is real-only: legacy synthetic dashboards
+            # are not an accepted data source.
+            landing = client.get(args.backend + '/portal', follow_redirects=False)
+            assert landing.status_code == 307
+            assert landing.headers['location'] == '/real'
+            real_html = client.get(args.backend + '/real')
+            real_html.raise_for_status()
+            assert '仅真实视频 · 事件与证据' in real_html.text
+            report['checks']['real_only_landing'] = 'PASS'
 
             auth = request(client, 'POST', args.backend + '/api/auth/login', json={
                 'username': 'ci_live_portal', 'password': password})
@@ -66,7 +71,15 @@ def run(args):
 
             places = request(client, 'GET', args.backend + '/api/places', headers=headers)
             place = next((p for p in places if p['active']), None)
-            assert place, 'No active local site for camera binding'
+            if place is None:
+                regions = request(client, 'GET', args.backend + '/api/regions', headers=headers)
+                leaf = next((r for r in regions if r['level'] == 4), None)
+                assert leaf is not None, 'No configured leaf jurisdiction for this CI clip'
+                place = request(client, 'POST', args.backend + '/api/places',
+                    headers=headers, json={
+                        'name': '授权公开视频RTSP验收场所（非现场）',
+                        'region_id': leaf['id']})
+            assert place['active'] is True
             binding = request(client, 'POST', args.backend + '/api/frigate/cameras',
                 headers=headers, json={'camera': args.camera, 'place_id': place['id']})
             assert binding['place_id'] == place['id']
@@ -97,16 +110,13 @@ def run(args):
             assert again['inserted'] == 0, 'Repeated synchronization duplicated real events'
             report['checks']['idempotent_main_resync'] = 'PASS'
 
-            dashboard = request(client, 'GET', args.backend + '/api/insights/overview',
-                                headers=headers)
-            total = dashboard['real_video']['counts']['person_objects']
-            assert total >= len(actual_ids), (
-                'Main Web overview failed to count real Frigate person events')
-            assert dashboard['synthetic']['mode'] == 'synthetic_only'
-            assert dashboard['synthetic']['cards']['unique_synthetic_people_in_window'] == 0
-            report['checks']['portal_real_count_and_synthetic_isolation'] = 'PASS'
-            report['dashboard_anonymous_event_count'] = total
-            report['synthetic_people'] = 0
+            # Make sure the old demo endpoints cannot inject fake people or
+            # false observations even when called by an authenticated admin.
+            for forbidden in ('/api/business/seed', '/api/demo/seed',
+                              '/api/base/demo/duplicates'):
+                blocked = client.post(args.backend + forbidden, headers=headers)
+                assert blocked.status_code == 410, (forbidden, blocked.status_code)
+            report['checks']['synthetic_mutation_endpoints_disabled'] = 'PASS'
 
             monitored = request(client, 'GET', args.backend + '/api/monitoring/overview',
                                 headers=headers)
