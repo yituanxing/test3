@@ -7,6 +7,8 @@ def test_bootstrap_populates_only_isolated_synthetic_demo(tmp_path, monkeypatch)
     monkeypatch.setenv("ZD_LEGACY_MODE", "1")
     monkeypatch.setattr(main, "DB", tmp_path / "business-demo.sqlite")
     main.setup_db()
+    with main.db() as conn:
+        baseline_sources = conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
     before = prepare_business_demo()
     assert before["status"] == "ready"
     assert before["synthetic_people"] >= 6
@@ -14,7 +16,7 @@ def test_bootstrap_populates_only_isolated_synthetic_demo(tmp_path, monkeypatch)
         count = conn.execute("SELECT COUNT(*) FROM synthetic_observations").fetchone()[0]
         assert count > 15
         assert conn.execute("SELECT COUNT(*) FROM samples WHERE origin='video'").fetchone()[0] == 0
-        assert conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0] == baseline_sources
         published = base_registry.active_assignments(conn)
         assert published[1]["state"] == "published"
         assert published[0]["P099"] == conn.execute(
