@@ -54,7 +54,6 @@ jobs:
       - name: Classify changed paths for targeted media validation
         id: media_scope
         shell: bash
-        env:
         run: |
           set -euo pipefail
           run_full=false
@@ -72,7 +71,7 @@ jobs:
               run_full=true
             fi
           fi
-          git log -1 --format=%s | grep -q '\[cctv-full\]' && run_full=true || true
+          git log -1 --format=%s 'HEAD^2' | grep -q '\[cctv-full\]' && run_full=true || true
           echo "run=$run_full" >> "$GITHUB_OUTPUT"
           echo "Targeted full public-media run: $run_full"
       - name: Python compilation and isolated regression suite
