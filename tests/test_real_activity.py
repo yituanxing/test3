@@ -21,9 +21,9 @@ def _row(key, frame, x0, y0, x1, y1):
 
 
 def test_unambiguous_temporal_fragments_and_no_overcount_of_people():
-    rows = [_row("a",500,10,10,12,10), _row("b",625,11,10,13,10),
+    rows = [_row("a",500,10,10,12,10), _row("b",525,11,10,13,10),
             _row("c",500,200,100,202,100),
-            _row("d",625,201,100,203,100)]
+            _row("d",525,201,100,203,100)]
     result = real_activity.activity_summary(rows,25.,temporal_verified=True)
     assert result["matched_pair_observations"] == 4
     assert result["sampled_video_instants"] == 2
@@ -31,6 +31,21 @@ def test_unambiguous_temporal_fragments_and_no_overcount_of_people():
     assert result["multi_instant_fragments"] == 2
     assert sorted(x["synchronized_pair_observations"] for x in result["activities"]) == [2,2]
     assert result["timeline"][0]["video_second"] == 20.
+
+
+def test_strict_real_activity_demo_alerts_only_on_approved_links():
+    rows=[_row("a",500,10,10,12,10),_row("b",525,11,10,13,10)]
+    summary=real_activity.activity_summary(rows,25.,temporal_verified=True)
+    assert summary["multi_instant_fragments"]==1
+    data={"ready":True,"cross_time_temporal_linkage_verified":True,**summary}
+    alerts=real_activity.build_demo_activity_alerts(data)
+    assert len(alerts)==1
+    assert alerts[0]["rule_is_demo"] is True
+    assert alerts[0]["alert_is_real_incident"] is False
+    assert alerts[0]["source_evidence_is_real_video"] is True
+    assert alerts[0]["supporting_candidate_keys"] == ["a","b"]
+    assert real_activity.build_demo_activity_alerts({
+        **data,"cross_time_temporal_linkage_verified":False}) == []
 
 
 def test_ambiguous_or_missing_evidence_never_merged_as_identity():
@@ -94,6 +109,10 @@ def test_admin_must_import_real_video_provenance_and_never_use_GT(auth, monkeypa
     assert client.get("/api/real/activity",headers=county).status_code==403
     empty=client.get("/api/real/activity",headers=admin).json()
     assert not empty["ready"] and empty["anonymous_activity_fragments"]==0
+    empty_alerts=client.get("/api/real/demo-alerts",headers=admin).json()
+    assert empty_alerts["alerts"]==[]
+    assert client.get("/api/real/demo-alerts").status_code==401
+    assert client.get("/api/real/demo-alerts",headers=county).status_code==403
     raw=_manifest()
     # This test includes audit labels solely to prove sanitization. The actual
     # verified owner output is generated from original video elsewhere.
@@ -109,6 +128,9 @@ def test_admin_must_import_real_video_provenance_and_never_use_GT(auth, monkeypa
     assert d["anonymous_activity_fragments"]==2
     assert d["multi_instant_fragments"]==0
     assert d["cross_time_temporal_linkage_verified"] is False
+    demo=client.get("/api/real/demo-alerts",headers=admin).json()
+    assert demo["alerts"]==[]
+    assert demo["rule_is_demo"] is True
     assert d["activities"][0]["camera_count"]==2
     assert d["activities"][0]["first_video_second"]==20.
     assert d["confirmed_natural_person_identity"] is False
