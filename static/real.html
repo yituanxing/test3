@@ -49,6 +49,15 @@ th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
 <p class="small">包含真实发生时间、摄像机、上游事件ID、检测评分。无真实事件不展示模拟记录。</p>
 <div class="scroll"><table><thead><tr><th>发生时间（UTC）</th><th>场所</th><th>摄像机</th><th>上游事件ID</th><th>检测置信度</th><th>结束时间</th></tr></thead>
 <tbody id="events"><tr><td colspan="6">加载中</td></tr></tbody></table></div><p id="tail" class="small"></p></section>
+<section class="box" id="researchActivity">
+<h2>真实双摄像机 · 匿名人员活动</h2>
+<p class="small">EPFL 六人实验室，两路真实同步录像。位置标定与 YOLO 检测得到跨摄像机配对，跨帧保守关联成为录像内匿名片段。这不是跨场所身份或今天的实况。</p>
+<div><button id="loadActivity">导入真实双机研究证据</button> <span id="activityState" class="small">尚未读取证据</span></div>
+<div id="activityStats" class="cards" style="margin-top:14px"></div>
+<div class="scroll"><table><thead><tr><th>片段编号</th><th>录像开始</th><th>录像结束</th><th>双机配对帧数</th><th>研究范围</th></tr></thead>
+<tbody id="activityTable"><tr><td colspan="5">未导入时不生成任何人员数据</td></tr></tbody></table></div>
+<p id="activityEvidence" class="small"></p>
+</section>
 <section class="box"><h2>真实研究视频的独立证据</h2>
 <div id="research">加载中</div><p class="small">这里展示官方公开片段的相机内轨迹标注，不代表已经自动完成跨机同人识别，也不是实时监控数据。</p>
 <a href="/cctv">核对原片帧、人体框和关联研究 →</a></section>
