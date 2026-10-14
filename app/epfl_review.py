@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from hashlib import sha256
+from math import hypot, isfinite
 import json
 from pathlib import Path
 from typing import Literal
@@ -79,10 +80,19 @@ def initialize(c):
     """)
     # Compatible with existing persistent databases from the manual-JSON
     # release. The old SQLite trust_level CHECK remains unchanged.
-    if "origin" not in {r["name"] for r in c.execute(
-            "PRAGMA table_info(epfl_candidate_reports)")}:
+    report_cols = {r["name"] for r in c.execute(
+        "PRAGMA table_info(epfl_candidate_reports)")}
+    if "origin" not in report_cols:
         c.execute("""ALTER TABLE epfl_candidate_reports ADD COLUMN origin
                    TEXT NOT NULL DEFAULT 'uploaded_research_json'""")
+    if "video_fps" not in report_cols:
+        c.execute("ALTER TABLE epfl_candidate_reports ADD COLUMN video_fps REAL")
+    candidate_cols = {r["name"] for r in c.execute(
+        "PRAGMA table_info(epfl_pair_candidates)")}
+    for name in ("cam0_ground_x", "cam0_ground_y",
+                 "cam1_ground_x", "cam1_ground_y"):
+        if name not in candidate_cols:
+            c.execute("ALTER TABLE epfl_pair_candidates ADD COLUMN " + name + " REAL")
 
 
 def register(app, db):
@@ -155,12 +165,29 @@ def _extract(raw):
                     type(d) not in (int, float) or
                     not 0 <= d <= MAX_PAIR_DISTANCE):
                     _reject("检测框序号或几何距离不合法")
-                records.append((split, frame, a, b, round(float(d), 3)))
+                # Optional v2 activity coordinates must be complete, finite,
+                # model-derived and geometrically consistent with pairing.
+                coords = [p.get(name) for name in (
+                    "cam0_ground_xy", "cam1_ground_xy")]
+                if any(x is not None for x in coords):
+                    if not all(isinstance(x, list) and len(x) == 2
+                               and all(type(v) in (float, int)
+                                       and isfinite(v) and abs(v) <= 1000
+                                       for v in x) for x in coords):
+                        _reject("双机真实检测坐标不完整或超出范围")
+                    if abs(hypot(coords[0][0] - coords[1][0],
+                                 coords[0][1] - coords[1][1]) - float(d)) > .02:
+                        _reject("检测坐标与匹配距离不一致")
+                    coords = [round(float(v), 3) for x in coords for v in x]
+                else:
+                    coords = [None] * 4
+                records.append((split, frame, a, b, round(float(d), 3),
+                                *coords))
     if not 1 <= len(records) <= 400 or len(records) != len(set(records)):
         _reject("研究候选为空或存在重复匹配")
     # Validate 1-to-1 pairing per synchronized frame.
     left, right = set(), set()
-    for split, frame, a, b, d in records:
+    for split, frame, a, b, d, *coords in records:
         lk, rk = (split, frame, a), (split, frame, b)
         if lk in left or rk in right:
             _reject("同一帧存在非一对一配对")
@@ -233,6 +260,15 @@ def _import(raw: dict, request: Request, origin: str):
         raise HTTPException(413, "研究报告最大1MiB")
     records = _extract(raw)
     digest = _hash(records)
+    camera = raw["per_camera"]
+    rates = [camera[str(i)].get("fps") for i in (0, 1)]
+    fps = None
+    if any(rate is not None for rate in rates):
+        if (not all(type(v) in (float, int) and isfinite(v)
+                    and 1 <= v <= 120 for v in rates)
+            or abs(rates[0] - rates[1]) > 0.05):
+            _reject("双路研究录像FPS缺失或不同步")
+        fps = float(rates[0])
     with _db() as c:
         c.execute("BEGIN IMMEDIATE")
         duplicate = c.execute(
@@ -242,18 +278,19 @@ def _import(raw: dict, request: Request, origin: str):
             now = datetime.now(timezone.utc).isoformat()
             c.execute("""INSERT INTO epfl_candidate_reports
             (report_digest,video_sha0,video_sha1,candidate_count,
-             imported_by,imported_at,trust_level,origin)
-            VALUES(?,?,?,?,?,?,'user_provided_research_report',?)""",
-            (digest, *CAMERA_SHA256, len(records), actor["id"], now,origin))
-            for split, frame, a, b, dist in records:
+             imported_by,imported_at,trust_level,origin,video_fps)
+            VALUES(?,?,?,?,?,?,'user_provided_research_report',?,?)""",
+            (digest, *CAMERA_SHA256, len(records), actor["id"], now,origin,fps))
+            for split, frame, a, b, dist, x0, y0, x1, y1 in records:
                 key = sha256(
                     f"{digest}:{split}:{frame}:{a}:{b}:{dist}".encode()
                 ).hexdigest()[:32]
                 c.execute("""INSERT INTO epfl_pair_candidates
                  (candidate_key,report_digest,eval_split,frame_0_based,
-                  cam0_box_index,cam1_box_index,ground_distance)
-                 VALUES(?,?,?,?,?,?,?)""",
-                 (key, digest, split, frame, a, b, dist))
+                  cam0_box_index,cam1_box_index,ground_distance,
+                  cam0_ground_x,cam0_ground_y,cam1_ground_x,cam1_ground_y)
+                 VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                 (key, digest, split, frame, a, b, dist,x0,y0,x1,y1))
             admin.audit(c,"research_epfl_candidate_import",
                         f"epfl-report:{digest}",None,
                         {"count":len(records),"origin":origin,
