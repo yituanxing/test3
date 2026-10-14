@@ -79,6 +79,11 @@ async function api(url,method='GET',value){
  return body;
 }
 let sites=[],events=[],chosen=-1,viewer=null,map=null,pins=[],playing=null,initRequested=false;
+const deepLink=new URLSearchParams(location.search);
+const initialPerson=/^P[0-9]{3}$/.test(deepLink.get('person')||'')?deepLink.get('person'):'';
+const initialDays=['7','30','365'].includes(deepLink.get('days'))?deepLink.get('days'):'30';
+const initialPlace=/^[1-9][0-9]*$/.test(deepLink.get('place_id')||'')?deepLink.get('place_id'):'';
+let deepLinkApplied=false;
 function stop(){if(playing){clearInterval(playing);playing=null}$('play').disabled=events.length===0}
 function bounds(points){
  const xs=points.map(p=>p.lon),ys=points.map(p=>p.lat);
@@ -192,11 +197,17 @@ async function loadAll(){
   const sel=$('venue'),value=sel.value;
   sel.innerHTML=sites.map(v=>'<option value="'+v.id+'">'+esc(v.name)+'</option>').join('');
   if(sites.some(v=>String(v.id)===value))sel.value=value;
+   if(!deepLinkApplied && sites.some(v=>String(v.id)===initialPlace))sel.value=initialPlace;
   const keep=$('person').value;
   $('person').innerHTML=people.people.map(v=>'<option value="'+esc(v.person)+'">'+esc(v.person)+
     ' · '+v.synthetic_visits+'次模拟到访</option>').join('')||
     '<option value="">暂无合成P###到访</option>';
   if(people.people.some(x=>x.person===keep))$('person').value=keep;
+   if(!deepLinkApplied){
+     $('days').value=initialDays;
+     if(people.people.some(x=>x.person===initialPerson))$('person').value=initialPerson;
+     deepLinkApplied=true;
+   }
   syncVenueForm();refreshMap();await loadTrack();
  }catch(e){$('notice').textContent='读取失败：'+e.message}
 }

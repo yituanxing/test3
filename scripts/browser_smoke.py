@@ -225,13 +225,20 @@ def run():
                         expect(page.locator("#flowSummary")).to_contain_text("流入")
                         checks.append("shared_analytics_period_rank_flow_browser")
                         page.screenshot(path=str(OUT / "ui-shared-analytics.png"), full_page=True)
+                        page.evaluate("openPerson('P099')")
+                        expect(page.locator('#openPersonMap')).to_be_visible(timeout=12000)
+                        expect(page.locator('#openPersonMap')).to_have_attribute(
+                            'href','/geo?person=P099&days=30')
+                        checks.append('insights_person_to_geo_deep_link')
                         # #17: actual map/browser operation uses only fictional
                         # sites and P### chronology; all remote map requests
                         # blocked to prove the offline coordinate fallback.
                         page.route('https://cdn.jsdelivr.net/**',lambda route:route.abort())
                         page.route('https://demotiles.maplibre.org/**',lambda route:route.abort())
-                        page.goto(base+'/geo',wait_until='domcontentloaded')
+                        page.locator('#openPersonMap').click()
+                        expect(page).to_have_url(base+'/geo?person=P099&days=30')
                         expect(page.get_by_role('heading',name='场所地图与合成轨迹回放')).to_be_visible()
+                        expect(page.locator('#person')).to_have_value('P099',timeout=12000)
                         # The persistent dialog listener above handles confirmations.
                         # A second once-listener double-accepts the same dialog.
                         page.locator('#seedGeo').click()

@@ -254,7 +254,7 @@ function showPlace(id){
  '<p class="sub">所属辖区：'+esc(p.region_path||'—')+'</p>'+notice()+
  '<div class="cards">'+stat('已登记视频源',src.length,'非实时在线数量')+stat('匿名目标事件（7天）',real.person_objects||0,'真实 person 事件数')+
  stat('合成到访',demo.visits||0,'虚构活动数据')+stat('合成规则命中',demo.alerts||0,'候选提示，非真实异常')+'</div>'+
- '<div class="grid"><section class="panel"><h2>视频源与设备</h2><p class="smallnote">显示已登记设备，不宣称在线播放或在线。</p><div class="items">'+(src.map(s=>'<div class="item"><div><b>'+esc(s.name)+'</b><small>'+esc(s.kind)+' · '+(s.enabled?'已启用':'已停用')+'</small></div><span class="pill real">视频源</span></div>').join('')||'<div class="empty">未登记视频源</div>')+'</div><div class="toolbar"><a href="/monitor">查看视频检测 →</a><a href="/admin">设备管理 →</a></div></section>'+
+ '<div class="grid"><section class="panel"><h2>视频源与设备</h2><p class="smallnote">显示已登记设备，不宣称在线播放或在线。</p><div class="items">'+(src.map(s=>'<div class="item"><div><b>'+esc(s.name)+'</b><small>'+esc(s.kind)+' · '+(s.enabled?'已启用':'已停用')+'</small></div><span class="pill real">视频源</span></div>').join('')||'<div class="empty">未登记视频源</div>')+'</div><div class="toolbar"><a href="/monitor">查看视频检测 →</a><a href="/admin">设备管理 →</a><a href="/geo?place_id='+encodeURIComponent(id)+'">地图点位 →</a></div></section>'+
  '<section class="panel"><h2>近期香港真实目标事件</h2><p class="smallnote">从最近 100 条已同步事件中筛选，不代表全部历史；不含人员身份。</p>'+
  (events.length?'<div class="scroller"><table><thead><tr><th>摄像机</th><th>发生时间</th><th>置信度</th><th>类型</th></tr></thead><tbody>'+
  events.map(e=>'<tr><td>'+esc(e.camera)+'</td><td>'+esc(dt(e.started_at))+'</td><td>'+esc(e.score==null?'—':Number(e.score).toFixed(2))+'</td><td>匿名 person</td></tr>').join('')+'</tbody></table></div>':'<div class="empty">近期无真实检测事件。可进入视频监测页面同步。</div>')+'</section></div>'+
