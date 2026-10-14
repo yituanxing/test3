@@ -2,7 +2,13 @@
    Always use a fresh authenticated /api/auth/me response, never cached roles. */
 (function(){
  "use strict";
- function hide(selector){document.querySelectorAll(selector).forEach(n=>n.hidden=true)}
+ function suppress(element){
+  // Native [hidden] can be overridden by authored CSS display:flex/grid.
+  // Use !important so the same restriction works across all six legacy UIs.
+  element.hidden=true;
+  element.style.setProperty('display','none','important');
+ }
+ function hide(selector){document.querySelectorAll(selector).forEach(suppress)}
  function apply(actor){
   if(!actor||actor.level===1)return;
   hide('a[href="/base"],a[href="/business"],a[href="/portal?tab=acceptance"],nav a[href="/"]');
@@ -12,11 +18,11 @@
   if(location.pathname==='/cctv'){
    hide('.jumpnav a[href="#epflResearchPanel"]');
    for(const id of ('epflResearchPanel','process')){
-    const el=document.getElementById(id);if(el)el.hidden=true;
+    const el=document.getElementById(id);if(el)suppress(el);
    }
   }
   if(location.pathname==='/insights'){
-   const e=document.getElementById('seed');if(e)e.hidden=true;
+   const e=document.getElementById('seed');if(e)suppress(e);
   }
   if(location.pathname==='/monitor'){
    for(const id of ('videoButton','syncButton')){
