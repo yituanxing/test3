@@ -157,7 +157,10 @@ function summary(){
  '<p class="smallnote">真人跨场所身份尚未验收；人员底库与七类规则的演示数据独立于真实视频。</p></section>'+
  (state.user.level===1?'<section class="panel"><div class="row"><h2>单独的合成算法验证区（非真实业务结果）</h2><a href="/portal?tab=acceptance">查看真实/合成验收对照 →</a></div>'+
  '<p class="smallnote">原有P###模拟底库和七类规则仅用于软件逻辑回归。不会写入真实人体库，不计入真实事件、预警或身份分析。</p>'+
- '<div class="toolbar"><a href="/base">模拟底库</a><a href="/business">模拟规则</a><a href="/insights">合成统计</a></div></section>':'');
+ '<div class="toolbar"><a href="/base">模拟底库</a><a href="/business">模拟规则</a><a href="/insights">合成统计</a></div>'+
+ (c.synthetic_visits===0?'<div class="banner"><strong>演示尚未准备：</strong>当前人员底库、七类预警和人员检索没有合成业务事件，进入相应页面会看到空结果。<button id="seed" type="button">初始化明确标注的演示数据</button></div>':
+ '<p class="smallnote">合成活动已准备：'+esc(c.synthetic_visits)+'次模拟到访。进入底库生成草稿、核验归并并发布。</p>')+
+ '</section>':'');
 }
 
 function acceptancePage(){
@@ -286,6 +289,7 @@ function showPlace(id){
 function listAlerts(){
  const a=synthetic().recent_alerts;
  return title('ALERTS · 预警中心','业务规则候选与人工复核')+'<p class="sub">模拟规则采用统一列表、证据详情和审核结果；不将共同出现或跨场所活动直接认定为异常。</p>'+notice()+
+ (a.length===0&&state.user.level===1?'<div class="banner">当前没有规则候选。这不是已完成预警验收；尚未初始化合成业务活动。<button id="seed" type="button">初始化合成规则演示事件</button></div>':'')+
  '<section class="panel"><div class="scroller"><table><thead><tr><th>类型</th><th>规则命中说明</th><th>场所</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
  rows(a.map(x=>'<tr><td><span class="pill demo">'+esc(x.type_name)+'</span></td><td>'+esc(x.title)+'</td><td>'+esc((x.place_names||[]).join('、'))+'</td><td>'+esc(x.status||'待复核')+'</td><td><a class="arrow" href="'+alertLink(x)+'">证据详情 →</a></td></tr>'))+'</tbody></table></div><p class="smallnote">当前只展示最多 30 条近期合成规则候选；完整规则列表请从管理员业务验证台查看。</p></section>';
 }
