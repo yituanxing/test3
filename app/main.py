@@ -418,6 +418,14 @@ def excel_acceptance(request: Request):
         'remaining_gap': x['remaining_gap'],
         'demo_url': EXCEL_DEMO_ROUTES[x['id']],
         'evidence_files': x['evidence_files'],
+        'delivery_mode': x['delivery_mode'],
+        'delivered_now': x['delivered_now'],
+        'alternative_used': x['alternative_used'],
+        'why_demo_usable': x['why_demo_usable'],
+        'not_equivalent_to': x['not_equivalent_to'],
+        'future_implementation': x['future_implementation'],
+        'acceptance_gate': x['acceptance_gate'],
+        'next_priority': x['next_priority'],
     } for x in req]
     counts = {k:sum(x['status']==k for x in items) for k in
               ('verified_real','synthetic_only','partial','missing')}
@@ -425,6 +433,10 @@ def excel_acceptance(request: Request):
         'source_file': manifest['source_file'],
         'source_worksheet': manifest['source_worksheet'],
         'requirements': items, 'counts': counts,
+        'delivery_assessment_date': manifest['delivery_assessment_date'],
+        'delivery_baseline_ci': manifest['delivery_baseline_ci'],
+        'substitution_scope': manifest['substitution_scope'],
+        'delivery_modes': manifest['delivery_modes'],
         'all_23_verified_real': False,
         'warning': '这是严格的原Excel需求追踪，不代表23项真实功能全部完成；P###预警仍是合成身份业务。'
     }

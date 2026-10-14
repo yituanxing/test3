@@ -167,8 +167,16 @@ function acceptancePage(){
    '</td><td><b>'+esc(x.title)+'</b></td><td><span class="pill '+labels[x.status]+'">'+
    esc(names[x.status])+'</span></td><td><div class="smallnote">'+
    esc(x.verified_scope.length>64?x.verified_scope.slice(0,64)+'…':x.verified_scope)+
-   '</div><details class="accept-detail"><summary>展开实证范围与待补缺口</summary>'+
-   '<p><b>已有：</b>'+esc(x.verified_scope)+'</p><p><b>尚缺：</b>'+esc(x.remaining_gap)+
+   '</div><details class="accept-detail"><summary>当前做到什么 / 用什么替代 / 为什么能演示 / 下一步怎么做</summary>'+
+   '<p><b>实际已做：</b>'+esc(x.delivered_now)+'</p>'+
+   '<p><b>当前替代：</b>'+esc(x.alternative_used)+'</p>'+
+   '<p><b>为什么可用于演示：</b>'+esc(x.why_demo_usable)+'</p>'+
+   '<p><b>不等同于：</b>'+esc(x.not_equivalent_to)+'</p>'+
+   '<p><b>后续实施：</b>'+esc(x.future_implementation)+'</p>'+
+   '<p><b>正式验收证据：</b>'+esc(x.acceptance_gate)+'</p>'+
+   '<p><b>后续优先级：</b>'+esc(x.next_priority)+'</p>'+
+   '<p><b>原审计范围：</b>'+esc(x.verified_scope)+'</p>'+
+   '<p><b>尚缺：</b>'+esc(x.remaining_gap)+
    '</p><p class="smallnote"><b>回归：</b>'+esc(x.evidence_files.join('、'))+
    '</p></details></td><td>'+(x.status==='missing'?
    '<span class="pill missing">暂无已验功能</span>':
@@ -178,7 +186,9 @@ function acceptancePage(){
  return title('EXCEL · DELIVERY','原Excel 23项逐项核对')+
   '<p class="sub">唯一来源：'+esc(a.source_file)+'，工作表“'+
    esc(a.source_worksheet)+'”。每一项对应现有页面与可核查缺口，不为验收造新身份数据。</p>'+
-  '<div class="banner"><strong>验收边界：</strong>'+esc(a.warning)+'</div>'+
+  '<div class="banner"><strong>验收边界：</strong>'+esc(a.warning)+
+  '<br><b>替代只用于有限范围演示，不等于原需求验收。</b>每一项都可展开查看替代原因、不能替代的能力和后续验收门槛。'+
+  '<br><span class="smallnote">冻结审计基线：'+esc(a.delivery_assessment_date)+'</span></div>'+
   cards+
   '<section class="panel"><h2>演示顺序 · 复用现有系统，两条数据链路互不混合</h2>'+
   '<div class="accept-steps"><a href="/cctv#epflResearchPanel"><strong>01 · 真实视频人体关联</strong><span>匿名跨机配对、证据审核，不确认身份。</span></a>'+

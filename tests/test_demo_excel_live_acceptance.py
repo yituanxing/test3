@@ -45,6 +45,19 @@ def test_exact_23_from_manifest_and_admin_not_other_roles(actor_clients):
     for shown,raw in zip(value["requirements"],manifest["requirements"]):
         assert shown["status"]==raw["status"]
         assert shown["verified_scope"]==raw["verified_scope"]
+    mode={"verified_real":"original_scope",
+          "synthetic_only":"synthetic_business",
+          "partial":"limited_demonstration",
+          "missing":"not_replaced"}
+    keys=("delivered_now","alternative_used","why_demo_usable",
+          "not_equivalent_to","future_implementation","acceptance_gate")
+    for item in value["requirements"]:
+        assert item["delivery_mode"]==mode[item["status"]]
+        assert all(isinstance(item[k],str) and len(item[k])>=18 for k in keys)
+        assert item["next_priority"] in ("P0","P1","P2")
+        if item["status"]=="missing":
+            assert "没有有效替代" in item["alternative_used"]
+    assert value["delivery_assessment_date"]=="2026-10-14"
     assert value["requirements"][13]["status"]=="missing" # #14
     assert value["requirements"][16]["status"]=="missing" # #17
 
