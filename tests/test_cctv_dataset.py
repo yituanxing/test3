@@ -376,7 +376,7 @@ def test_real_detector_runs_enter_canonical_anonymous_occurrences_and_qa_with_ve
     assert picture.headers['cache-control']=='private, no-store'
     assert picture.headers['x-annotations']=='YOLO model local tracks, not ground truth'
     assert picture.headers['x-model-boxes']=='1'
-    assert picture.content[:2]==b'\\xff\\xd8'
+    assert picture.content[:2]==b'\xff\xd8'
     assert client.get(proof,headers=county,params={
         'run_key':'f'*32,'frame':1}).status_code==404
     assert client.get(proof,headers=county,params={
