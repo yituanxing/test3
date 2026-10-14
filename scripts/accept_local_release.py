@@ -118,6 +118,19 @@ def main():
             assert activity["matched_pair_observations"]==119
             assert activity["multi_instant_fragments"]==14
             assert activity["cross_time_temporal_linkage_verified"] is True
+            indoor=_request(base,"/api/real/scene-aggregate?minimum_observations=3"
+                            "&zone_x_bin=2&zone_y_bin=3",token)
+            assert indoor["total_observations"]==119
+            assert len(indoor["frame_cells"])==40
+            assert len(indoor["demo_zone_events"])==20
+            assert indoor["zone"]=={"x_bin":2,"y_bin":3,
+                                    "width_cells":2,"height_cells":2}
+            assert indoor["individual_trajectory_available"] is False
+            other_zone=_request(base,"/api/real/scene-aggregate?zone_x_bin=6"
+                                "&zone_y_bin=5",token)
+            assert other_zone["total_observations"]==119
+            assert other_zone["zone"]["x_bin"]==6
+            assert other_zone["demo_zone_events"] != indoor["demo_zone_events"]
             alerts=_request(base,"/api/real/demo-alerts",token)
             assert len(alerts["alerts"])==14
             assert all(a["source_evidence_is_real_video"]
@@ -138,6 +151,10 @@ def main():
                 "actual_genuine_camera_pair_observations":119,
                 "independently_evaluated_one_second_fragments":14,
                 "evidence_grounded_demo_alerts":14,
+                "actual_video_scene_sampled_frames":len(indoor["frame_cells"]),
+                "video_derived_default_zone_event_instants":len(indoor["demo_zone_events"]),
+                "projected_zone_adjustment_real_media_based":True,
+                "gps_or_person_geolocation_asserted":False,
                 "simulated_excel_rule_types":7,
                 "simulated_rules_separate_from_actual_video":True,
                 "original_excel_items":23,
