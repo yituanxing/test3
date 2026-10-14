@@ -27,7 +27,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = Path(os.getenv('ZD_DATA_DIR', str(ROOT / 'data')))
+DATA_DIR = Path(os.getenv('ZD_DATA_DIR', str(ROOT / 'data' / 'real-only')))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB = DATA_DIR / 'demo.sqlite3'
 STATIC = ROOT / 'static' / 'index.html'
@@ -286,7 +286,7 @@ async def app_lifespan(application):
         continuous_capture.shutdown()
 
 
-app = FastAPI(title='ZD Business Pipeline Demo', version='1.1.0', lifespan=app_lifespan)
+app = FastAPI(title='ZD Real Video Evidence', version='1.1.0', lifespan=app_lifespan)
 
 
 @app.exception_handler(RequestValidationError)
