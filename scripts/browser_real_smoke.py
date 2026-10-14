@@ -62,6 +62,27 @@ def main():
                         expect(page.locator("#realEvents")).to_have_text("0", timeout=12000)
                         expect(page.locator("#places")).to_contain_text("本辖区尚无场所")
                         assert page.locator('a[href="/business"]').count() == 0
+                        expect(page.locator("#videoClipPlaceholder")).to_be_visible()
+                        page.locator("#videoClipPicker").set_input_files(
+                            str(ROOT / "samples" / "test-pattern.mp4"))
+                        expect(page.locator("#videoClipStatus")).to_contain_text(
+                            "请选择CI研究视频工件")
+                        expect(page.locator("#videoClip")).to_be_hidden()
+                        actual_clip = os.getenv("ZD_REAL_EPFL_CLIP_FILE")
+                        if actual_clip:
+                            page.locator("#videoClipPicker").set_input_files(
+                                str(Path(actual_clip).resolve()))
+                            expect(page.locator("#videoClip")).to_be_visible(timeout=15000)
+                            expect(page.locator("#videoClipStatus")).to_contain_text(
+                                "已打开本地实际视频")
+                            page.evaluate("() => { clipFPS=25; seekVideoSourceFrame(1875); }")
+                            page.wait_for_function(
+                                "() => { const v=document.querySelector('#videoClip');"
+                                "return v.readyState>=2 && Math.abs(v.currentTime-15)<.2; }",
+                                timeout=15000)
+                            page.locator("#videoClip").screenshot(
+                                path=str(OUT / "ui-actual-epfl-clip-frame.png"))
+                            print("REAL_VIDEO_BROWSER_SEEK_AND_DECODE_PASS")
                         page.screenshot(path=str(OUT / "ui-real-only-landing.png"), full_page=True)
                         page.goto(base + "/monitor")
                         assert page.locator('a[href="/business"]').count() == 0
