@@ -60,6 +60,12 @@ def test_real_upstream_events_count_once_and_hide_neighboring_jurisdiction(case)
     client,auth,local,other=case
     stamp=datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     with main.db() as c:
+        # Real Frigate events refer to explicitly configured cameras. The
+        # test must respect that FK, like the upstream ingestion path does.
+        c.execute('INSERT INTO frigate_camera_bindings(camera,place_id) VALUES(?,?)',
+                  ('camera_a',local))
+        c.execute('INSERT INTO frigate_camera_bindings(camera,place_id) VALUES(?,?)',
+                  ('camera_other',other))
         for event_id,camera,pid in (
            ('real-fixture-1','camera_a',local),('real-fixture-2','camera_a',local),
            ('other-county-fixture','camera_other',other)):
