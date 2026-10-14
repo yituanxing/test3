@@ -48,6 +48,8 @@ const bar=document.createElement("div");bar.className="zd-global-top";
 bar.innerHTML="<b>"+page.title+"</b><span>"+page.subtitle+"</span>";
 const nodes=[...document.body.childNodes];document.body.append(root);root.append(aside,right);right.append(bar);
 for(const node of nodes)right.append(node);
+const formerHeader=right.querySelector("header");
+if(formerHeader)formerHeader.style.display="none";
 const active=aside.querySelector('a[data-active="'+page.active+'"]');
 if(active){active.classList.add("active");active.setAttribute("aria-current","page")}
 const token=sessionStorage.getItem("zd_access_token");
