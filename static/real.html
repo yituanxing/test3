@@ -135,6 +135,15 @@ details>summary:hover{text-decoration:underline}
  .card strong{font-size:26px}
  #excelAcceptance .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+.video-proof{margin:17px 0 21px;padding:19px;border:2px solid #83a7d0;border-radius:12px;background:#f6faff}
+.video-proof video{display:block;width:100%;height:auto;background:#101820;border-radius:9px;margin:12px 0}
+.video-proof .clip-empty{min-height:110px;display:grid;place-items:center;text-align:center;border:1px dashed #7896b8;border-radius:9px;color:#345575;background:#e9f1fb;margin:12px 0;padding:20px}
+.video-proof .clip-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.video-proof input[type=file]{max-width:100%}
+.video-proof .frame-status{background:#e9f0fc;padding:10px 12px;border-radius:8px;font-size:13px;margin:9px 0;color:#163b65}
+button[data-evidence-frame]{font-size:12px;padding:3px 7px;background:#e3effc;border-color:#a2c2e6;color:#124777}
+button[data-evidence-frame]:hover{background:#c5e0fa}
 </style></head><body>
 <header><b>ZD · 视频活动分析</b><nav aria-label="主导航">
 <a href="/real" aria-current="page">演示首页</a><a href="/cctv">双机检测证据</a>
@@ -143,8 +152,8 @@ details>summary:hover{text-decoration:underline}
 <main>
 <section class="story-hero" id="introDemo">
 <div class="topline">ZD VIDEO ANALYTICS · 技术原型演示</div>
-<h1>从两路真实录像，看见人员活动</h1>
-<p>两台摄像机分别拍摄同一实验室。系统将真实检测结果对应起来，展示短时间活动、室内空间分布和可调整的演示提醒。按下面四步查看，不需要读懂后台算法。</p>
+<h1>真实双机录像 → 检测证据 → 活动提醒</h1>
+<p>先打开会动的两路真实录像，再点击实际记录定位原始帧，查看匿名检测、空间活动和演示规则。没加载视频，就明确显示缺少画面，不能靠统计数字冒充视频。</p>
 <div class="hero-links"><a href="#researchActivity">开始演示 ↓</a><a href="#realSceneAggregation">查看空间活动</a><a href="#demoAlerts">查看提醒</a></div>
 </section>
 <div class="source-notice"><strong>数据来源：真实研究录像</strong><span>EPFL 同一实验室的两机同步录制视频，非你的实时摄像机。画面对应的配对、位置和短时间活动来自真实检测；区域划分和提醒阈值是演示规则，不代表风险。</span></div>
@@ -154,7 +163,7 @@ details>summary:hover{text-decoration:underline}
 <a href="#demoAlerts"><small>STEP 03 · 规则</small><strong>活动提醒</strong><span>修改区域和人数阈值</span></a>
 <a href="#technicalArea"><small>STEP 04 · 管理</small><strong>系统与验收</strong><span>查看设备、权限和Excel</span></a>
 </nav>
-<div class="stage-head"><span class="stage-number">1</span><div><h2>先确认：视频已经被识别</h2><p>看观测次数和匿名片段，点击一次即可导入包内的真实研究视频检测证据。</p></div></div>
+<div class="stage-head"><span class="stage-number">1</span><div><h2>第一步：看到真实视频画面</h2><p>先选取授权双机 MP4，再导入同一批录像的识别记录；两者缺一不能算画面验收。</p></div></div>
 <section class="local-playback box" id="localVideoPlayback">
 <div class="local-playback-meta">
 <h2>先看两台摄像机拍到的真实画面</h2>
@@ -170,7 +179,17 @@ details>summary:hover{text-decoration:underline}
 <section class="box" id="researchActivity">
 <h2>已检测的双摄像机录像</h2>
 <p class="small">使用两台摄像机拍摄的同一个真实实验室。程序会导入已经完成YOLO检测的录像证据；这里展示的是配对观测和短时匿名关联，<b>不是独立人数、实名身份或现场实时监控</b>。</p>
-<div><button id="loadActivity">导入真实双机研究证据</button> <span id="activityState" class="small">尚未读取证据</span></div>
+
+<div class="video-proof" id="videoEvidence">
+<h3>① 两台摄像机的真实连续画面（不是热力图）</h3>
+<p>从 <a href="https://github.com/yituanxing/test3/actions/runs/38585465839" target="_blank" rel="noopener noreferrer">已通过的视频 CI</a> 下载并解压工件 <b>zd-licensed-epfl-real-continuous-38-second-research-clips</b>，选择文件 <b>真实原片连续双机画面_38秒.mp4</b>。这是独立研究/教学素材，不能当作具有商业分发许可，工件可能过期。</p>
+<div class="clip-tools"><label for="videoClipPicker"><b>选择双机 MP4：</b></label><input type="file" id="videoClipPicker" accept=".mp4,video/mp4" aria-label="选取已授权的EPFL双机连续视频"></div>
+<div id="videoClipPlaceholder" class="clip-empty">目前没有实际视频画面。检测数字、热力网格即使有数据，也不意味着已播放原录像。</div>
+<video id="videoClip" controls playsinline preload="metadata" hidden aria-label="真实EPFL双摄像机连续画面"></video>
+<p id="videoClipStatus" class="small" role="status">还未选取真实视频文件；视频仅在本地浏览器读取，不上传。</p>
+<p id="videoFrameStatus" class="frame-status" role="status">点击下方的“看源帧”定位画面；这段剪辑仅覆盖原录像60–98秒。</p>
+</div>
+<div><button id="loadActivity">② 读取同批录像的实际检测记录</button> <span id="activityState" class="small">尚未读取证据</span></div>
 <div id="activityStats" class="cards" style="margin-top:14px"></div>
 <details class="focus-table"><summary>查看各条匿名检测片段的详细帧号</summary><div class="scroll"><table><thead><tr><th>片段编号</th><th>录像开始</th><th>录像结束</th><th>双机配对帧数</th><th>研究范围</th></tr></thead>
 <tbody id="activityTable"><tr><td colspan="5">未导入时不生成任何人员数据</td></tr></tbody></table></div></details>
@@ -181,7 +200,7 @@ details>summary:hover{text-decoration:underline}
 <section class="box" id="realSceneAggregation">
 <h2>观察人在空间中的活动</h2>
 <p class="small">下方格子来自两路真实录制视频的匿名检测位置。先选择短时片段，再拖动时间进度条；可点击格子设置区域，查看检测数量变化。
-可以逐个录像采样帧播放区域热度，查看场景内活动分布变化；<strong>颜色变化不等于同一个人的移动轨迹</strong>。
+可以逐个录像采样时刻查看区域热度，已选择对应录像时会一并定位原始画面；<strong>颜色变化不等于同一个人的移动轨迹</strong>。
 网格不是实测建筑平面图、真实GPS或经纬度。红框代表你选择的演示区域，紫线是同一实验室的虚拟A/B分界。</p>
 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
 <label>同帧双机配对数阈值 <select id="sceneCountThreshold"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
@@ -210,7 +229,7 @@ details>summary:hover{text-decoration:underline}
 <label>真实录像采样帧：<span id="sceneFrameLabel">汇总热度</span></label>
 <input type="range" id="sceneFrameCursor" min="0" max="0" value="0" style="width:100%">
 <div style="display:flex;gap:8px;align-items:center">
-<button id="scenePlay" type="button">▶ 逐帧播放</button>
+<button id="scenePlay" type="button">▶ 逐个采样时刻</button>
 <button id="sceneOverview" type="button">查看累计热度</button>
 </div></div>
 <p id="sceneFrameInfo" class="small">选择采样帧，只显示该时刻落入各格子的双摄像机配对观测次数。</p>
@@ -313,6 +332,63 @@ async function api(url,method='GET'){
  const d=await r.json();if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:r.status);
  return d;
 }
+
+const CLIP_SOURCE_START_SEC=60;
+let clipObjectURL=null,clipReady=false,clipFPS=null;
+function resetClip(message){
+ const player=$('videoClip');player.pause();player.removeAttribute('src');player.load();player.hidden=true;
+ if(clipObjectURL)URL.revokeObjectURL(clipObjectURL);
+ clipObjectURL=null;clipReady=false;$('videoClipPlaceholder').hidden=false;
+ $('videoClipStatus').textContent=message;
+ $('videoFrameStatus').textContent='没有实际视频画面，检测结果与热力图不算画面验收。';
+}
+function seekVideoSourceFrame(frame){
+ const f=Number(frame),note=$('videoFrameStatus'),player=$('videoClip');
+ if(!Number.isSafeInteger(f)||f<0)return;
+ if(!clipReady){note.textContent='第'+f+'帧：只有检测记录，还没有打开实际视频。';return;}
+ if(!clipFPS){note.textContent='缺少源视频 FPS，不能核实帧位置。';return;}
+ const sec=f/clipFPS,offset=sec-CLIP_SOURCE_START_SEC;
+ if(offset<0||offset>=player.duration){
+  note.textContent='第'+f+'帧（原录像'+sec.toFixed(2)+'秒）不在本次60–98秒剪辑内，不用其它画面冒充。';return;
+ }
+ player.pause();player.currentTime=Math.min(offset,player.duration-0.04);
+ note.textContent='已定位：源录像第'+f+'帧 / '+sec.toFixed(2)+'秒，对应上方实际视频'+offset.toFixed(2)+'秒。';
+}
+$('videoClipPicker').onchange=event=>{
+ const file=event.target.files?.[0];
+ if(!file){resetClip('还未选择视频文件');return;}
+ resetClip('正在检查视频…');
+ if(!file.name.includes('真实原片连续双机画面_38秒')||!file.name.toLowerCase().endsWith('.mp4')){
+  $('videoClipStatus').textContent='请选择CI研究视频工件里的「真实原片连续双机画面_38秒.mp4」，不能拿测试视频或单机视频替代。';return;
+ }
+ clipObjectURL=URL.createObjectURL(file);
+ const player=$('videoClip');
+ player.onloadedmetadata=()=>{
+  if(!Number.isFinite(player.duration)||player.duration<36||player.duration>40||
+     player.videoWidth<1200||player.videoHeight<480){
+   resetClip('与已验的双机同屏38秒视频规格不一致，不能作为对应画面。');return;
+  }
+  clipReady=true;player.hidden=false;$('videoClipPlaceholder').hidden=true;
+  $('videoClipStatus').textContent='已打开本地实际视频：'+player.duration.toFixed(1)+'秒，两机同屏。浏览器可解码，但当前未对本地文件做SHA256来源校验。';
+  if(sceneData?.frame_cells?.length&&sceneFrameIndex>0)seekVideoSourceFrame(sceneData.frame_cells[sceneFrameIndex-1].video_frame);
+ };
+ player.onerror=()=>resetClip('此MP4无法解码，尚未完成画面验收。');
+ player.src=clipObjectURL;player.load();
+};
+function jumpEvidenceFrame(frame){
+ if(!sceneData?.frame_cells?.length){
+  $('videoFrameStatus').textContent='尚未读取对应的模型采样记录。先点击“② 读取同批录像的实际检测记录”。';return;
+ }
+ const n=Number(frame),index=sceneData.frame_cells.findIndex(row=>row.video_frame===n);
+ if(index<0){$('videoFrameStatus').textContent='第'+n+'帧不属于已保存的采样时刻，不冒充已有模型结果。';return;}
+ sceneStop();sceneFrameIndex=index+1;scenePaint();
+ $('videoEvidence').scrollIntoView({block:'center',behavior:'smooth'});
+}
+document.querySelector('main').addEventListener('click',event=>{
+ const button=event.target.closest('button[data-evidence-frame]');
+ if(button)jumpEvidenceFrame(button.dataset.evidenceFrame);
+});
+
 async function reload(){
  $('message').textContent='从服务器读取实际记录…';$('refresh').disabled=true;
  try{
@@ -347,6 +423,7 @@ async function loadActivity(){
    response=await api('/api/real/activity');
   }
   if(!response.ready)throw Error('导入成功前没有可显示的数据');
+  clipFPS=Number(response.video_fps)>0?Number(response.video_fps):null;
   const cards=[
    ['双机匹配观测（非人数）',response.matched_pair_observations],
    ['有检测的录像时刻',response.sampled_video_instants],
@@ -359,7 +436,7 @@ async function loadActivity(){
    const when=(f,t)=>'第'+f+'帧'+(t==null?'':' / '+Number(t).toFixed(2)+'秒');
    return '<tr><td>'+esc(v.activity_id)+'</td><td>'+when(v.first_video_frame,v.first_video_second)+
     '</td><td>'+when(v.last_video_frame,v.last_video_second)+'</td><td>'+
-    v.synchronized_pair_observations+'</td><td>EPFL 同一实验室，摄像机0和1</td></tr>';
+    v.synchronized_pair_observations+'</td><td>同一实验室，摄像机0/1 <button type="button" data-evidence-frame="'+v.first_video_frame+'">看源帧</button></td></tr>';
   }).join('')||'<tr><td colspan="5">实际视频当前没有匹配成功的匿名片段</td></tr>';
   state.textContent='已导入实际双机视频识别结果；'+
    (response.cross_time_temporal_linkage_verified?'跨帧身份片段已独立评估':
@@ -438,7 +515,7 @@ function sceneTracksDraw(){
  overlay.innerHTML=html;
 }
 $('sceneTrackSelect').onchange=sceneTracksDraw;
-function sceneStop(){if(sceneTimer){clearInterval(sceneTimer);sceneTimer=null}$('scenePlay').textContent='▶ 逐帧播放'}
+function sceneStop(){if(sceneTimer){clearInterval(sceneTimer);sceneTimer=null}$('scenePlay').textContent='▶ 逐个采样时刻'}
 function scenePaint(){
  if(!sceneData)return;
  const sample=sceneFrameIndex>0?sceneData.frame_cells[sceneFrameIndex-1]:null;
@@ -471,7 +548,8 @@ function scenePaint(){
      c.y_bin>=sceneZoneY&&c.y_bin<sceneZoneY+2)
       .reduce((sum,c)=>sum+c.paired_detection_count,0)+
   '次配对观测。只展示匿名空间分布，不推断个人移动路线。':
-  '全录像已采样时间点的累计热度。选择下方进度条逐帧查看场景活动变化。';
+  '全录像的累计热度。选择下方进度条查看采样时刻；真实画面需要加载上方视频。';
+ if(sample)seekVideoSourceFrame(sample.video_frame);
 }
 async function loadSceneAggregate(){
  try{
