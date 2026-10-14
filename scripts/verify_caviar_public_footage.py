@@ -23,7 +23,15 @@ def main():
         with server.db() as db:
             root=db.execute('SELECT id FROM regions WHERE level=1 LIMIT 1').fetchone()['id']
             access.create_user(db,'publiccaviar','public-video-proof-long-password',root)
-            place=db.execute("SELECT id FROM places WHERE name='测试场所 A'").fetchone()['id']
+            # This is ACTUAL CAVIAR research footage, not a fabricated site.
+            # A fresh real-only database deliberately has no test places.
+            region=db.execute(
+                "SELECT id FROM regions WHERE level=4 ORDER BY id LIMIT 1"
+            ).fetchone()['id']
+            place=db.execute(
+                "INSERT INTO places(name,region_id) VALUES(?,?)",
+                ("CAVIAR 公开研究录像现场（同一场所双机位）",region)
+            ).lastrowid
         with TestClient(server.app) as client:
             login=client.post('/api/auth/login',json={
                 'username':'publiccaviar','password':'public-video-proof-long-password'})
