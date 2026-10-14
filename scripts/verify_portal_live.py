@@ -59,7 +59,7 @@ def run(args):
             assert landing.headers['location'] == '/real'
             real_html = client.get(args.backend + '/real')
             real_html.raise_for_status()
-            assert '仅真实视频 · 事件与证据' in real_html.text
+            assert 'id="liveEvidence"' in real_html.text
             report['checks']['real_only_landing'] = 'PASS'
 
             auth = request(client, 'POST', args.backend + '/api/auth/login', json={
@@ -134,7 +134,11 @@ def run(args):
             # clip. A fixture-only empty-state browser test cannot prove this.
             real_page = client.get(args.backend + '/real')
             real_page.raise_for_status()
-            assert '仅真实视频 · 事件与证据' in real_page.text
+            assert 'id="liveEvidence"' in real_page.text
+            assert 'id="videoClip"' in real_page.text, (
+                'Real workbench missing actual evidence-video player')
+            assert 'id="events"' in real_page.text, (
+                'Real workbench missing actual Frigate event table')
             report['checks']['real_workbench_page_served'] = 'PASS'
 
             real = request(client, 'GET', args.backend + '/api/real/evidence',
