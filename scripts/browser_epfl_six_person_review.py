@@ -91,6 +91,16 @@ def run():
                             "研究候选",timeout=15000)
                         expect(page.locator("#epflReviewRows")).to_contain_text(
                             "baseline",timeout=15000)
+                        # Review is paged, with usable previous/next links.
+                        assert page.locator("#epflReviewRows tr").count()==12
+                        expect(page.locator("#epflPageNote")).to_contain_text(
+                            "1–12 / 119",timeout=10000)
+                        page.locator("#epflLoadMore").click()
+                        expect(page.locator("#epflPageNote")).to_contain_text(
+                            "13–24 / 119",timeout=10000)
+                        page.locator("#epflPrevPage").click()
+                        expect(page.locator("#epflPageNote")).to_contain_text(
+                            "1–12 / 119",timeout=10000)
                         # The full original proof still supports manual import;
                         # same 119 pairs MUST remain idempotent.
                         page.locator("#epflReportInput").set_input_files(
@@ -126,7 +136,21 @@ def run():
                             "已人工复核 / 待复核")
                         expect(page.locator("#view")).to_contain_text(
                             "1 / 118")
-                        assert page.locator("#view tbody tr").count()==23
+                        assert page.locator("#acceptanceRows tr").count()==23
+                        page.locator("#acceptStatusFilter").select_option("missing")
+                        expect(page.locator("#acceptVisibleCount")).to_have_text(
+                            "显示 2 / 23 项")
+                        assert page.locator("#acceptanceRows tr:visible").count()==2
+                        assert page.locator(
+                            '#acceptanceRows tr[data-acceptance-status="missing"] a'
+                        ).count()==0, "Do not link a missing feature as implemented"
+                        page.locator("#acceptStatusFilter").select_option("all")
+                        page.locator("#acceptSearch").fill("轨迹")
+                        expect(page.locator("#acceptVisibleCount")).to_have_text(
+                            "显示 1 / 23 项")
+                        page.locator("#acceptSearch").fill("")
+                        expect(page.locator("#acceptVisibleCount")).to_have_text(
+                            "显示 23 / 23 项")
                         expect(page.locator("#view")).to_contain_text(
                             "人脸检索")
                         expect(page.locator("#view")).to_contain_text(
