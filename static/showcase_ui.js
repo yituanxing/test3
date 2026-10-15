@@ -83,18 +83,20 @@ const live=panel("live");
 live.innerHTML='<div class="zd-module-header"><h1>现场设备事件</h1><p>此模块读取连接到本机Frigate的摄像机事件，独立于EPFL历史研究录像。</p></div>';
 for(const id of Object.keys(modules)){if(id!=="oldPlayer"&&modules[id])modules[id].remove()}
 const videoPlayer=byId("videoEvidence");
-if(videoPlayer)video.prepend(videoPlayer);
+// The old double-uploader was removed: the surviving compact instruction
+// should now be visible directly above the ONE evidence player, not placed
+// into a hidden compatibility bin.
+if(modules.oldPlayer)video.append(modules.oldPlayer);
+if(videoPlayer)video.append(videoPlayer);
 video.append(modules.video);
 space.append(modules.space);
 alerts.append(modules.alerts);
 acceptance.append(modules.acceptance,modules.rules,modules.audit);
 live.append(modules.live);
 if(modules.live)modules.live.open=true;
-// Preserve the legacy local upload controls offstage so backward-compatible
-// event listeners never crash, but never expose a second duplicated player.
-const hiddenLegacy=document.createElement("div");hiddenLegacy.hidden=true;
-if(modules.oldPlayer)hiddenLegacy.append(modules.oldPlayer);
-main.replaceChildren(home,video,space,alerts,acceptance,live,hiddenLegacy);
+// All retained panels are visible by module selection; no hidden media-input
+// control that leaves an apparently connected video-and-evidence flow broken.
+main.replaceChildren(home,video,space,alerts,acceptance,live);
 for(const old of document.querySelectorAll(".zd-panel .stage-head"))old.remove();
 const views={overview:home,video,space,alerts,acceptance,live};
 const headings={overview:"视频监控",video:"录像与检测",space:"空间活动",alerts:"视频活动提醒",acceptance:"需求验收",live:"现场设备事件"};

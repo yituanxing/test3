@@ -36,3 +36,10 @@ def test_guide_does_not_send_acceptor_to_disabled_default_routes():
     assert '默认 `ZD_LEGACY_MODE=0`' in text
     assert '/real#excelAcceptance' in text
     assert '/real#excelRuleShowcase' in text
+
+def test_video_evidence_instructions_are_visible_not_in_hidden_legacy_container():
+    script=(ROOT/"static"/"showcase_ui.js").read_text(encoding="utf-8")
+    assert "if(modules.oldPlayer)video.append(modules.oldPlayer);" in script
+    assert "if(videoPlayer)video.append(videoPlayer);" in script
+    assert 'hiddenLegacy' not in script
+    assert 'const primary=byId("videoClip")' in script
