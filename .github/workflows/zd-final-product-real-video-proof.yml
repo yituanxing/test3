@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/zd-final-product-real-video-proof.yml
       - scripts/browser_operational_site_with_video.py
+      - scripts/browser_each_page_acceptance.py
       - tests/test_demo_first_run_ready.py
       - scripts/demo_bootstrap.py
       - scripts/package_local_demo.py
@@ -93,6 +94,7 @@ jobs:
                   'zd-demo/static/site_navigation.js',
                   'zd-demo/static/compact_sections.js',
                   'zd-demo/static/recognition_results.html',
+                  'zd-demo/scripts/browser_each_page_acceptance.py',
                   'zd-demo/RECOGNITION_RESULTS_DELIVERY_20261015.md',
                   'zd-demo/static/showcase_ui.js',
                   'zd-demo/scripts/start_local_demo_windows.bat',
@@ -117,6 +119,8 @@ jobs:
           name: zd-real-video-product-browser-evidence
           path: |
             reports/ui-shipped-*.png
+            reports/accept-*.png
+            reports/every-page-acceptance.json
             reports/excel-business-actual-browser-audit.json
             reports/actual-product-server.log
           retention-days: 2
