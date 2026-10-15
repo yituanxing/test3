@@ -433,6 +433,11 @@ def admin_home():
 def insights_home():
     return FileResponse(INSIGHTS_STATIC)
 
+
+@app.get('/recognition-results')
+def recognition_results_home():
+    return FileResponse(ROOT / 'static' / 'recognition_results.html')
+
 @app.get('/anime-scenes')
 def anime_scene_home():
     return FileResponse(ROOT / 'static' / 'anime-scenes.html')
