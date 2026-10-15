@@ -18,6 +18,11 @@ button{border:0;padding:10px 13px;border-radius:8px;background:var(--blue);color
 #map{height:480px;border-radius:10px;background:#edf2f9;border:1px solid #d4dfed;position:relative;overflow:hidden}
 #mapFallback{height:100%;display:grid;place-items:center;text-align:center;color:#58718f}
 #mapFallback svg{display:block;width:100%;height:100%}
+#geoMapEmpty{position:absolute;z-index:7;left:50%;top:50%;transform:translate(-50%,-50%);
+ min-width:260px;max-width:88%;padding:22px 28px;background:#ffffffec;border:1px dashed #8cb2d2;
+ border-radius:14px;box-shadow:0 8px 32px #143b6420;color:#254d72;text-align:center;pointer-events:none}
+#geoMapEmpty strong{display:block;font-size:19px;margin-bottom:7px}
+#geoMapEmpty small{display:block;line-height:1.55;color:#647f9e;font-size:13px}
 #mapCaption{color:#617389;font-size:12px;margin:8px 0 0}#notice,#saveNotice{color:#39597d;font-size:13px}
 .pill{display:inline-block;border-radius:30px;padding:2px 9px;font-size:12px;background:#e7f1fc;color:#2a5ea8}
 .pill.fake{background:#fff0d7;color:#a46714}.pill.none{background:#fceaea;color:#a33}
@@ -41,7 +46,7 @@ button{border:0;padding:10px 13px;border-radius:8px;background:var(--blue);color
 <button type="button" class="secondary" id="refresh">刷新点位</button>
 <span id="notice" role="status">读取中…</span>
 </div>
-<div id="map"><div id="mapFallback">准备地理底图…</div><div class="map-tip">仅地理点位与合成到访；不表示实际人员定位</div></div>
+<div id="map"><div id="mapFallback">准备地理底图…</div><div id="geoMapEmpty"><strong>当前尚无场所示意点位</strong><small>请点击上方「生成虚构示意位置」后再查看分布。<br>这些只是演示坐标，不代表现场人员位置。</small></div><div class="map-tip">仅地理点位与合成到访；不表示实际人员定位</div></div>
 <p id="mapCaption">如网络不可用，会显示离线坐标示意图，地理底图需联网。</p>
 </section>
 <section class="panel">
@@ -115,6 +120,7 @@ function fallback(){
 }
 function refreshMap(){
  const spots=sites.filter(p=>p.geo);
+ const empty=$('geoMapEmpty');if(empty)empty.hidden=spots.length>0;
  if(map&&map.isStyleLoaded()){
   const pData={type:'FeatureCollection',features:spots.map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.geo.lon,p.geo.lat]},
    properties:{name:p.name,place_id:p.id,provenance:p.geo.provenance}}))};
