@@ -189,6 +189,7 @@ def main():
                             ("/admin","admin","辖区与场所","账户权限"),
                             ("/monitor","devices","采集概览","持续采集"),
                             ("/insights","search","人员检索","综合分析"),
+                            ("/cctv","evidence","双机视频证据","录像及轨迹"),
                         ]:
                             page.goto(base+route,wait_until="domcontentloaded")
                             bar=page.locator(".zd-workspace-tabs")
