@@ -8,6 +8,8 @@ on:
       - scripts/browser_operational_site_with_video.py
       - tests/test_demo_first_run_ready.py
       - scripts/demo_bootstrap.py
+      - scripts/package_local_demo.py
+      - RECOGNITION_RESULTS_DELIVERY_20261015.md
       - static/**
       - app/main.py
   workflow_dispatch:
@@ -90,6 +92,8 @@ jobs:
                   'zd-demo/static/portal.html',
                   'zd-demo/static/site_navigation.js',
                   'zd-demo/static/compact_sections.js',
+                  'zd-demo/static/recognition_results.html',
+                  'zd-demo/RECOGNITION_RESULTS_DELIVERY_20261015.md',
                   'zd-demo/static/showcase_ui.js',
                   'zd-demo/scripts/start_local_demo_windows.bat',
                   'zd-demo/scripts/start_local_demo_windows.ps1',
