@@ -73,7 +73,7 @@ def excel_rule_demo(request: Request):
 # Routes usable in the public, REAL-ONLY distribution. The old portal,
 # business, insights and roster pages are intentionally disabled there.
 _READ_ONLY_ROUTES = {
-    1:"/cctv", 2:"/admin", 3:"/real#excelRuleShowcase",
+    1:"/cctv", 2:"/admin", 3:"/real#excelAcceptance",
     4:"/real", 5:"/real", 6:"/real#excelRuleShowcase",
     7:"/real#excelRuleShowcase", 8:"/real#excelRuleShowcase",
     9:"/real#excelRuleShowcase", 10:"/real#excelRuleShowcase",
@@ -81,7 +81,7 @@ _READ_ONLY_ROUTES = {
     13:"/cctv", 14:"/real", 15:"/real",
     16:"/cctv", 17:"/real", 18:"/real",
     19:"/real#researchActivity", 20:"/admin",
-    21:"/real#excelRuleShowcase", 22:"/real#excelRuleShowcase",
+    21:"/real#excelAcceptance", 22:"/real#excelRuleShowcase",
     23:"/admin",
 }
 

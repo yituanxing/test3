@@ -34,7 +34,7 @@
 2. **真视频** `/real`：播放38秒双摄像机摘录，选中录像的真实检测时刻，看模型/匿名活动及空间分布。可以解释原始检测事实与演示阈值的区别。
 3. **匿名活动记录** `/insights`：默认展示V###真实视频匿名片段，点源证据回`/cctv#epflResearchPanel`；强调不等于确认自然人。
 4. **算法与人工质量核查** `/cctv`：展示同帧配对源frame/box、人工审核；可选 CAVIAR原片与YOLO/ByteTrack，需额外媒体安装。
-5. **业务产品闭环** `/portal` → `/base` / `/business`：说明这是 P### 合成业务场景，用来验证七类规则和复核，**不是上面V###真实检测自动生成的真人告警**。
+5. **按原 Excel 验收** `/real#excelAcceptance`：逐项复查 23 条；通过 `/real#excelRuleShowcase` 验看七类独立只读 P### 合成规则算法；管理账号、场所和辖区进入 `/admin`。默认 `ZD_LEGACY_MODE=0`，`/portal` 重定向至 `/real`，`/base` 和 `/business` 不是正式演示入口。不能将模拟预警描述成真实匿名视频触发的人员警情。
 6. **补充技术** `/monitor`、`/face-lab`、`/anime-scenes`：展示已经投入的媒体、可选模型和动画研究，不夸大现状。
 
 ## 五、Excel原需求的诚实验收边界

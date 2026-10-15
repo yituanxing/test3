@@ -243,14 +243,12 @@ body>header{display:none!important}
 <div class="stage-head"><span class="stage-number">1</span><div><h2>第一步：看到真实视频画面</h2><p>先选取授权双机 MP4，再导入同一批录像的识别记录；两者缺一不能算画面验收。</p></div></div>
 <section class="local-playback box" id="localVideoPlayback">
 <div class="local-playback-meta">
-<h2>先看两台摄像机拍到的真实画面</h2>
-<p class="small">解压交付包，选择 <b>01_真实连续视频_需研究授权 / 真实原片连续双机画面_38秒.mp4</b>。视频只在当前浏览器本地播放，不上传服务器、也不会自动重新识别。</p>
-<label class="choose-video" for="demoClipInput">选择本地双机视频 MP4</label>
-<input id="demoClipInput" type="file" accept=".mp4,video/mp4" aria-label="从本地交付包选择连续双机演示视频">
-<p class="small" id="demoClipState">尚未选取本地连续视频；仍可先查看下方真实识别结果。</p>
-<div class="operation-notice">注意：播放器显示连续录像；下方119次配对和短轨迹来自以前在真实视频上完成的YOLO检测，不是在播放时即时推断。双摄像机位于同一实验室。</div>
+<h2>真实双机视频与源帧检索，使用同一个播放器</h2>
+<p>点击下方链接，在真实连续画面区域选一次 MP4；随后读取检测记录，点击「看源帧」会直接定位同一个视频播放器。避免上方看视频、下方找不到视频的断链。</p>
+<p class="small">MP4 需要从 <a href="https://github.com/yituanxing/test3/actions/runs/38585465839" target="_blank" rel="noopener noreferrer">真实视频 CI 工件</a>或授权交付包选取，没有实际录像时不会伪造画面。</p>
+<div class="hero-links"><a href="#videoEvidence" class="choose-video" id="openRealVideo">打开实际双机视频与源帧 ↓</a><a href="#excelAcceptance">逐项核验原 Excel 23 条 →</a></div>
+<div class="operation-notice">下方的 EPFL 检测结果来自此前真实执行的模型；离线回放不意味着网页实时推理，也不代表识别出真实身份。</div>
 </div>
-<video id="demoClipPlayer" controls playsinline preload="metadata" hidden aria-label="用户自行选择的真实双摄像机原片连续回放"></video>
 </section>
 
 <section class="box" id="researchActivity">
@@ -714,10 +712,21 @@ async function loadExcelAcceptance(){
     '<div class="card"><span class="small">'+label+'</span><strong>'+
     (data.status_counts[code]||0)+'</strong></div>').join('');
   const labels=Object.fromEntries(statuses);
-  $('excelAcceptanceRows').innerHTML=data.requirements.map(row=>
-    '<tr><td>#'+row.id+'</td><td>'+esc(row.title)+'</td><td>'+esc(labels[row.status])+'</td><td>'+
-    esc(row.delivered_now)+'</td><td>'+esc(row.remaining_gap)+'</td><td><a href="'+
-    esc(row.demo_route)+'">查看（有限演示）</a></td></tr>').join('');
+  // Acceptance UX: do not offer fake/disabled features as working links.
+  $('excelAcceptanceRows').innerHTML=data.requirements.map(row=>{
+    let link;
+    if(row.status==='missing'){
+      link='<span class="small">关键能力缺失：不提供假入口</span>';
+    }else if(row.status==='synthetic_only'&&(row.id===3||row.id===21)){
+      link='<span class="small">真实人脸底库未实现；合成归并只在隔离测试模式</span>';
+    }else{
+      const label=row.status==='verified_real'?'进入已验收管理功能':
+        row.status==='synthetic_only'?'查看只读模拟规则':'查看现有有限证据';
+      link='<a href="'+esc(row.demo_route)+'">'+label+' →</a>';
+    }
+    return '<tr><td>#'+row.id+'</td><td>'+esc(row.title)+'</td><td>'+esc(labels[row.status])+'</td><td>'+
+      esc(row.delivered_now)+'</td><td>'+esc(row.remaining_gap)+'</td><td>'+link+'</td></tr>';
+  }).join('');
   $('excelAcceptanceNote').textContent='来源：'+data.source_file+'｜'+data.source_worksheet+
    '工作表 '+data.source_rows+'行；不是23项全部通过。';
  }catch(e){$('excelAcceptanceNote').textContent='Excel核验读取失败：'+e.message}
@@ -748,26 +757,6 @@ async function initializeResearchMode(){
   $('message').textContent='身份权限检查失败：'+e.message;
  }
 }
-let currentLocalVideoURL=null;
-$('demoClipInput').onchange=()=>{
- const selected=$('demoClipInput').files?.[0];
- const video=$('demoClipPlayer');
- if(currentLocalVideoURL){URL.revokeObjectURL(currentLocalVideoURL);currentLocalVideoURL=null}
- video.pause();video.removeAttribute('src');video.hidden=true;
- if(!selected)return;
- if(!selected.name.toLowerCase().endsWith('.mp4')){
-  $('demoClipState').textContent='请选择交付包里的MP4视频；该文件不支持。';return;
- }
- currentLocalVideoURL=URL.createObjectURL(selected);
- video.src=currentLocalVideoURL;
- video.hidden=false;
- $('demoClipState').textContent='已选择 '+selected.name+'（仅本地回放，未上传）；按播放键查看连续画面。';
- video.load();
-};
-$('demoClipPlayer').onerror=()=>{
- $('demoClipState').textContent='视频无法解码，请选择交付包内的H.264 MP4，或先用系统自带播放器试播。';
-};
-window.addEventListener('pagehide',()=>{if(currentLocalVideoURL)URL.revokeObjectURL(currentLocalVideoURL)});
 $('loadActivity').onclick=loadActivity;
 initializeResearchMode();
 $('days').onchange=reload;$('refresh').onclick=reload;
