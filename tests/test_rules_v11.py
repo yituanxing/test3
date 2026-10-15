@@ -60,3 +60,78 @@ def test_api_rejects_invalid_config(tmp_path,monkeypatch):
     assert client.put('/api/business/config',json={**config,'enabled_rules':['appearance','appearance']}).status_code==422
     assert client.put('/api/business/config',json={**config,'interaction_min_rounds':0}).status_code==422
     assert client.get('/api/business/config').json()==config
+
+
+def test_three_person_repeated_stable_cohort_not_union_of_pairs():
+    """Excel #7: N-person repeated co-presence uses one same fictional group."""
+    home={'P001':1,'P002':1,'P003':1}
+    rows=[e(1,'P001',2,60),e(2,'P002',2,61),e(3,'P003',2,62),
+          e(4,'P001',2,160),e(5,'P002',2,161),e(6,'P003',2,162)]
+    options=cfg(companion_min_people=3,companion_min_episodes=2)
+    report=analyze(rows,options,now=BASE+timedelta(hours=5),
+                   affiliation_overrides=home)
+    matches=hits(report,'companion')
+    assert len(matches)==1
+    assert matches[0]['people']==['P001','P002','P003']
+    assert len(matches[0]['observation_ids'])==6
+    # Removing a group member from the later time window MUST defeat N=3,
+    # even though there are several pairwise coincidences.
+    incomplete=[x for x in rows if x['id']!=6]
+    assert not hits(analyze(incomplete,options,now=BASE+timedelta(hours=5),
+                            affiliation_overrides=home),'companion')
+    assert not hits(analyze(rows,{**options,'companion_min_people':4},
+                           now=BASE+timedelta(hours=5),
+                           affiliation_overrides=home),'companion')
+    # Compatibility: default N=2 still emits repeated pairwise candidates.
+    assert len(hits(analyze(rows,cfg(companion_min_episodes=2),
+                            now=BASE+timedelta(hours=5),
+                            affiliation_overrides=home),'companion'))==3
+
+
+def test_multi_place_and_synthetic_code_watchlist_with_legacy_scalar():
+    """Excel #11: one shared rule evaluates target intersections."""
+    rows=[e(1,'P001',1,0),e(2,'P002',2,30),
+          e(3,'P001',2,60),e(4,'P001',3,90)]
+    options=cfg(watch_place_ids=[1,2],watch_person_ids=['P001'],
+                watch_place_id=3)
+    report=analyze(rows,options,now=BASE+timedelta(hours=4))
+    matches=hits(report,'appearance')
+    assert len(matches)==2
+    assert {tuple(x['place_ids']) for x in matches}=={(1,),(2,)}
+    assert all(x['people']==['P001'] for x in matches)
+    scalar=analyze(rows,cfg(watch_place_id=3),now=BASE+timedelta(hours=4))
+    assert len(hits(scalar,'appearance'))==1
+    assert hits(scalar,'appearance')[0]['place_ids']==[3]
+
+
+def test_multi_target_config_validation_and_recompute(tmp_path,monkeypatch):
+    from fastapi.testclient import TestClient
+    import app.main as main
+    monkeypatch.setattr(main,'DB',tmp_path/'multiple-rule-targets.sqlite3')
+    main.setup_db()
+    client=TestClient(main.app)
+    assert client.post('/api/business/seed').status_code==200
+    cfg0=client.get('/api/business/config').json()
+    places=client.get('/api/places').json()
+    place_ids=[p['id'] for p in places[:2]]
+    options={**cfg0,'watch_place_ids':place_ids,'watch_person_ids':['P001'],
+             'companion_min_people':3}
+    save=client.put('/api/business/config',json=options)
+    assert save.status_code==200,save.text
+    assert save.json()['recomputed'] is True
+    assert client.get('/api/business/config').json()['watch_place_ids']==place_ids
+    assert all(x['people']==['P001'] for x in
+               client.get('/api/business/analysis').json()['alerts']
+               if x['type']=='appearance')
+    cases=[
+        ({'companion_min_people':1},422),
+        ({'watch_place_ids':[0]},422),
+        ({'watch_place_ids':[999999]},404),
+        ({'watch_place_ids':[place_ids[0],place_ids[0]]},422),
+        ({'watch_person_ids':['张三']},422),
+        ({'watch_person_ids':['P001','P001']},422),
+    ]
+    for diff,expected in cases:
+        res=client.put('/api/business/config',json={**options,**diff})
+        assert res.status_code==expected, (diff,res.text)
+    assert client.get('/api/business/config').json()==options

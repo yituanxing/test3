@@ -1,0 +1,4 @@
+# Optional research-only pretrained person detection; base app stays lightweight.
+# YOLO11 models are AGPL-3.0/Enterprise; check commercial distribution licensing.
+-r requirements-tracking.txt
+ultralytics>=8.3.0,<9

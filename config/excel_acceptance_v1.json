@@ -1,0 +1,498 @@
+{
+  "source_file": "ZD场所预警分析-原型设计-20261012-v1.0.xlsx",
+  "source_worksheet": "需求",
+  "source_rows": "7:29",
+  "source_verified_count": 23,
+  "generated_on": "2026-10-13",
+  "ci_reference": "https://github.com/yituanxing/test3/actions/runs/38405307609",
+  "ci_head": "4c844ef64062aaabd2fca5a7c9fdcaac086c97df",
+  "statuses": {
+    "verified_real": "现有真实管理/授权接口与自动化验收通过（仍按条目文字保留例外）",
+    "synthetic_only": "合成已知P###业务演示通过；不能当作真实人脸/身份证明",
+    "partial": "部分实现；Excel完整原要求未验收",
+    "missing": "Excel关键验收能力尚未具备"
+  },
+  "warning": "这是一份需求追踪与验收边界声明，不是对全部23项合格的承诺；真实视频身份识别、跨机真人同一身份、地图GPS需独立真值和测试。",
+  "requirements": [
+    {
+      "id": 1,
+      "excel_row": 7,
+      "title": "人脸解析",
+      "status": "partial",
+      "verified_scope": "国标设备接入与部分真人媒体处理已有验证；多路实时/历史28181人脸解析、聚类比对与特征全链未通过；真实官方CAVIAR双机位CVML框作为输入，已运行Roboflow ByteTrack v2.6本机时序跟踪的独立Owner验收（检测本身未运行）；已增加预训练YOLO11n在真正CAVIAR MPEG画面的人体检测→现成ByteTrack本机跟踪，模型框独立于官方人工GT存入统一证据、支持人工质量审核；实测准确率另行评估",
+      "evidence_files": [
+        "tests/test_gb28181_wvp_adapter.py",
+        "tests/test_real_face_boxes.py",
+        "tests/test_cctv_dataset.py"
+      ],
+      "remaining_gap": "多路历史国标+真人身份聚类/比对需真实端到端验收；ByteTrack对官方GT的分配覆盖率不能替代实际人体检测的召回率或跨机位真实人物匹配精度；该模型框只有视频相对帧号，不是现实UTC时刻、独立人身份或跨机真人ReID；Ultralytics授权需核验。",
+      "delivery_mode": "limited_demonstration",
+      "delivered_now": "国标媒体接入部分链路、实际CAVIAR人体检测与本机跟踪、EPFL双机同步位置匹配119条候选和人工审核",
+      "alternative_used": "用真实匿名人体框、ByteTrack局部轨迹、已标定同步配对展示视频识别子链路",
+      "why_demo_usable": "可核验视频→模型→配对→数据库→复核的运行过程，不需要编造人物身份",
+      "not_equivalent_to": "不是人脸特征/跨场所真人身份识别，也未覆盖全部历史国标视频解析",
+      "future_implementation": "用授权摄像机视频完善GB28181多路直播/历史、有效人脸质检和带拒识的人脸/跨机身份模块",
+      "acceptance_gate": "独立人脸GT和非重叠多摄像机同人/异人标注，分别测检出、错认、拒识、时延、可撤销复核",
+      "next_priority": "P0"
+    },
+    {
+      "id": 2,
+      "excel_row": 8,
+      "title": "州、市县、街道和社区四级",
+      "status": "verified_real",
+      "verified_scope": "四级角色登录、分辖区权限及不同平台视图已有API/浏览器回归",
+      "evidence_files": [
+        "tests/test_access_v12.py",
+        "tests/test_admin.py",
+        "tests/test_portal_v13.py"
+      ],
+      "remaining_gap": "演示前仍要使用州/县/街道/社区账号逐个走读",
+      "delivery_mode": "original_scope",
+      "delivered_now": "四级角色、辖区授权和浏览器/API已做真实测试",
+      "alternative_used": "不替代，按原文实现四级管理",
+      "why_demo_usable": "真实账号与数据库操作可直接验证",
+      "not_equivalent_to": "不代表具备生产环境统一身份认证或外部安全审核",
+      "future_implementation": "正式部署接SSO/MFA及安全合规审核",
+      "acceptance_gate": "四级账号分别检查辖区读写、跨区403、会话失效与审计",
+      "next_priority": "P2"
+    },
+    {
+      "id": 3,
+      "excel_row": 9,
+      "title": "各场所陌生人底库建立",
+      "status": "synthetic_only",
+      "verified_scope": "指定天数、最早出现/次数优先/人工裁决、底库矫正发布链路在P###合成身份上通过；新增独立、仅州级研究管理员可操作的QA通过后D###匿名候选到访演示，但不向P###正式底库导入或验证真人身份",
+      "evidence_files": [
+        "tests/test_base_registry.py",
+        "tests/test_roster_maintenance.py",
+        "tests/test_research_linkage.py"
+      ],
+      "remaining_gap": "真实人脸采集与聚类人脸照片底库尚未端到端实现",
+      "delivery_mode": "synthetic_business",
+      "delivered_now": "P###合成人员底库按有效出现去重、归属、矫正、版本发布；D###人工研究会话独立",
+      "alternative_used": "用已知真实答案的合成P###活动代替真人身份聚类输入",
+      "why_demo_usable": "可验证归属规则、主归属唯一、纠错、快照差异和发布事务",
+      "not_equivalent_to": "不是现实陌生人身份底库，D###人工标签也不能自动晋升P###",
+      "future_implementation": "先完成经核实的跨机主体与真实到访，再复用版本底库；保留人工纠错和身份拒识",
+      "acceptance_gate": "一人多帧/多机及不同人负例、误合并回滚、主归属策略、可重算审计",
+      "next_priority": "P0"
+    },
+    {
+      "id": 4,
+      "excel_row": 10,
+      "title": "场所态势",
+      "status": "partial",
+      "verified_scope": "场所/流量/底库/趋势有合成业务视图，真实视频只有匿名目标统计",
+      "evidence_files": [
+        "tests/test_insights.py",
+        "tests/test_monitoring.py"
+      ],
+      "remaining_gap": "真实独立人数、真实串所人数不可从匿名轨迹得到",
+      "delivery_mode": "limited_demonstration",
+      "delivered_now": "实际匿名监控事件统计，P###合成场所趋势与底库统计",
+      "alternative_used": "用匿名事件数量和P###合成会话展示部分态势与图表",
+      "why_demo_usable": "可验统计界面、时序和场所过滤、来源标识",
+      "not_equivalent_to": "检测框与本机track不能代替真人独立人数或串所人数",
+      "future_implementation": "可靠到访层完成后接场所会话人数、时区及去重统计",
+      "acceptance_gate": "同人多机多帧不重数、断流和晚到事件处理对照人工GT",
+      "next_priority": "P1"
+    },
+    {
+      "id": 5,
+      "excel_row": 11,
+      "title": "异常人员态势",
+      "status": "partial",
+      "verified_scope": "同比/环比、排行、出入关联及关系图在合成数据上有部分表现",
+      "evidence_files": [
+        "tests/test_insights.py",
+        "tests/test_rules_v11.py"
+      ],
+      "remaining_gap": "没有真实人身份热点地理图、完整场所热力和真人串所网络",
+      "delivery_mode": "limited_demonstration",
+      "delivered_now": "P###合成异常排行、趋势及关系图；真实仅匿名检测概况",
+      "alternative_used": "用合成异常业务指标与关系图演示聚合展示",
+      "why_demo_usable": "可检查指标算法、分析视图和规则联动",
+      "not_equivalent_to": "没有真实异常人员身份、热点空间图及真人串所网络",
+      "future_implementation": "真实身份审核完成后接规则复核结果并建立可核验空间态势",
+      "acceptance_gate": "真实异常/非异常负例，时段口径、权限隔离、误报审核",
+      "next_priority": "P1"
+    },
+    {
+      "id": 6,
+      "excel_row": 12,
+      "title": "串所预警",
+      "status": "synthetic_only",
+      "verified_scope": "P###跨场所规则引擎与实例/审查功能可演示",
+      "evidence_files": [
+        "tests/test_business.py",
+        "tests/test_rules_v11.py"
+      ],
+      "remaining_gap": "真人跨机位身份真值不足，不能触发真实串所",
+      "delivery_mode": "synthetic_business",
+      "delivered_now": "P###跨场所串所规则引擎和人工复核已运行",
+      "alternative_used": "用合成跨场所到访事件代替真人活动",
+      "why_demo_usable": "规则时间窗、次数、触发与审计可实际验证",
+      "not_equivalent_to": "不证明真人跨场所匹配，也不能发布真实风险警情",
+      "future_implementation": "为规则接独立可信身份/到访层，同时保持模拟与真实来源隔离",
+      "acceptance_gate": "跨所人工真值、相似衣着不同人负例、误合并阻断和审计",
+      "next_priority": "P0"
+    },
+    {
+      "id": 7,
+      "excel_row": 13,
+      "title": "串所同行人预警",
+      "status": "synthetic_only",
+      "verified_scope": "规则引擎可对合成人员的重复同行和人数阈值建模",
+      "evidence_files": [
+        "tests/test_rules_v11.py",
+        "tests/test_business.py"
+      ],
+      "remaining_gap": "未对真实行人做跨机身份关联",
+      "delivery_mode": "synthetic_business",
+      "delivered_now": "P###多场所重复同行的阈值和证据复核",
+      "alternative_used": "用有真值的合成同行人员事件替代真实共同到访",
+      "why_demo_usable": "可测试配对次数、窗口及阈值边界",
+      "not_equivalent_to": "同框/同位置不等于实名同行，EPFL同场所配对不能证明串所",
+      "future_implementation": "引入可信多人员会话和有时间容差的共现模型",
+      "acceptance_gate": "同行与偶然共现负例、多人换ID、来源可追溯",
+      "next_priority": "P1"
+    },
+    {
+      "id": 8,
+      "excel_row": 14,
+      "title": "串所互动预警",
+      "status": "synthetic_only",
+      "verified_scope": "A/B互访和设定次数的规则逻辑在合成事件上有测试",
+      "evidence_files": [
+        "tests/test_rules_v11.py",
+        "tests/test_business.py"
+      ],
+      "remaining_gap": "未有真人互访身份真值",
+      "delivery_mode": "synthetic_business",
+      "delivered_now": "模拟A/B人员互访的次数、时间窗规则与复核",
+      "alternative_used": "用P###模拟跨所双向访问代替真人互访",
+      "why_demo_usable": "可验证互访计算和配置的完整执行",
+      "not_equivalent_to": "不能据此认定真实人员互动或关系",
+      "future_implementation": "对接授权可信到访事件，增加人工审核而非自动断言互动",
+      "acceptance_gate": "双向互访/偶然路过正反例和错关联负例",
+      "next_priority": "P1"
+    },
+    {
+      "id": 9,
+      "excel_row": 15,
+      "title": "串所聚集预警",
+      "status": "synthetic_only",
+      "verified_scope": "多人合成底库归属/共同场所出现和阈值已有规则测试",
+      "evidence_files": [
+        "tests/test_rules_v11.py",
+        "tests/test_business.py"
+      ],
+      "remaining_gap": "未有真实多人唯一身份识别与跨机聚集真值",
+      "delivery_mode": "synthetic_business",
+      "delivered_now": "P###合成多人共同出现、聚集阈值命中与复核",
+      "alternative_used": "以合成群体与有效出现事件模拟真人聚集",
+      "why_demo_usable": "可检验群体去重、阈值、规则审计",
+      "not_equivalent_to": "多机多框不可作为真人聚集独立人数",
+      "future_implementation": "通过经核实多人场所会话计算时空聚集候选",
+      "acceptance_gate": "不同人GT、同一人多机重复出现、区域阈值和误配排除",
+      "next_priority": "P1"
+    },
+    {
+      "id": 10,
+      "excel_row": 16,
+      "title": "久未出现预警",
+      "status": "synthetic_only",
+      "verified_scope": "合成人员未出现与完整检查周期阈值有负向回归",
+      "evidence_files": [
+        "tests/test_rules_v11.py"
+      ],
+      "remaining_gap": "真实人库未建立，不能真正给现实中的人发缺席预警",
+      "delivery_mode": "synthetic_business",
+      "delivered_now": "合成人员超过完整时间窗久未出现规则与边界回归",
+      "alternative_used": "用有确定出现历史的虚构人员模拟缺席",
+      "why_demo_usable": "可测滚动窗口、阈值与触发时间",
+      "not_equivalent_to": "视频未检出不等于现实人员未出现",
+      "future_implementation": "有可信到访与摄像机覆盖率后建立缺席不确定状态",
+      "acceptance_gate": "设备停采/盲区/时间窗不足负例，防止错误预警",
+      "next_priority": "P1"
+    },
+    {
+      "id": 11,
+      "excel_row": 17,
+      "title": "出现预警",
+      "status": "synthetic_only",
+      "verified_scope": "合成P###出现名单/场所配置可由规则实例触发并审核",
+      "evidence_files": [
+        "tests/test_rule_instances.py",
+        "tests/test_integrated_excel_contract.py"
+      ],
+      "remaining_gap": "真实视频仍仅有匿名局部检测",
+      "delivery_mode": "synthetic_business",
+      "delivered_now": "P###出现名单规则实例、命中、复核与归档",
+      "alternative_used": "用有已知标签的合成出现事件替代真人名单比对",
+      "why_demo_usable": "可测名单配置、阈值和审核操作",
+      "not_equivalent_to": "匿名人体不等于现实关注名单人员",
+      "future_implementation": "合法授权真人身份比对后只产生可复核候选",
+      "acceptance_gate": "陌生相似人拒识、名单权限、人工复核、纠错撤销",
+      "next_priority": "P1"
+    },
+    {
+      "id": 12,
+      "excel_row": 18,
+      "title": "场所人数异常预警",
+      "status": "synthetic_only",
+      "verified_scope": "合成到访人数与底库数比较，按活动结束时间和阈值触发",
+      "evidence_files": [
+        "tests/test_rules_v11.py"
+      ],
+      "remaining_gap": "真实独立人数不可直接用检测框数代替",
+      "delivery_mode": "synthetic_business",
+      "delivered_now": "合成场所去重到访人数与底库数差异预警",
+      "alternative_used": "以P###有效出现人数替代真人唯一人数",
+      "why_demo_usable": "可验人数阈值、时间范围、规则证据",
+      "not_equivalent_to": "检测框/track/119配对不是独立人数",
+      "future_implementation": "建立可信去重访问人数并分开实时占用和历史到访",
+      "acceptance_gate": "手工人数真值、换机重复、进出、漏检和断流测试",
+      "next_priority": "P1"
+    },
+    {
+      "id": 13,
+      "excel_row": 19,
+      "title": "场所出入口",
+      "status": "partial",
+      "verified_scope": "场所摄像机、视频源、帧截图及人工标注可查询；新增按场所/视频源/UTC入库时间、实际检测框及最新人工复核状态检索帧级证据；可溯源展示脱敏原片几何框，不以此代替真人身份识别；真实官方CAVIAR双机位CVML框作为输入，已运行Roboflow ByteTrack v2.6本机时序跟踪的独立Owner验收（检测本身未运行）；已增加预训练YOLO11n在真正CAVIAR MPEG画面的人体检测→现成ByteTrack本机跟踪，模型框独立于官方人工GT存入统一证据、支持人工质量审核；实测准确率另行评估",
+      "evidence_files": [
+        "tests/test_cctv_dataset.py",
+        "tests/test_integrated_excel_contract.py",
+        "tests/test_video_evidence_search.py"
+      ],
+      "remaining_gap": "真实人脸抓拍和识别结果全链、真人检索未完成；没有实名人脸比对、自动去重或能保存并检索的原始识别人脸图；ByteTrack对官方GT的分配覆盖率不能替代实际人体检测的召回率或跨机位真实人物匹配精度；该模型框只有视频相对帧号，不是现实UTC时刻、独立人身份或跨机真人ReID；Ultralytics授权需核验。",
+      "delivery_mode": "limited_demonstration",
+      "delivered_now": "真实场所摄像机绑定、CAVIAR视频帧解码、人形检测框与人工质量查看",
+      "alternative_used": "以人体候选与研究原片代替部分入口抓拍流程",
+      "why_demo_usable": "能够证明视频源→实际帧→检测框→审核界面",
+      "not_equivalent_to": "不能代替高质量人脸抓拍图或真实人员ID",
+      "future_implementation": "明确入口区域，补授权人脸采集质量及GB28181实时/回放闭环",
+      "acceptance_gate": "入口与源时间、帧/框/位置可溯源；背面/遮挡/无人脸负例",
+      "next_priority": "P0"
+    },
+    {
+      "id": 14,
+      "excel_row": 20,
+      "title": "人脸检索",
+      "status": "missing",
+      "verified_scope": "未提供经验证的人脸照片输入到真人跨摄像机识别检索闭环",
+      "evidence_files": [
+        "tests/test_insights.py",
+        "tests/test_face_photo_lab.py"
+      ],
+      "remaining_gap": "合成P###文本查询不是人脸图像检索",
+      "delivery_mode": "not_replaced",
+      "delivered_now": "已新增需管理员主动启用、需双OpenCV Zoo模型的授权测试照片1:N临时相似度实验接口；默认关闭，图片不持久化、只保留短期内存特征；仍无监控真人跨所识别",
+      "alternative_used": "没有有效替代原Excel的真人跨所人脸检索；仅用用户主动提供的授权照片和SFace演示短时1:N相似度排序，输出不确认身份",
+      "why_demo_usable": "可逐步验证单脸质量门禁、图像输入、特征提取、内存候选比对、手动复核路径，而不采集监控生物特征",
+      "not_equivalent_to": "没有真实监控人脸底库、持续检索、对跨场所实际身份的准确性统计与合规批准，SFace模型许可待澄清",
+      "future_implementation": "经许可与独立真值验证后才在严格授权模式下建设可撤销人脸图片索引与人工复核，且与实际摄像机生物识别用途另行评审",
+      "acceptance_gate": "权属确认且独立评估的授权照片GT、同/异人Top-k、误认/拒识率、生命周期删除和分级权限，验证后才能转实况功能",
+      "next_priority": "P2"
+    },
+    {
+      "id": 15,
+      "excel_row": 21,
+      "title": "人员检索",
+      "status": "partial",
+      "verified_scope": "合成人员编码搜索与已知P###历史出现可查；人工匿名标签D###可查询已复核的UTC机位事件与按场所候选会话，严格不等同真人身份证明",
+      "evidence_files": [
+        "tests/test_insights.py",
+        "tests/test_research_linkage.py"
+      ],
+      "remaining_gap": "人脸图像检索与真实跨所关联尚无可核验能力",
+      "delivery_mode": "limited_demonstration",
+      "delivered_now": "P###人员编码搜索及研究D###人工标签事件/会话检索",
+      "alternative_used": "用合成人员编码/匿名标签展示人员搜索过程",
+      "why_demo_usable": "可验索引、列表、时间筛选与权限逻辑",
+      "not_equivalent_to": "D###不是自然人身份，不能代替真人跨所搜索",
+      "future_implementation": "接经审核的真实主体库，分开可信身份与未确认候选",
+      "acceptance_gate": "重名/误合并、跨区403、来源/证据与纠错后的再检索",
+      "next_priority": "P1"
+    },
+    {
+      "id": 16,
+      "excel_row": 22,
+      "title": "抓拍结果查询",
+      "status": "partial",
+      "verified_scope": "视频抽样帧、研究监控底图/人工框和来源时间可追溯；新增源级/场所级/UTC入库时间及最新审核状态筛选、全范围匹配条数、分页、脱敏原始帧，SQLite实际OpenCV正样片与跨县权限回归验证；真实官方CAVIAR双机位CVML框作为输入，已运行Roboflow ByteTrack v2.6本机时序跟踪的独立Owner验收（检测本身未运行）；已增加预训练YOLO11n在真正CAVIAR MPEG画面的人体检测→现成ByteTrack本机跟踪，模型框独立于官方人工GT存入统一证据、支持人工质量审核；实测准确率另行评估",
+      "evidence_files": [
+        "tests/test_cctv_dataset.py",
+        "tests/test_real_face_boxes.py",
+        "tests/test_video_evidence_search.py"
+      ],
+      "remaining_gap": "抓拍人脸图、真人特征/身份仍不完整；查询是帧与几何框，不是图片相似度人脸检索；直播无可重放原片时不能伪造源帧快照；ByteTrack对官方GT的分配覆盖率不能替代实际人体检测的召回率或跨机位真实人物匹配精度；该模型框只有视频相对帧号，不是现实UTC时刻、独立人身份或跨机真人ReID；Ultralytics授权需核验。",
+      "delivery_mode": "limited_demonstration",
+      "delivered_now": "真实抽帧、模型框、来源摘要、时间/场所筛选、脱敏预览与误检审核",
+      "alternative_used": "以真实研究视频帧及匿名框代替部分人脸抓拍结果查询",
+      "why_demo_usable": "数据检索、回溯到证据和人工标记是真实执行",
+      "not_equivalent_to": "脱敏抽帧不是人脸特征图或真人跨所图片检索",
+      "future_implementation": "获得合规抓拍留存后补可撤销的人脸缩略图、质量和生命周期",
+      "acceptance_gate": "源摘要一致、访问权限、帧图对应、过期拒绝和检索准确性",
+      "next_priority": "P1"
+    },
+    {
+      "id": 17,
+      "excel_row": 23,
+      "title": "轨迹回放",
+      "status": "missing",
+      "verified_scope": "缺乏原片证据支持的真人GPS/地理轨迹；不生成虚假地图移动",
+      "evidence_files": [
+        "tests/test_insights.py",
+        "tests/test_geo_demo.py"
+      ],
+      "remaining_gap": "#17仍缺真实位置和可信真人跨场所身份；本轮实现的地图只是独立的合成演示，原Excel完整要求未验收",
+      "delivery_mode": "not_replaced",
+      "delivered_now": "新增了基于录入场所坐标的地图点位及P###合成到访时序点回放；无原始GPS数据，场所坐标默认不存在，示例点明确标注虚构",
+      "alternative_used": "没有有效替代原文中的真人GPS轨迹；仅以MapLibre地图和虚构P###到访顺序做技术子流程演示，连线不代表道路或真人路径",
+      "why_demo_usable": "可验证地图加载、场所坐标配置、按时间到访事件投影、权限过滤与轨迹可视化，不必声称真实身份",
+      "not_equivalent_to": "只有虚构主体及虚构/未经核验场所坐标，不能证明GPS、真实人员定位或道路轨迹；无坐标时必须显示缺失",
+      "future_implementation": "取得独立核验的场所/摄像机真实坐标后，接合法可信的真人到访证据，地图仅展示被证据支持的离散点，不推断道路",
+      "acceptance_gate": "真实场所坐标测绘+摄像机时间证据+授权真人事件逐点核验，跨区越权及错认负例，并证明路线不伪造",
+      "next_priority": "P2"
+    },
+    {
+      "id": 18,
+      "excel_row": 24,
+      "title": "关系图谱",
+      "status": "partial",
+      "verified_scope": "自动合成共现关系及网络可展示；补充人工审计式跨机位匿名研究分组、撤销与上游证据变动自动过期，不是自动生物特征匹配",
+      "evidence_files": [
+        "tests/test_insights.py",
+        "tests/test_research_linkage.py"
+      ],
+      "remaining_gap": "人工建立关系及可信真实人员网络尚未完整实现",
+      "delivery_mode": "limited_demonstration",
+      "delivered_now": "P###共现关系图与D###人工研究关联、撤销和证据过期",
+      "alternative_used": "用合成网络及可审计匿名分组替代真人关系图子功能",
+      "why_demo_usable": "可核验图显示、边来源和更正处理",
+      "not_equivalent_to": "共现不必然代表人际关系，不能确认真人关系",
+      "future_implementation": "用可信事件生成有来源的关系候选，要求人工审核",
+      "acceptance_gate": "图边去重、无证据边阻断、人工纠错/跨区权限",
+      "next_priority": "P1"
+    },
+    {
+      "id": 19,
+      "excel_row": 25,
+      "title": "人员活动分析",
+      "status": "partial",
+      "verified_scope": "合成P###出入场所与频次可查；针对受控人工分组按同场所时间间隔合并候选会话并保留原始摄像机事件证据，不是现实唯一人员流动统计",
+      "evidence_files": [
+        "tests/test_insights.py",
+        "tests/test_research_linkage.py"
+      ],
+      "remaining_gap": "缺现实人物唯一身份、地理区域热点及真实场所路线",
+      "delivery_mode": "limited_demonstration",
+      "delivered_now": "P###场所频次与时间线、D###候选会话及真实匿名事件",
+      "alternative_used": "用合成活动记录和经过UTC核对的匿名会话展示活动分析",
+      "why_demo_usable": "频次/时间分段/场所排序与图表可操作",
+      "not_equivalent_to": "无法证明同一真人跨所活动，录像帧号不代表UTC",
+      "future_implementation": "有可信主体到访后按窗口重建人员活动并展示覆盖率",
+      "acceptance_gate": "会话切分、晚到重放、换人/误合并、时区断流负例",
+      "next_priority": "P1"
+    },
+    {
+      "id": 20,
+      "excel_row": 26,
+      "title": "场所管理",
+      "status": "verified_real",
+      "verified_scope": "场所创建、修改、禁用/软删除及摄像机区域绑定有后端测试",
+      "evidence_files": [
+        "tests/test_admin.py",
+        "tests/test_site_model.py"
+      ],
+      "remaining_gap": "删除采用软删除留审计，不是物理删除",
+      "delivery_mode": "original_scope",
+      "delivered_now": "真实场所和视频源创建、编辑、启停、软删除和审计",
+      "alternative_used": "不替代；为了审计采用软删除保留历史",
+      "why_demo_usable": "确定性管理操作可用真实API/SQLite直接核对",
+      "not_equivalent_to": "不等于物理删除，也不代表已通过生产安全测评",
+      "future_implementation": "补数据保留期与正式删除审批，支持批量设备治理",
+      "acceptance_gate": "停用后历史不丢、跨级越权403和审计版本",
+      "next_priority": "P2"
+    },
+    {
+      "id": 21,
+      "excel_row": 27,
+      "title": "场所人员底库管理",
+      "status": "synthetic_only",
+      "verified_scope": "可对合成底库手工增加/移除及迁移归属并留版本审计",
+      "evidence_files": [
+        "tests/test_base_registry.py",
+        "tests/test_roster_maintenance.py"
+      ],
+      "remaining_gap": "真人底库及真实人脸照片编辑尚未完成",
+      "delivery_mode": "synthetic_business",
+      "delivered_now": "P###合成底库增删/归属迁移/快照差异与审计",
+      "alternative_used": "以合成已知人库验证底库操作界面及事务逻辑",
+      "why_demo_usable": "业务管理接口/版本是真实的且可复盘",
+      "not_equivalent_to": "真人身份、人脸照片编辑及本人更正尚未实现",
+      "future_implementation": "真实授权主体库通过后挂接原版本发布与纠错",
+      "acceptance_gate": "冲突、历史版本保留、权限和人员删除审计",
+      "next_priority": "P1"
+    },
+    {
+      "id": 22,
+      "excel_row": 28,
+      "title": "预警设置管理",
+      "status": "synthetic_only",
+      "verified_scope": "规则实例新增、启停、编辑、归档、审计均是真实API/SQLite；命中效果用合成P###",
+      "evidence_files": [
+        "tests/test_rule_instances.py",
+        "tests/test_integrated_excel_contract.py"
+      ],
+      "remaining_gap": "不能据此声称真人预警已完成",
+      "delivery_mode": "synthetic_business",
+      "delivered_now": "真实规则实例新增、修改、启停、归档、重算；P###合成命中",
+      "alternative_used": "规则配置本身真实，命中事件用合成人员输入",
+      "why_demo_usable": "可测业务规则生命周期与数据库审计",
+      "not_equivalent_to": "不代表已经产生任何可靠真人风险预警",
+      "future_implementation": "新增真实输入来源的灰度隔离和人工审批/回滚",
+      "acceptance_gate": "阈值正反例、编辑即时生效、模拟/真实不串库、权限",
+      "next_priority": "P1"
+    },
+    {
+      "id": 23,
+      "excel_row": 29,
+      "title": "账号管理",
+      "status": "verified_real",
+      "verified_scope": "账户创建、禁用/软删除、密码重置与四级权限隔离有真实API测试",
+      "evidence_files": [
+        "tests/test_access_v12.py",
+        "tests/test_admin.py"
+      ],
+      "remaining_gap": "账号删除为停用、保留历史审计",
+      "delivery_mode": "original_scope",
+      "delivered_now": "真实账号创建、禁用、密码重置、角色迁移与会话失效",
+      "alternative_used": "不替代；禁用而非无审计的物理删除",
+      "why_demo_usable": "可由真实不同权限账号直接验证",
+      "not_equivalent_to": "本地演示不等于生产MFA、SSO、安全审计",
+      "future_implementation": "部署时接SSO/MFA、凭证轮转及审批管理",
+      "acceptance_gate": "重置旧Token失效、跨区403、禁用会话与审计",
+      "next_priority": "P2"
+    }
+  ],
+  "last_review_note": "研究人工关联与会话已落地但仍是operator_assertion，未验证跨摄像机身份自动比对。#14图像人脸检索、#17真实地理轨迹继续missing；#3及七类规则仍synthetic_only。",
+  "latest_tracking_proof": {
+    "ci_run": "https://github.com/yituanxing/test3/actions/runs/38418598531",
+    "status": "real_official_CAVIAR_GT_to_ByteTrack_tracking_only",
+    "official_video_frames_per_camera": 383,
+    "detector_evaluated": false,
+    "cross_camera_identity_evaluated": false
+  },
+  "delivery_assessment_date": "2026-10-14",
+  "delivery_baseline_ci": "https://github.com/yituanxing/test3/actions/runs/38509893958",
+  "substitution_scope": "演示替代只能验证限定范围内的页面和业务规则；不能升级为原Excel真实身份、人脸检索、地理轨迹的正式验收。",
+  "delivery_modes": {
+    "original_scope": "已验证管理原功能（软删除除外）",
+    "synthetic_business": "有真值的P###合成数据替代真实身份输入，仅验证业务计算",
+    "limited_demonstration": "实际匿名研究视频或合成分析只能替代局部技术过程",
+    "not_replaced": "没有有效替代；保留缺失"
+  }
+}

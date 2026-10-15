@@ -247,6 +247,20 @@ def update_source(source_id:int,data:SourceUpdate,request:Request):
         name=data.name.strip()
         if not name:
             raise HTTPException(422,'视频源名称不能为空')
+        # A public research clip is tied to one verified physical hallway;
+        # reassigning it to another place could fabricate cross-site visits.
+        if old['place_id'] != data.place_id and c.execute(
+                'SELECT 1 FROM public_cctv_imports WHERE source_id=?',
+                (source_id,)).fetchone():
+            raise HTTPException(409,'公开研究视频所属固定场所不可直接改绑')
+        from app import site_model
+        old_binding=site_model._current(c,source_id)
+        if data.place_id!=old['place_id']:
+            site_model.change_binding(c,source_id,data.place_id,None,
+                                      'source_inventory_reassigned')
+        elif old_binding is None:
+            site_model.record_initial(c,source_id,old['place_id'],
+                                      provenance='legacy_backfill')
         c.execute('UPDATE sources SET name=?,place_id=?,kind=?,uri=?,enabled=? WHERE id=?',
                   (name,data.place_id,data.kind,data.uri,int(data.enabled),source_id))
         result={'id':source_id,**data.model_dump(),'name':name}

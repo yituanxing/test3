@@ -39,6 +39,12 @@ def run():
                 "INSERT INTO sources(place_id,name,kind,uri) VALUES(?,?,?,?)",
                 (1, "browser-real-face-review", "file",
                  str(ROOT / "samples" / "astronaut-face-test.mp4"))).lastrowid
+            # Deliberately offline RTSP endpoint for capture UI start/stop
+            # contract testing. We do NOT pretend any decoded media exists.
+            rtsp_source_id = c.execute(
+                "INSERT INTO sources(place_id,name,kind,uri) VALUES(?,?,?,?)",
+                (1, "browser-offline-RTSP-contract", "rtsp",
+                 "rtsp://127.0.0.1:1/never-online")).lastrowid
         try:
             with (OUT / "ui-server.log").open("w") as log:
                 server = subprocess.Popen(
@@ -80,6 +86,70 @@ def run():
                         page.locator('a[data-tab="overview"]').click()
                         expect(page.locator("h2.lead")).to_contain_text("辖区重点场所运行概览")
                         checks.append("home_navigation")
+                        # Production-facing landing must start with actual
+                        # camera evidence, not virtual P### visits or rules.
+                        page.goto(base+"/real")
+                        expect(page.get_by_role("heading",name="仅真实视频 · 事件与证据")).to_be_visible()
+                        expect(page.locator("#realEvents")).to_have_text("0",timeout=12000)
+                        expect(page.locator("#events")).to_contain_text("没有用虚构P###填充",timeout=12000)
+                        expect(page.locator("#places")).to_contain_text("测试场所 A",timeout=12000)
+                        checks.append("true_data_only_browser_zero_state_no_synthetic_fallback")
+                        page.screenshot(path=str(OUT/"ui-real-evidence-only.png"),full_page=True)
+                        page.goto(base+"/portal")
+                        # Primary human CCTV route: real-source catalog and
+                        # truthful empty state. A real remote pair is verified
+                        # separately in the cctv-real labelled CI step.
+                        page.goto(base+"/cctv")
+                        expect(page.get_by_role("heading",name="真实监控与人体关联 · 验收工作台")).to_be_visible()
+                        expect(page.locator("#place")).to_contain_text("测试场所 A")
+                        expect(page.locator("#sources")).to_contain_text(
+                            "尚无研究监控视频", timeout=12000)
+                        assert page.locator("#sources tr").count()==1
+                        expect(page.locator("#occurrenceRows")).to_contain_text(
+                            "不会生成模拟数",timeout=12000)
+                        expect(page.locator("#occurrenceNote")).to_contain_text(
+                            "不合并跨机位轨迹",timeout=12000)
+                        checks.append("real_fixed_camera_catalog_truthful_no_video_state")
+                        checks.append("common_anonymous_local_occurrences_zero_state_browser")
+                        page.screenshot(path=str(OUT/"ui-cctv-primary.png"),full_page=True)
+                        # Excel #20/#23: the admin screen MUST actually attach
+                        # Bearer auth, list real inventory, register an RTSP
+                        # source and create a scope-bound login through its UI.
+                        page.goto(base + "/admin")
+                        expect(page.locator("#regionCount")).not_to_have_text("—")
+                        expect(page.locator("#accountPanel")).to_be_visible()
+                        expect(page.locator("#placesBody")).to_contain_text("测试场所 A")
+                        page.locator("#newSourceName").fill("browser-added-RTSP")
+                        page.locator("#newSourceUri").fill("rtsp://127.0.0.1:1/new-offline")
+                        page.get_by_role("button", name="新增 RTSP").click()
+                        expect(page.locator("#sourcesBody")).to_contain_text("browser-added-RTSP")
+                        checks.append("authenticated_admin_rtsp_creation")
+                        page.locator("#accountName").fill("smokecommunity")
+                        page.locator("#accountPassword").fill("browser-account-strong-password")
+                        page.locator("#accountNewRegion").select_option(
+                            label="演示州 / 演示县市 / 演示街道 / 演示社区")
+                        page.get_by_role("button", name="新建账号").click()
+                        expect(page.locator("#accountsBody")).to_contain_text("smokecommunity")
+                        checks.append("admin_four_tier_account_creation")
+                        # Same school supports two cameras and one zone; real
+                        # administration writes actual SQLite binding history.
+                        expect(page.get_by_role("heading",name="公共场所—内部场景—摄像机关系")).to_be_visible()
+                        page.locator("#sitePlace").select_option(label="测试场所 A")
+                        page.locator("#siteZoneName").fill("学校西校门")
+                        page.locator("#siteCategory").select_option("entrance")
+                        page.get_by_role("button", name="创建场景区域").click()
+                        expect(page.locator("#siteZonesRows")).to_contain_text(
+                            "学校西校门",timeout=10000)
+                        page.locator("#siteSource").select_option(label="browser-added-RTSP（测试场所 A）")
+                        page.locator("#siteZone").select_option(label="学校西校门")
+                        page.get_by_role("button",name="确认设备区域").click()
+                        expect(page.locator("#siteHistory")).to_contain_text("学校西校门",timeout=12000)
+                        page.reload()
+                        expect(page.locator("#siteZonesRows")).to_contain_text("学校西校门",timeout=12000)
+                        checks.append("real_browser_canonical_place_zone_camera_binding_persists")
+                        page.screenshot(path=str(OUT / "ui-shared-site-zone-binding.png"), full_page=True)
+                        page.screenshot(path=str(OUT / "ui-admin-operations.png"), full_page=True)
+
                         # Business-critical browser acceptance: actual server DB
                         # recomputes the truth case; this is not a UI mock.
                         page.goto(base+"/base")
@@ -103,6 +173,16 @@ def run():
                             if dialog.type=="prompt" else dialog.accept()))
                         page.locator("#pub").click()
                         expect(page.locator("#kRunState")).to_contain_text("当前已发布底库")
+                        # The published roster is an immutable snapshot: the
+                        # user's next pending draft must not replace it.
+                        published_snapshot=page.evaluate("""async()=> (
+                            await (await fetch('/api/base/active')).json())""")
+                        assert published_snapshot['run']['state']=='published'
+                        original_run_id=published_snapshot['run']['id']
+                        orig_person=next(x for x in published_snapshot['people']
+                                         if x['person']=='P099')
+                        assert orig_person['place_id']==2,orig_person
+                        checks.append("published_roster_has_frequency_assignment_B")
                         page.locator("#strategy").select_option("earliest")
                         page.get_by_role("button",name="② 生成底库草稿").click()
                         expect(p099.locator("td").nth(2)).to_contain_text("测试场所 A")
@@ -121,17 +201,168 @@ def run():
                         expect(page.locator("#windowInfo")).to_contain_text("2035")
                         # A pending empty draft does not auto-publish itself.
                         expect(page.locator("#kRunState")).to_contain_text("未发布草稿")
+                        active_after_draft=page.evaluate("""async()=> (
+                            await (await fetch('/api/base/active')).json())""")
+                        assert active_after_draft['run']['id']==original_run_id,(
+                            active_after_draft,original_run_id)
+                        assert active_after_draft['run']['state']=='published'
+                        assert next(x for x in active_after_draft['people']
+                                    if x['person']=='P099')['place_id']==2
+                        latest_draft=page.evaluate("""async()=> (
+                            await (await fetch('/api/base')).json())""")
+                        assert latest_draft['run']['state']=='draft'
+                        assert latest_draft['run']['id'] != original_run_id
+                        assert latest_draft['people']==[],latest_draft
+                        # A second publish of the old completed run must not
+                        # silently discard the new draft or alter the release.
+                        republish=page.evaluate("""async id => {
+                            const r=await fetch('/api/base/runs/'+id+'/publish',
+                                                {method:'POST'});
+                            return {status:r.status,body:await r.json()};
+                        }""",original_run_id)
+                        assert republish['status']==409,republish
+                        checks.append("published_roster_immutable_during_new_draft_and_duplicate_publish_409")
                         checks.append("real_browser_rolling_window_removes_absent_fictional_person")
                         page.screenshot(path=str(OUT/"ui-roster-expiry-diff.png"),full_page=True)
+                        # Excel #4/#5/#19: one analytics contract drives
+                        # comparisons, rankings and scoped cross-home flows.
+                        page.goto(base + "/insights")
+                        expect(page.locator("#periodComparison")).to_contain_text(
+                            "当期到访", timeout=12000)
+                        expect(page.locator("#comparisonWindow")).to_contain_text(
+                            "UTC", timeout=12000)
+                        expect(page.locator("#placeBreakdown tr").first).to_be_visible()
+                        expect(page.locator("#flowSummary")).to_contain_text("流入")
+                        checks.append("shared_analytics_period_rank_flow_browser")
+                        page.screenshot(path=str(OUT / "ui-shared-analytics.png"), full_page=True)
+                        page.evaluate("openPerson('P099')")
+                        expect(page.locator('#openPersonMap')).to_be_visible(timeout=12000)
+                        expect(page.locator('#openPersonMap')).to_have_attribute(
+                            'href','/geo?person=P099&days=30')
+                        checks.append('insights_person_to_geo_deep_link')
+                        # #17: actual map/browser operation uses only fictional
+                        # sites and P### chronology; all remote map requests
+                        # blocked to prove the offline coordinate fallback.
+                        page.route('https://cdn.jsdelivr.net/**',lambda route:route.abort())
+                        page.route('https://demotiles.maplibre.org/**',lambda route:route.abort())
+                        page.locator('#openPersonMap').click()
+                        expect(page).to_have_url(base+'/geo?person=P099&days=30')
+                        expect(page.get_by_role('heading',name='场所地图与合成轨迹回放')).to_be_visible()
+                        expect(page.locator('#person')).to_have_value('P099',timeout=12000)
+                        # The persistent dialog listener above handles confirmations.
+                        # A second once-listener double-accepts the same dialog.
+                        page.locator('#seedGeo').click()
+                        expect(page.locator('#notice')).to_contain_text('已配坐标',timeout=12000)
+                        expect(page.locator('#mapFallback svg')).to_be_visible(timeout=12000)
+                        expect(page.locator('#trackSummary')).to_contain_text('合成到访',timeout=12000)
+                        expect(page.locator('#events .event').first).to_be_visible(timeout=12000)
+                        # The fresh browser fixture has only sites A/B;
+                        # extra sites are created by separate tests, not here.
+                        assert page.locator('#placeRows tr').count()>=2
+                        expect(page.locator('#placeRows')).to_contain_text('虚构坐标')
+                        page.screenshot(path=str(OUT/'ui-geo-fictional-track.png'),full_page=True)
+                        checks.append('offline_geographic_map_real_browser_synthetic_visits_and_coordinates')
+                        # #14: face-photo similarity is off until the operator
+                        # explicitly installs models and enables consented use.
+                        page.goto(base+'/face-lab',wait_until='domcontentloaded')
+                        expect(page.get_by_role('heading',name='已授权照片的临时相似度检索')).to_be_visible()
+                        expect(page.locator('#modelBadge')).to_contain_text('暂不可运行')
+                        expect(page.locator('#enroll')).to_be_disabled()
+                        expect(page.locator('#search')).to_be_disabled()
+                        checks.append('optional_photo_lab_off_without_models_no_fake_identity')
+                        page.unroute('https://cdn.jsdelivr.net/**')
+                        page.unroute('https://demotiles.maplibre.org/**')
+                        # Excel #7/#11: one rule config drives repeated N-person
+                        # group matching and selected synthetic place/person lists.
+                        page.goto(base + "/business")
+                        expect(page.locator("#cfg_companion_min_people")).to_have_value("2", timeout=12000)
+                        page.locator("#cfg_companion_min_people").fill("3")
+                        page.locator("#watchMultiPlaces").select_option(label="测试场所 A")
+                        page.locator("#watchPeople").fill("P099")
+                        page.get_by_role("button",name="保存并重新分析").click()
+                        expect(page.locator("#cfg_companion_min_people")).to_have_value("3", timeout=12000)
+                        expect(page.locator("#watchPeople")).to_have_value("P099")
+                        rule_config=page.evaluate("""async()=> (await
+                            (await fetch('/api/business/config')).json())""")
+                        assert rule_config['companion_min_people']==3,rule_config
+                        assert rule_config['watch_person_ids']==['P099'],rule_config
+                        assert len(rule_config['watch_place_ids'])==1,rule_config
+                        all_rules=page.evaluate("""async()=> (
+                            await (await fetch('/api/business/analysis')).json())""")
+                        assert all_rules['mode']=='synthetic_only'
+                        kinds={x['type'] for x in all_rules['rule_counts']}
+                        assert kinds=={'cross_place','companion','interaction',
+                            'gathering','absence','appearance','headcount'}, kinds
+                        assert all(v['count']>=0 for v in all_rules['rule_counts'])
+                        assert '合成' in all_rules['disclaimer'],all_rules
+                        checks.append("all_seven_real_rule_engine_types_synthetic_source")
+                        checks.append("common_rule_n_person_and_multi_target_browser")
+                        page.screenshot(path=str(OUT/"ui-shared-rules.png"),full_page=True)
+                        # Excel #22: true browser CRUD with one shared rule
+                        # instance engine; verify DB persistence across reload.
+                        page.locator("#instType").select_option("appearance")
+                        page.locator("#instName").fill("动画场景合成出现规则")
+                        page.locator("#instPlaces").select_option(label="测试场所 B")
+                        page.locator("#instPeople").fill("P099")
+                        page.locator("#instSave").click()
+                        expect(page.locator("#instanceRows")).to_contain_text(
+                            "动画场景合成出现规则", timeout=12000)
+                        page.reload()
+                        expect(page.locator("#instanceRows")).to_contain_text(
+                            "动画场景合成出现规则", timeout=12000)
+                        first_row=page.locator("#instanceRows tr").filter(
+                            has_text="动画场景合成出现规则")
+                        first_row.get_by_role("button",name="暂停").click()
+                        expect(page.locator("#instanceRows")).to_contain_text("暂停")
+                        # Paused instance must suppress the default appearance
+                        # singleton, NOT silently restore legacy events.
+                        resp=page.evaluate("""async()=> (await
+                            (await fetch('/api/business/analysis')).json())""")
+                        assert not [a for a in resp['alerts']
+                                    if a['type']=='appearance'],resp['rule_counts']
+                        page.screenshot(path=str(OUT/"ui-rule-instances.png"),full_page=True)
+                        checks.append("shared_rule_instance_browser_create_pause_persist")
                         # Real video and actual browser interaction: never rely
                         # on a stubbed API or synthetic detector boxes.
                         page.goto(base+"/monitor")
+                        expect(page.locator("#videoButton")).to_be_visible(timeout=12000)
+                        expect(page.locator("#syncButton")).to_be_visible(timeout=12000)
                         # The GB28181 status must be truthful even without SIP
                         # hardware or a WVP upstream: no simulated online device.
                         expect(page.locator("#gbStatus")).to_contain_text("尚未配置")
                         expect(page.locator("#gbPanel")).to_contain_text(
                             "WVP-PRO + ZLMediaKit")
                         checks.append("gb28181_not_configured_shown_as_unverified")
+                        # Actual Chromium click path for a registered local
+                        # RTSP source. The RTSP address intentionally has NO
+                        # broadcaster: verify start/stop workflow and truthful
+                        # failure state, not nonexistent video/identity results.
+                        expect(page.locator("#captureSource option").filter(
+                            has_text="browser-offline-RTSP-contract")).to_have_count(
+                                1, timeout=12000)
+                        page.locator("#captureSource").select_option(str(rtsp_source_id))
+                        page.locator("#captureStart").click()
+                        expect(page.locator("#captureJobs")).to_contain_text(
+                            "已启用", timeout=12000)
+                        with main.db() as check:
+                            state = check.execute(
+                                "SELECT desired_enabled FROM capture_jobs WHERE source_id=?",
+                                (rtsp_source_id,)).fetchone()
+                            assert state and state[0] == 1
+                            assert check.execute(
+                                "SELECT COUNT(*) FROM samples WHERE source_id=?",
+                                (rtsp_source_id,)).fetchone()[0] == 0
+                        page.locator("#captureJobs").get_by_role(
+                            "button", name="停止任务").click()
+                        expect(page.locator("#captureJobs")).to_contain_text(
+                            "已停用", timeout=12000)
+                        with main.db() as check:
+                            assert check.execute(
+                                "SELECT desired_enabled FROM capture_jobs WHERE source_id=?",
+                                (rtsp_source_id,)).fetchone()[0] == 0
+                        checks.append("chromium_rtsp_capture_start_stop_without_false_media")
+                        page.screenshot(path=str(OUT/"ui-capture-start-stop.png"),
+                                        full_page=True)
                         actual = page.evaluate("""async sourceId => {
                             const r=await fetch('/api/sources/'+sourceId+
                               '/process?max_frames=10&sample_every=5',
@@ -157,6 +388,188 @@ def run():
                             assert check.execute(
                                 'SELECT COUNT(*) FROM face_box_reviews').fetchone()[0] == 2
                         checks.append("real_video_face_box_append_only_review_ui")
+                        # Excel #13/#16: actual recorded MP4 -> model face boxes ->
+                        # jurisdiction-scoped, source-filtered evidence ->
+                        # on-demand redacted original frame. This is NOT
+                        # biometric image similarity or independent-person ID.
+                        page.locator("#evidenceSource").select_option(str(face_source_id))
+                        page.locator("#evidenceWithBoxes").check()
+                        page.locator("#evidenceSearchButton").click()
+                        expect(page.locator("#evidencePageInfo")).to_contain_text(
+                            "匹配",timeout=12000)
+                        expect(page.locator("#faceEvidence")).to_contain_text(
+                            "browser-real-face-review",timeout=12000)
+                        page.locator("#faceEvidence button").last.click()
+                        expect(page.locator("#redactedEvidence")).to_be_visible(
+                            timeout=12000)
+                        assert page.locator("#redactedEvidence").get_attribute("src").startswith("blob:")
+                        checks.append("real_capture_evidence_query_scoped_and_redacted_preview_browser")
+                        page.screenshot(path=str(OUT/"ui-video-capture-evidence-search.png"),
+                                        full_page=True)
+                        # Anime scene map is a STORYBOARD, not GPS. Open a real
+                        # decoded file and accept one candidate manually.
+                        page.goto(base+"/anime-scenes")
+                        expect(page.get_by_role("heading",name="动画场景 · 时间轴 · 示意图")).to_be_visible()
+                        # Actual browser file upload (not a fake API or a mock
+                        # path): verify the raw bytes are registered as a source.
+                        page.locator("#uploadFile").set_input_files(
+                            str(ROOT/"samples"/"astronaut-face-test.mp4"))
+                        page.locator("#upload").click()
+                        expect(page.locator("#status")).to_contain_text(
+                            "视频上传成功",timeout=20000)
+                        expect(page.locator("#source")).to_contain_text("上传动画")
+                        checks.append("actual_browser_video_upload_to_real_decoder")
+                        page.locator("#source").select_option(str(face_source_id))
+                        page.locator("#seconds").fill("2")
+                        page.locator("#suggest").click()
+                        expect(page.locator("#candidates [data-adopt]").first).to_be_visible(
+                            timeout=20000)
+                        page.locator("#candidate_0").fill("测试镜头（人工命名）")
+                        page.locator("#candidates [data-adopt]").first.click()
+                        expect(page.locator("#segments")).to_contain_text(
+                            "测试镜头（人工命名）",timeout=12000)
+                        assert page.locator("#graph").locator("svg").count()==1
+                        expect(page.locator("#characters")).to_contain_text("没有任何人工绑定到真实视频帧的虚构角色")
+                        checks.append("real_file_scene_cut_to_manual_storyboard_no_fake_character")
+                        page.screenshot(path=str(OUT/"ui-anime-storyboard.png"),full_page=True)
+                        # Canonical grouping acceptance: a shot is NOT a venue,
+                        # and the entire movie is NOT bound to the camera source place.
+                        page.locator("#venueName").fill("动画学校A")
+                        page.locator("#createVenue").click()
+                        expect(page.locator("#venueSelect")).to_contain_text(
+                            "动画学校A",timeout=12000)
+                        page.locator("#groupName").fill("教室")
+                        page.locator("#createGroup").click()
+                        expect(page.locator("#assignGroup")).to_contain_text(
+                            "动画学校A / 教室",timeout=12000)
+                        page.locator("#assign").click()
+                        expect(page.locator("#segments")).to_contain_text(
+                            "动画学校A / 教室",timeout=12000)
+                        graph=page.evaluate("""async(sourceId)=>{
+                            const r=await fetch('/api/anime/scenes/sources/'+sourceId+'/graph',
+                                                {headers:{Authorization:'Bearer '+
+                                                sessionStorage.getItem('zd_access_token')}});
+                            return await r.json();
+                        }""",face_source_id)
+                        assert graph['canonical_venues'][0]['name']=="动画学校A",graph
+                        assert graph['canonical_scenes'][0]['name']=="教室",graph
+                        assert graph['characters']=={},graph
+                        checks.append("manual_canonical_anime_venue_and_scene_group_browser")
+                        page.screenshot(path=str(OUT/"ui-anime-canonical-groups.png"),full_page=True)
+                        # This is a controlled local EVENT FIXTURE for the
+                        # REVIEW UI, not proof that a detector found a person.
+                        # Earlier real-CAVIAR full-media proof remains separate.
+                        with main.db() as check:
+                            check.execute("INSERT OR IGNORE INTO frigate_camera_bindings(camera,place_id) VALUES(?,?)",
+                                          ("qa_camera_fixture",1))
+                            check.execute("""INSERT INTO frigate_object_events
+                              (camera,event_id,place_id,label,started_at,score,has_snapshot,updated_at)
+                              VALUES ('qa_camera_fixture','test-track-1',1,'person',?,0.81,0,?)""",
+                              (main.utcnow(),main.utcnow()))
+                        page.goto(base+"/cctv")
+                        expect(page.locator("#qaOccurrence")).to_contain_text(
+                            "qa_camera_fixture",timeout=12000)
+                        expect(page.locator("#qaStatus")).to_contain_text(
+                            "not_reviewed",timeout=12000)
+                        page.locator("#qaVerdict").select_option("needs_review")
+                        page.locator("#qaReason").fill("浏览器人工质检测试样本：目标框仍需复查")
+                        page.locator("#qaSave").click()
+                        expect(page.locator("#qaStatus")).to_contain_text(
+                            "needs_review",timeout=12000)
+                        expect(page.locator("#qaHistory")).to_contain_text(
+                            "浏览器人工质检测试样本",timeout=12000)
+                        expect(page.locator("#occurrenceCounts")).to_contain_text(
+                            "待审 1",timeout=12000)
+                        expect(page.locator("#occurrenceCounts")).to_contain_text(
+                            "1 条原始匿名事件",timeout=12000)
+                        with main.db() as check:
+                            assert check.execute(
+                                "SELECT COUNT(*) FROM anonymous_occurrence_reviews").fetchone()[0]==1
+                            check.execute("""UPDATE frigate_object_events SET score=0.92,
+                               updated_at=? WHERE camera='qa_camera_fixture'
+                               AND event_id='test-track-1'""",(main.utcnow(),))
+                        page.locator("#qaOccurrence").dispatch_event("change")
+                        expect(page.locator("#qaStatus")).to_contain_text(
+                            "stale_review",timeout=12000)
+                        page.locator("#loadOccurrences").click()
+                        expect(page.locator("#occurrenceCounts")).to_contain_text(
+                            "过期 1",timeout=12000)
+                        expect(page.locator("#occurrenceCounts")).to_contain_text(
+                            "1 条原始匿名事件",timeout=12000)
+                        checks.append("real_browser_qa_raw_vs_reviewed_window_consistency")
+                        checks.append("real_browser_append_only_anonymous_quality_and_stale_evidence")
+                        page.screenshot(path=str(OUT/"ui-anonymous-quality-review.png"),full_page=True)
+                        # This is a deliberately controlled RESEARCH STUDY
+                        # fixture: two known local events, two cameras in the
+                        # SAME venue, no inferred real-world person identity.
+                        from datetime import datetime, timezone, timedelta
+                        from app import site_model
+                        with main.db() as check:
+                            now=datetime.now(timezone.utc)+timedelta(seconds=2)
+                            for name in ("browser_research_cam_a","browser_research_cam_b"):
+                                check.execute("""INSERT OR IGNORE INTO frigate_camera_bindings
+                                  (camera,place_id) VALUES(?,1)""",(name,))
+                                site_model.record_frigate_initial(check,name,1)
+                                epoch=check.execute("""SELECT id FROM frigate_site_binding_history
+                                  WHERE camera=? AND valid_until IS NULL""",(name,)).fetchone()[0]
+                                check.execute("""INSERT INTO frigate_object_events
+                                  (camera,event_id,place_id,label,started_at,score,has_snapshot,
+                                   updated_at,binding_epoch_id)
+                                  VALUES (?,'same-local-demo',1,'person',?,0.84,0,?,?)""",
+                                  (name,now.isoformat(),main.utcnow(),epoch))
+                        page.reload()
+                        expect(page.locator("#researchPanel")).to_be_visible(timeout=12000)
+                        for name in ("browser_research_cam_a","browser_research_cam_b"):
+                            option=page.locator("#qaOccurrence option").filter(has_text=name).first
+                            key=option.get_attribute("value")
+                            assert key
+                            page.locator("#qaOccurrence").select_option(key)
+                            page.locator("#qaVerdict").select_option("valid_local_target")
+                            page.locator("#qaReason").fill("实际浏览器控制研究录像目标质检验收")
+                            page.locator("#qaSave").click()
+                            expect(page.locator("#qaStatus")).to_contain_text(
+                                "valid_local_target",timeout=12000)
+                            page.locator("#researchReason").fill(
+                                "人工研究标签D001经控制样本核对，不代表真人自动识别")
+                            page.locator("#researchAttach").click()
+                            expect(page.locator("#researchStatus")).to_contain_text(
+                                "当前有效",timeout=12000)
+                        expect(page.locator("#researchRows")).to_contain_text(
+                            "D001",timeout=12000)
+                        expect(page.locator("#researchRows tr").first.locator("td").nth(3)
+                               ).to_have_text("2",timeout=12000)
+                        with main.db() as check:
+                            assert check.execute("SELECT COUNT(*) FROM research_occurrence_links"
+                                  ).fetchone()[0]==2
+                        checks.append("browser_manual_pseudonymous_link_two_cameras_one_candidate_visit")
+                        page.screenshot(path=str(OUT/"ui-manual-research-linkage.png"),full_page=True)
+                        # Verify end users can REVIEW item 221, not only call
+                        # its direct backend URL. This is a deliberate fake
+                        # upstream event fixture, not a real detected person.
+                        with main.db() as check:
+                            check.execute("""INSERT OR IGNORE INTO frigate_camera_bindings
+                                (camera,place_id) VALUES('zz_qa_page_demo',1)""")
+                            check.executemany("""INSERT INTO frigate_object_events
+                              (camera,event_id,place_id,label,started_at,score,has_snapshot,updated_at)
+                              VALUES('zz_qa_page_demo',?,1,'person',?,0.84,0,?)""",
+                              [(f'browser_{i:04}',main.utcnow(),main.utcnow())
+                               for i in range(220)])
+                        page.reload()
+                        expect(page.locator("#qaNext")).to_be_enabled(timeout=12000)
+                        page.locator("#qaNext").click()
+                        expect(page.locator("#qaPageStatus")).to_contain_text("当前第 2 页",timeout=12000)
+                        last_key=page.locator("#qaOccurrence option").last.get_attribute("value")
+                        page.locator("#qaOccurrence").select_option(last_key)
+                        expect(page.locator("#qaStatus")).to_contain_text("not_reviewed",timeout=12000)
+                        page.locator("#qaReason").fill("实际浏览器第二页审核，验证超过200条事件仍可达")
+                        page.locator("#qaSave").click()
+                        expect(page.locator("#qaStatus")).to_contain_text(
+                            "valid_local_target",timeout=12000)
+                        with main.db() as check:
+                            assert check.execute("""SELECT COUNT(*) FROM anonymous_occurrence_reviews
+                                 WHERE occurrence_key=?""",(last_key,)).fetchone()[0]==1
+                        checks.append("browser_page_221_local_occurrence_quality_reachable")
+                        page.screenshot(path=str(OUT/"ui-anonymous-quality-page2.png"),full_page=True)
                         page.goto(base+"/portal")
                         page.set_viewport_size({"width": 390, "height": 844})
                         page.screenshot(path=str(OUT / "ui-mobile.png"), full_page=True)
@@ -164,6 +577,132 @@ def run():
                         page.locator("#logout").click()
                         expect(page).to_have_url(base + "/login")
                         checks.append("logout")
+                        # Four-tier role UI/authorization: once the state admin
+                        # logs out, no subordinate may read the global acceptance
+                        # report, EPFL candidate import, or P### roster writes.
+                        # A second county is created to test *actual* data
+                        # visibility instead of only checking hidden buttons.
+                        with main.db() as scoped:
+                            root=scoped.execute(
+                                "SELECT id FROM regions WHERE level=1 LIMIT 1"
+                            ).fetchone()[0]
+                            county=scoped.execute(
+                                "SELECT id FROM regions WHERE level=2 LIMIT 1"
+                            ).fetchone()[0]
+                            street=scoped.execute(
+                                "SELECT id FROM regions WHERE level=3 LIMIT 1"
+                            ).fetchone()[0]
+                            community=scoped.execute(
+                                "SELECT id FROM regions WHERE level=4 LIMIT 1"
+                            ).fetchone()[0]
+                            external_county=scoped.execute(
+                                "INSERT INTO regions(name,parent_id,level) VALUES(?, ?, 2)",
+                                ("验收外县",root)).lastrowid
+                            external_street=scoped.execute(
+                                "INSERT INTO regions(name,parent_id,level) VALUES(?, ?, 3)",
+                                ("验收外街道",external_county)).lastrowid
+                            external_community=scoped.execute(
+                                "INSERT INTO regions(name,parent_id,level) VALUES(?, ?, 4)",
+                                ("验收外社区",external_street)).lastrowid
+                            scoped.execute(
+                                "INSERT INTO places(name,region_id) VALUES(?, ?)",
+                                ("验收外县专属场所",external_community))
+                            for username,region_id in (
+                                ("uiscopecounty",county),
+                                ("uiscopestreet",street),
+                                ("uiscopecommunity",community)):
+                                access.create_user(scoped,username,password,region_id)
+                        for username in ("uiscopecounty","uiscopestreet",
+                                         "uiscopecommunity"):
+                            page.goto(base+"/login")
+                            page.locator('input[name="username"]').fill(username)
+                            page.locator('input[name="password"]').fill(password)
+                            page.locator('button[type="submit"]').click()
+                            expect(page).to_have_url(base+"/portal",timeout=12000)
+                            expect(page.locator("h2.lead")).to_contain_text(
+                                "辖区重点场所运行概览",timeout=12000)
+                            assert page.locator('a[data-tab="acceptance"]').count()==0
+                            assert page.locator('a[href="/base"]').count()==0
+                            assert page.locator('a[href="/business"]').count()==0
+                            # Endpoints must be denied, not only hidden.
+                            protected=page.evaluate("""async()=> {
+                              const urls=['/api/demo/excel-acceptance',
+                                  '/api/research/epfl/bundled',
+                                  '/api/research/epfl/candidates',
+                                  '/api/base/active','/api/business/analysis'];
+                              const out={};
+                              // portal.html does not globally patch fetch;
+                              // use the same Bearer session as its api() helper.
+                              const bearer='Bearer '+sessionStorage.getItem('zd_access_token');
+                              const headers={'Authorization':bearer};
+                              for(const url of urls)
+                                  out[url]=(await fetch(url,{headers})).status;
+                              out['/api/base/generate']=(await fetch(
+                                  '/api/base/generate',{method:'POST',
+                                  headers:{...headers,'Content-Type':'application/json'},
+                                  body:JSON.stringify({days:7,strategy:'earliest',
+                                     correction_mode:'rebuild'})})).status;
+                              return out;
+                            }""")
+                            assert set(protected.values())=={403},(
+                                username,protected)
+                            places_scoped=page.evaluate("""async()=> (
+                                await (await fetch('/api/places',{headers:{
+                                  Authorization:'Bearer '+
+                                    sessionStorage.getItem('zd_access_token')
+                                }})).json())""")
+                            assert any(p['name']=='测试场所 A'
+                                for p in places_scoped),places_scoped
+                            assert not any(p['name']=='验收外县专属场所'
+                                for p in places_scoped),(username,places_scoped)
+                            page.goto(base+"/portal?tab=acceptance")
+                            expect(page.locator("#view")).to_contain_text(
+                                "仅供州级演示管理员核验交付声明",timeout=12000)
+                            assert page.locator("#acceptanceRows tr").count()==0
+                            # Real pages must not offer controls whose API
+                            # reliably returns HTTP 403 for subordinate tiers.
+                            page.goto(base+"/insights")
+                            expect(page.locator("#seed")).to_be_hidden()
+                            assert page.locator('nav a[href="/base"]:visible').count()==0
+                            assert page.locator('nav a[href="/business"]:visible').count()==0
+                            page.goto(base+"/monitor")
+                            expect(page.locator("#videoButton")).to_be_hidden()
+                            # The page must remain usable for scoped real
+                            # data instead of failing on admin-only global
+                            # /api/frigate/status.
+                            expect(page.locator("#sampled")).not_to_have_text(
+                                "—",timeout=12000)
+                            expect(page.locator("#stages")).to_contain_text(
+                                "上游全局连接状态仅州级管理员可查看",timeout=12000)
+                            expect(page.locator("#syncButton")).to_be_hidden()
+                            page.goto(base+"/geo",wait_until="domcontentloaded")
+                            expect(page.locator("#seedGeo")).to_be_hidden()
+                            expect(page.locator("#editor")).to_be_hidden()
+                            expect(page.locator("#notice")).to_contain_text(
+                                "可见场所",timeout=12000)
+                            page.goto(base+"/face-lab",wait_until="domcontentloaded")
+                            expect(page.locator("#modelBadge")).to_contain_text(
+                                "当前账户不可操作",timeout=12000)
+                            page.goto(base+"/admin")
+                            expect(page.locator("#accountPanel")).to_be_hidden()
+                            assert page.locator('nav a[href="/business"]:visible').count()==0
+                            page.goto(base+"/cctv")
+                            expect(page.locator("#epflResearchPanel")).to_be_hidden()
+                            expect(page.locator("#epflUseBundled")).to_be_hidden()
+                            expect(page.locator("#epflReviewPanel")).to_be_hidden()
+                            assert page.locator('.jumpnav a[href="#epflResearchPanel"]:visible').count()==0
+                            page.goto(base+"/base")
+                            expect(page.get_by_role("heading",name=
+                                "当前账号仅能使用获授权的辖区功能")).to_be_visible()
+                            expect(page.locator("main")).to_contain_text("合成人员底库")
+                            page.goto(base+"/business")
+                            expect(page.get_by_role("heading",name=
+                                "当前账号仅能使用获授权的辖区功能")).to_be_visible()
+                            expect(page.locator("main")).to_contain_text("七类合成预警规则")
+                            page.goto(base+"/portal")
+                            page.locator("#logout").click()
+                            expect(page).to_have_url(base+"/login",timeout=10000)
+                            checks.append("tiered_role_scope_and_real_ui_denial_"+username)
                         assert not errors, "JavaScript errors: " + str(errors)
                         checks.append("no_page_errors")
                     finally:

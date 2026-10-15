@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZD · 地图与合成到访回放</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+:root{--bg:#eff4fa;--blue:#2363b8;--ink:#1a2d43;--muted:#5c7089;--line:#dce4ef}
+*{box-sizing:border-box} [hidden]{display:none!important} body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 system-ui,'Microsoft YaHei',sans-serif}
+header{background:#132b4d;color:white;padding:14px max(22px,calc((100vw - 1380px)/2));display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+header strong{font-size:17px}header nav{display:flex;flex-wrap:wrap;gap:14px}a{color:#2262b8}header a{color:#d2e4fa;text-decoration:none}
+main{max-width:1380px;margin:0 auto;padding:18px 22px 44px}
+h1{font-size:25px;margin:5px 0 3px}h2{font-size:16px;margin:0 0 10px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 15px}.warning{border:1px solid #ead2a4;background:#fff6df;padding:13px 17px;border-radius:11px;margin-bottom:17px;color:#714e1d}
+.layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(300px,1fr);gap:16px}
+.panel{background:white;border:1px solid var(--line);border-radius:13px;padding:17px;box-shadow:0 4px 16px #244e790c;min-width:0}
+.panel.wide{grid-column:1/-1}.controls{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:14px 0}
+label{display:grid;gap:4px;color:#435b73;font-size:12px}select,input{border:1px solid #bdcbdd;padding:9px 11px;border-radius:8px;color:var(--ink);font:inherit;background:white;max-width:100%}
+button{border:0;padding:10px 13px;border-radius:8px;background:var(--blue);color:white;font:inherit;cursor:pointer}button.secondary{background:#e8f0fc;color:#275eaa}button:disabled{opacity:.45;cursor:not-allowed}
+#map{height:480px;border-radius:10px;background:#edf2f9;border:1px solid #d4dfed;position:relative;overflow:hidden}
+#mapFallback{height:100%;display:grid;place-items:center;text-align:center;color:#58718f}
+#mapFallback svg{display:block;width:100%;height:100%}
+#geoMapEmpty{position:absolute;z-index:7;left:50%;top:50%;transform:translate(-50%,-50%);
+ min-width:260px;max-width:88%;padding:22px 28px;background:#ffffffec;border:1px dashed #8cb2d2;
+ border-radius:14px;box-shadow:0 8px 32px #143b6420;color:#254d72;text-align:center;pointer-events:none}
+#geoMapEmpty strong{display:block;font-size:19px;margin-bottom:7px}
+#geoMapEmpty small{display:block;line-height:1.55;color:#647f9e;font-size:13px}
+#mapCaption{color:#617389;font-size:12px;margin:8px 0 0}#notice,#saveNotice{color:#39597d;font-size:13px}
+.pill{display:inline-block;border-radius:30px;padding:2px 9px;font-size:12px;background:#e7f1fc;color:#2a5ea8}
+.pill.fake{background:#fff0d7;color:#a46714}.pill.none{background:#fceaea;color:#a33}
+.scroll{max-height:420px;overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:10px 8px;border-bottom:1px solid #eef1f6;text-align:left;vertical-align:top}th{position:sticky;top:0;background:#f5f8fd}
+#events{display:grid;gap:7px;max-height:470px;overflow:auto}.event{border:1px solid #e0e8f2;border-radius:9px;padding:9px 12px;background:#f8fbff;text-align:left;color:#274461}.event.on{border:2px solid #1a63b3;background:#e8f3ff}.event small{display:block;color:#6a809a}
+#trackSummary{font-size:12px;color:#5b738d}.map-tip{position:absolute;bottom:12px;left:12px;background:#fffdf3e8;border:1px solid #efdbb1;padding:6px 10px;font-size:12px;z-index:4;border-radius:7px}
+.step-pin{height:26px;width:26px;border-radius:50%;background:#216bc1;border:2px solid white;box-shadow:0 2px 5px #102b4a88;color:white;text-align:center;line-height:22px;font-weight:bold}
+@media(max-width:900px){.layout{grid-template-columns:1fr}header{padding:14px 18px}main{padding:16px}#map{height:390px}}
+</style></head><body>
+<header><strong>ZD / 地理点位与到访回放 · 演示模块</strong>
+<nav><a href="/portal">综合工作台</a><a href="/insights">人员活动</a><a href="/admin">场所管理</a><a href="/portal?tab=acceptance">Excel验收</a><a href="#" id="logout">退出</a></nav></header>
+<main>
+<h1>场所地图与合成轨迹回放</h1>
+<p class="sub">原 Excel #17 相邻技术能力：场所坐标登记、地图浏览、P###合成到访时间序列；不是 GPS 人员追踪。</p>
+<div class="warning"><b>⚠ 严格数据边界</b>：场所的示例坐标由程序任意生成，不是这些场所的真实位置。人工输入的坐标也未经独立测绘核验。蓝色顺序连线并非道路路线；P### 为虚构身份，不得理解成实际人员移动，更不产生真实风险预警。<b>Excel #17 的真人轨迹要求仍未完成。</b></div>
+<div class="layout">
+<section class="panel">
+<h2>01 · 地图中的场所位置</h2>
+<div class="controls">
+<button type="button" id="seedGeo">① 生成虚构示意位置（仅空白点）</button>
+<button type="button" class="secondary" id="refresh">刷新点位</button>
+<span id="notice" role="status">读取中…</span>
+</div>
+<div id="map"><div id="mapFallback">准备地理底图…</div><div id="geoMapEmpty"><strong>当前尚无场所示意点位</strong><small>请点击上方「生成虚构示意位置」后再查看分布。<br>这些只是演示坐标，不代表现场人员位置。</small></div><div class="map-tip">仅地理点位与合成到访；不表示实际人员定位</div></div>
+<p id="mapCaption">如网络不可用，会显示离线坐标示意图，地理底图需联网。</p>
+</section>
+<section class="panel">
+<h2>02 · 按虚构身份查看到访</h2>
+<div class="controls"><label>虚构编号<select id="person"><option value="">暂无模拟到访</option></select></label>
+<label>时间窗口<select id="days"><option value="7">近7日</option><option value="30" selected>近30日</option><option value="365">近365日</option></select></label>
+<button id="loadTrack">查看</button></div>
+<div id="trackSummary">尚未选择合成人员。</div>
+<div class="controls"><button id="prev" class="secondary">上一个时间点</button><button id="next" class="secondary">下一个时间点</button>
+<button id="play">逐点播放</button><button id="stop" class="secondary">停止</button></div>
+<div id="events" role="list" aria-label="按时序列出的模拟到访点"></div>
+</section>
+<section class="panel wide">
+<h2>03 · 场所坐标登记（仅州级管理）</h2>
+<p class="sub">演示场所默认不包含坐标；人工录入独立于原始场所/视频源表，避免在未核验情况下宣称实际摄像机位置。修改都有审计。</p>
+<div class="controls" id="editor">
+<label>选择场所<select id="venue"></select></label><label>纬度（WGS84）<input id="lat" type="number" min="-90" max="90" step="0.000001" placeholder="43.815"></label>
+<label>经度（WGS84）<input id="lon" type="number" min="-180" max="180" step="0.000001" placeholder="87.593"></label>
+<label>人工依据（必填）<input id="reason" maxlength="200" placeholder="未核实示意点 / 现场确认记录"></label>
+<button id="save">保存点位</button></div><p id="saveNotice" role="status"></p>
+<div class="scroll"><table><thead><tr><th>场所</th><th>坐标来源</th><th>当前经纬度</th><th>备注</th></tr></thead><tbody id="placeRows"><tr><td colspan="4">正在读取场所</td></tr></tbody></table></div>
+</section>
+</div></main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const token=sessionStorage.getItem('zd_access_token');
+if(!token)location.replace('/login');
+const esc=x=>String(x??'').replace(/[&<>"']/g,v=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','&quot;':'&quot;',"'":'&#39;'}[v]));
+async function api(url,method='GET',value){
+ const r=await fetch(url,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+  body:value===undefined?undefined:JSON.stringify(value)});
+ if(r.status===401){sessionStorage.removeItem('zd_access_token');location.replace('/login');throw Error('登录已失效')}
+ const body=await r.json();if(!r.ok)throw Error(typeof body.detail==='string'?body.detail:JSON.stringify(body.detail));
+ return body;
+}
+let sites=[],events=[],chosen=-1,viewer=null,map=null,pins=[],playing=null,initRequested=false;
+const deepLink=new URLSearchParams(location.search);
+const initialPerson=/^P[0-9]{3}$/.test(deepLink.get('person')||'')?deepLink.get('person'):'';
+const initialDays=['7','30','365'].includes(deepLink.get('days'))?deepLink.get('days'):'30';
+const initialPlace=/^[1-9][0-9]*$/.test(deepLink.get('place_id')||'')?deepLink.get('place_id'):'';
+let deepLinkApplied=false;
+function stop(){if(playing){clearInterval(playing);playing=null}$('play').disabled=events.length===0}
+function bounds(points){
+ const xs=points.map(p=>p.lon),ys=points.map(p=>p.lat);
+ return {minLon:Math.min(...xs)-.004,maxLon:Math.max(...xs)+.004,
+         minLat:Math.min(...ys)-.004,maxLat:Math.max(...ys)+.004};
+}
+function fallback(){
+ const all=sites.filter(p=>p.geo).map(p=>({lat:p.geo.lat,lon:p.geo.lon,name:p.name,id:p.id}));
+ const b=$('mapFallback')||document.createElement('div');b.id='mapFallback';b.style.display='block';
+ const bb=all.length?bounds(all):{minLon:0,maxLon:1,minLat:0,maxLat:1};
+ const x=v=>50+(v-bb.minLon)/(bb.maxLon-bb.minLon)*810;
+ const y=v=>425-(v-bb.minLat)/(bb.maxLat-bb.minLat)*370;
+ const route=events.map(e=>x(e.lon).toFixed(1)+','+y(e.lat).toFixed(1)).join(' ');
+ const pts=all.map(p=>'<circle cx="'+x(p.lon)+'" cy="'+y(p.lat)+'" r="7" fill="#1a8a85" stroke="white" stroke-width="2"><title>'+
+   esc(p.name)+'</title></circle>').join('');
+ const order=events.map((e,i)=>'<g><circle cx="'+x(e.lon)+'" cy="'+y(e.lat)+'" r="'+(i===chosen?13:10)+'" fill="'+(i===chosen?'#ef7126':'#246abc')+'"/>'+
+  '<text x="'+x(e.lon)+'" y="'+(y(e.lat)+4)+'" font-size="10" fill="white" text-anchor="middle">'+(i+1)+'</text></g>').join('');
+ b.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 470" role="img" aria-label="离线坐标示意图（不是道路地图）">'+
+   '<rect width="920" height="470" fill="#e9f1f9"/>'+
+   '<text x="24" y="27" fill="#596f8d" font-size="15">离线经纬度位置示意 · 无真实地理底图</text>'+
+   (events.length>1?'<polyline points="'+route+'" fill="none" stroke="#296bc0" stroke-width="3" stroke-dasharray="8 7"/>':'')+
+   pts+order+
+   (!all.length?'<g><rect x="217" y="146" width="486" height="180" rx="16" fill="#ffffff" stroke="#bed3e7" stroke-dasharray="6 5"/>'+
+     '<text x="460" y="200" fill="#244d74" font-size="22" font-weight="bold" text-anchor="middle">暂无场所示意点位</text>'+
+     '<text x="460" y="235" fill="#607f9e" font-size="16" text-anchor="middle">请点击上方「生成虚构示意位置」</text>'+
+     '<text x="460" y="264" fill="#607f9e" font-size="14" text-anchor="middle">演示点位不是真实 GPS 或摄像机位置</text></g>':'')+'</svg>';
+ if(!b.parentElement)$('map').prepend(b);
+ $('mapCaption').textContent='离线示意图：按经纬度比例投影，真实地理底图暂不可用。模拟点位并非实测场所。';
+}
+function refreshMap(){
+ const spots=sites.filter(p=>p.geo);
+ const empty=$('geoMapEmpty');if(empty)empty.hidden=spots.length>0;
+ if(map&&map.isStyleLoaded()){
+  const pData={type:'FeatureCollection',features:spots.map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.geo.lon,p.geo.lat]},
+   properties:{name:p.name,place_id:p.id,provenance:p.geo.provenance}}))};
+  const lineData={type:'FeatureCollection',features:events.length>1?[{type:'Feature',
+   geometry:{type:'LineString',coordinates:events.map(e=>[e.lon,e.lat])},properties:{}}]:[]};
+  map.getSource('venues')?.setData(pData);map.getSource('visit_line')?.setData(lineData);
+  pins.forEach(p=>p.remove());pins=[];
+  events.forEach((e,i)=>{
+   const el=document.createElement('div');el.className='step-pin';el.textContent=i+1;
+   el.style.background=i===chosen?'#ed751c':'#216bc1';
+   const m=new maplibregl.Marker({element:el}).setLngLat([e.lon,e.lat]).addTo(map);
+   el.onclick=()=>{chosen=i;renderTimeline()};pins.push(m);
+  });
+  if(spots.length){const b=new maplibregl.LngLatBounds();
+   spots.forEach(p=>b.extend([p.geo.lon,p.geo.lat]));map.fitBounds(b,{padding:65,maxZoom:14,duration:0});}
+ }else fallback();
+}
+function startMap(){
+ if(initRequested)return;initRequested=true;
+ const cdn='https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+ const js=document.createElement('script');js.src=cdn;js.async=true;
+ let done=false;
+ const offline=()=>{if(done)return;done=true;fallback();};
+ js.onerror=offline;
+ js.onload=()=>{
+  if(done||!window.maplibregl)return offline();
+  try{
+   const b=$('mapFallback');if(b)b.remove();
+   map=new maplibregl.Map({container:'map',style:'https://demotiles.maplibre.org/style.json',
+    center:[87.62,43.83],zoom:11,attributionControl:true});
+   map.addControl(new maplibregl.NavigationControl(),'top-right');
+   map.on('load',()=>{
+    if(done)return;done=true;
+    map.addSource('venues',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    map.addSource('visit_line',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    map.addLayer({id:'visit_line',type:'line',source:'visit_line',
+      paint:{'line-color':'#2672cf','line-width':4,'line-dasharray':[2,2]}});
+    map.addLayer({id:'venues',type:'circle',source:'venues',
+      paint:{'circle-radius':7,'circle-color':'#198a80','circle-stroke-width':2,'circle-stroke-color':'#ffffff'}});
+    map.on('click','venues',e=>{
+     const p=e.features?.[0];if(p)new maplibregl.Popup().setLngLat(e.lngLat).setText(p.properties.name+' · '+
+      (p.properties.provenance==='fictional_seed'?'虚构点位':'人工未核验')).addTo(map);
+    });
+    refreshMap();$('mapCaption').textContent='在线地理底图（演示服务）· 点位经纬度仅为演示或未独立核验。';
+   });
+   map.on('error',e=>{if(!done){try{map.remove()}catch(_){}map=null;offline()}});
+  }catch(e){map=null;offline();}
+ };
+ document.head.appendChild(js);
+ setTimeout(()=>{if(!done){if(map){try{map.remove()}catch(_){}map=null}offline()}},7000);
+}
+function renderTimeline(keepPlaying=false){
+ if(!keepPlaying)stop();$('prev').disabled=chosen<=0;$('next').disabled=chosen>=events.length-1||!events.length;
+ $('play').disabled=events.length===0;
+ $('events').innerHTML=events.map((e,i)=>
+  '<button class="event '+(i===chosen?'on':'')+'" data-index="'+i+'">'+
+  '<b>'+(i+1)+'. '+esc(e.place_name)+'</b><small>'+esc(e.started_at.replace('T',' ').slice(0,19))+
+  ' UTC · '+esc(e.coordinate_provenance==='fictional_seed'?'虚构场所坐标':'人工录入未核实坐标')+'</small></button>').join('')||
+  '<p class="sub">暂无可回放的合成到访。先准备模拟P###数据，并给所涉及的场所设置示意点位。</p>';
+ $('events').querySelectorAll('[data-index]').forEach(btn=>btn.onclick=()=>{chosen=Number(btn.dataset.index);renderTimeline()});
+ refreshMap();
+}
+async function loadTrack(){
+ stop();const person=$('person').value;
+ if(!person){events=[];chosen=-1;$('trackSummary').textContent='没有虚构P###身份可选';renderTimeline();return}
+ try{const d=await api('/api/geo/track?person='+encodeURIComponent(person)+'&days='+$('days').value);
+  events=d.events;chosen=events.length?0:-1;
+  $('trackSummary').textContent=person+'：有效合成到访 '+d.total_visible_visits+
+   ' 个；有坐标 '+events.length+' 个；无坐标 '+d.visits_without_coordinates+
+   ' 个。只有离散点的顺序，不表示行走/驾车路径。';
+  renderTimeline();
+ }catch(e){$('trackSummary').textContent='轨迹查询失败：'+e.message}
+}
+async function loadAll(){
+ try{
+  const [p,people]=await Promise.all([api('/api/geo/places'),api('/api/insights/people?days=365')]);
+  sites=p.places;
+  $('notice').textContent=sites.length+'个可见场所；已配坐标 '+p.positioned+' 个';
+  $('placeRows').innerHTML=sites.map(v=>'<tr><td>'+esc(v.name)+'</td><td>'+
+   (v.geo?'<span class="pill '+(v.geo.provenance==='fictional_seed'?'fake':'')+'">'+
+    (v.geo.provenance==='fictional_seed'?'虚构坐标':'人工未核验')+'</span>':'<span class="pill none">未设置</span>')+
+   '</td><td>'+(v.geo?esc(v.geo.lon.toFixed(6)+', '+v.geo.lat.toFixed(6)):'—')+
+   '</td><td>'+esc(v.geo?.note||'—')+'</td></tr>').join('');
+  const sel=$('venue'),value=sel.value;
+  sel.innerHTML=sites.map(v=>'<option value="'+v.id+'">'+esc(v.name)+'</option>').join('');
+  if(sites.some(v=>String(v.id)===value))sel.value=value;
+   if(!deepLinkApplied && sites.some(v=>String(v.id)===initialPlace))sel.value=initialPlace;
+  const keep=$('person').value;
+  $('person').innerHTML=people.people.map(v=>'<option value="'+esc(v.person)+'">'+esc(v.person)+
+    ' · '+v.synthetic_visits+'次模拟到访</option>').join('')||
+    '<option value="">暂无合成P###到访</option>';
+  if(people.people.some(x=>x.person===keep))$('person').value=keep;
+   if(!deepLinkApplied){
+     $('days').value=initialDays;
+     if(people.people.some(x=>x.person===initialPerson))$('person').value=initialPerson;
+     deepLinkApplied=true;
+   }
+  syncVenueForm();refreshMap();await loadTrack();
+ }catch(e){$('notice').textContent='读取失败：'+e.message}
+}
+function syncVenueForm(){
+ const x=sites.find(p=>String(p.id)===$('venue').value);
+ $('lat').value=x?.geo?.lat??'';$('lon').value=x?.geo?.lon??'';
+ $('reason').value=x?.geo?.note??'';
+}
+async function save(){
+ const id=Number($('venue').value),lat=$('lat').value,lon=$('lon').value;
+ if(!id||lat.trim()===''||lon.trim()===''||!$('reason').value.trim()){
+  $('saveNotice').textContent='请填写场所、纬度、经度与人工依据';return;
+ }
+ try{
+  await api('/api/geo/places/'+id,'PUT',{lat:Number(lat),lon:Number(lon),note:$('reason').value.trim()});
+  $('saveNotice').textContent='坐标已登记（仍为人工未核验），已写入审计';await loadAll();
+ }catch(e){$('saveNotice').textContent='保存失败：'+e.message}
+}
+$('logout').onclick=async e=>{e.preventDefault();await api('/api/auth/logout','POST').catch(()=>{});sessionStorage.removeItem('zd_access_token');location.replace('/login')};
+$('refresh').onclick=loadAll;$('venue').onchange=syncVenueForm;$('save').onclick=save;
+$('seedGeo').onclick=async()=>{if(!confirm('仅给尚无坐标的场所生成完全虚构点位，不代表现场位置。继续？'))return;
+ try{const x=await api('/api/geo/demo/seed','POST');$('saveNotice').textContent='虚构点位新增 '+x.inserted+' 个；不覆盖人工坐标';await loadAll()}
+ catch(e){$('saveNotice').textContent=e.message}};
+$('loadTrack').onclick=loadTrack;$('person').onchange=loadTrack;$('days').onchange=loadTrack;
+$('prev').onclick=()=>{if(chosen>0){chosen--;renderTimeline()}};
+$('next').onclick=()=>{if(chosen<events.length-1){chosen++;renderTimeline()}};
+$('stop').onclick=stop;
+$('play').onclick=()=>{stop();if(!events.length)return;playing=setInterval(()=>{
+ if(chosen<events.length-1){chosen++;renderTimeline(true);$('play').disabled=true;}
+ else stop();
+ },1100);$('play').disabled=true;};
+(async()=>{
+ try{
+  viewer=await api('/api/auth/me');const state=viewer.level===1;
+  $('seedGeo').hidden=!state;$('editor').hidden=!state;
+  await loadAll();
+  startMap();
+ }catch(e){$('notice').textContent='登录或权限检查失败：'+e.message}
+})();
+</script><script src="/ui/site-navigation.js"></script></body></html>

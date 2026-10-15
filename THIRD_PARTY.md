@@ -18,3 +18,28 @@ The host operator is responsible for upstream license notices, consent for any r
 - WVP-GB28181-PRO，https://github.com/648540858/wvp-GB28181-pro ，GitHub 仓库标记 MIT，自维护 SIP 注册、Catalog、Play、Playback；在上游独立启动，不把服务内置代码复制进 test3。test3 的 `app/gb28181.py` 只使用其公开 API。
 - ZLMediaKit，https://github.com/ZLMediaKit/ZLMediaKit ，MIT 类许可证及额外保留软件标识要求；它负责 GB28181 的 RTP PS/TS 收流与 RTSP 分发。官方项目建议商用前另行确认第三方库依赖许可证。
 - 不提交国标设备密码、SIP 登录信息、WVP API Key、生产相机录像或人脸特征。GitHub CI 的 RTSP 公共样例不构成对真实 GB SIP 设备的协议一致性认证。
+
+
+## Optional mature local-person tracking baseline (2026-10-13)
+
+- **Roboflow Trackers**, the pre-existing `trackers` Python package, Apache-2.0.
+  Upstream: https://github.com/roboflow/trackers and
+  https://trackers.roboflow.com/latest/learn/track/.
+- Only optional source verification installs `requirements-tracking.txt`
+  (`trackers==2.6.0`). We call the upstream `ByteTrackTracker`;
+  we have NOT implemented or forked Kalman filters, ByteTrack or the matcher.
+- The CCTV baseline intentionally feeds **published CAVIAR manually annotated
+  boxes** into ByteTrack. It measures per-camera temporal consistency (ID
+  changes, fragmentation and assigned GT boxes), not detection accuracy.
+  Camera-local annotation IDs are NOT a real-world identity ground truth.
+  No cross-camera biometric recognition, face matching or verified distinct
+  person counts are claimed. There is no automatic promotion to any real
+  alert or person registry.
+- Research dataset attribution: EC-funded CAVIAR project / IST 2001 37540,
+  CAVIAR study material CC BY-SA. Raw licensed clips are not shipped.
+
+## Optional SFace consented photo sandbox
+
+- `scripts/install_sface.py` optionally obtains OpenCV Zoo's 2021dec SFace ONNX model, checksum-checked. No face weights are shipped in the source ZIP.
+- The OpenCV Zoo SFace directory states Apache-2.0, **however the original weight's training dataset and redistribution/commercial permission are under an open clarification request**: https://github.com/opencv/opencv_zoo/issues/313 (as of 2026-10-14). Do not redistribute weight or deploy commercially without verifying rights.
+- Feature only processes individually uploaded, consented photos in ephemeral memory; not permitted to process CCTV streams, enroll unconsenting persons, or produce automatic identity determinations.

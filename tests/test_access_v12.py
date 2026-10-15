@@ -123,3 +123,87 @@ def test_restricted_sources_redact_uri(case):
     assert 'password' not in text
     assert '[REDACTED]' in text
     assert 'password' in str(client.get('/api/sources',headers=h1).json())
+
+
+def test_excel_23_user_management_is_state_only_and_revokes_sessions(case):
+    """Real auth, SQLite and tokens: four-tier role assignment & soft deletion."""
+    client,login,v=case
+    h=login('stateuser')
+    county=login('countyuser')
+    assert client.get('/api/auth/users').status_code==401
+    assert client.get('/api/auth/users',headers=county).status_code==403
+    assert client.post('/api/auth/users',headers=county,json={
+        'username':'badcountycreate','password':'abc-strong-password','region_id':v['leaf']
+    }).status_code==403
+    assert client.post('/api/auth/users',headers=h,json={
+        'username':'shortpass','password':'short','region_id':v['leaf']
+    }).status_code==422
+
+    created=client.post('/api/auth/users',headers=h,json={
+        'username':'fourleveldemo','password':'first-strong-password-2026',
+        'region_id':v['leaf']})
+    assert created.status_code==201,created.text
+    uid=created.json()['id']
+    assert created.json()['role']=='community'
+    assert client.post('/api/auth/users',headers=h,json={
+        'username':'fourleveldemo','password':'other-strong-password-2026',
+        'region_id':v['leaf']}).status_code==409
+    items=client.get('/api/auth/users',headers=h).json()['users']
+    assert any(x['id']==uid and x['region_id']==v['leaf'] for x in items)
+    assert 'password_hash' not in str(items)
+    assert 'first-strong-password' not in str(items)
+
+    first=client.post('/api/auth/login',json={
+        'username':'fourleveldemo','password':'first-strong-password-2026'})
+    assert first.status_code==200
+    oldtoken={'Authorization':'Bearer '+first.json()['access_token']}
+    assert client.get('/api/auth/me',headers=oldtoken).json()['role']=='community'
+    assert client.get('/api/places',headers=oldtoken).status_code==200
+    assert v['other_place'] not in {p['id'] for p in client.get('/api/places',headers=oldtoken).json()}
+    # A role change invalidates sessions, and the next login receives the new scope.
+    updated=client.patch(f'/api/auth/users/{uid}',headers=h,json={
+        'region_id':v['other_county']})
+    assert updated.status_code==200,updated.text
+    assert updated.json()['role']=='county'
+    assert client.get('/api/auth/me',headers=oldtoken).status_code==401
+    second=client.post('/api/auth/login',json={
+        'username':'fourleveldemo','password':'first-strong-password-2026'})
+    assert second.status_code==200
+    h2={'Authorization':'Bearer '+second.json()['access_token']}
+    places=client.get('/api/places',headers=h2).json()
+    assert v['other_place'] in {p['id'] for p in places} and v['local_place'] not in {p['id'] for p in places}
+
+    assert client.post(f'/api/auth/users/{uid}/reset-password',headers=county,json={
+        'password':'unauthorized-password-2026'}).status_code==403
+    reset=client.post(f'/api/auth/users/{uid}/reset-password',headers=h,json={
+        'password':'new-strong-password-2026'})
+    assert reset.status_code==200,reset.text
+    assert reset.json()['sessions_revoked'] is True
+    assert client.get('/api/auth/me',headers=h2).status_code==401
+    assert client.post('/api/auth/login',json={
+        'username':'fourleveldemo','password':'first-strong-password-2026'}).status_code==401
+    assert client.post('/api/auth/login',json={
+        'username':'fourleveldemo','password':'new-strong-password-2026'}).status_code==200
+
+    assert client.patch(f'/api/auth/users/{uid}',headers=h,json={
+        'enabled':False}).status_code==200
+    assert client.post('/api/auth/login',json={
+        'username':'fourleveldemo','password':'new-strong-password-2026'}).status_code==401
+    assert client.patch(f'/api/auth/users/{uid}',headers=h,json={
+        'enabled':True}).status_code==200
+    assert client.post('/api/auth/login',json={
+        'username':'fourleveldemo','password':'new-strong-password-2026'}).status_code==200
+    audit=client.get('/api/admin/audit',headers=h).json()
+    all_audit=str(audit)
+    assert 'auth_user_create' in all_audit and 'auth_password_reset' in all_audit
+    assert 'new-strong-password-2026' not in all_audit
+    assert 'first-strong-password-2026' not in all_audit
+
+
+def test_account_update_never_disables_current_state_admin(case):
+    client,login,_=case
+    h=login('stateuser')
+    me=client.get('/api/auth/me',headers=h).json()
+    assert client.patch(f"/api/auth/users/{me['id']}",headers=h,json={'enabled':False}).status_code==409
+    assert client.patch(f"/api/auth/users/{me['id']}",headers=h,json={'region_id':me['region_id']}).status_code==409
+    assert client.get('/api/auth/me',headers=h).status_code==200

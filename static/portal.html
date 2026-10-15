@@ -29,6 +29,17 @@ main{min-width:0}.top{height:76px;background:#fff;display:flex;align-items:cente
 .panel h2{margin:0 0 6px;font-size:17px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .pill{border-radius:20px;padding:4px 9px;background:#eaf1ff;color:#385daa;font-size:12px}
 .pill.real{background:#e4f5f2;color:#107b6b}.pill.demo{background:#fff4e2;color:#92621d}
+.pill.partial{background:#fff3db;color:#965b0b}.pill.missing{background:#ffe7e7;color:#a93636}
+.accept-tools{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:15px 0}
+.accept-tools label{display:grid;gap:5px;font-size:12px;color:#536d88}
+.accept-tools input,.accept-tools select{border:1px solid var(--border);border-radius:9px;padding:10px 12px;min-width:160px;font:inherit}
+.accept-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:17px 0}
+.accept-steps a{display:block;padding:17px;background:#f6f9fe;border:1px solid #d7e4f5;border-radius:10px}
+.accept-steps a:hover{border-color:#4a76c7}.accept-steps strong{display:block;margin-bottom:6px;color:#244c89}
+.accept-steps span{display:block;font-size:12px;color:#657b94}.accept-detail summary{cursor:pointer;color:#2c5eae;margin-top:7px;font-weight:650}
+.accept-detail p{line-height:1.6;margin:8px 0}.accept-table td:last-child{white-space:nowrap}
+#acceptVisibleCount{font-size:12px;color:#607692}#acceptanceRows tr[hidden]{display:none}
+@media(max-width:850px){.accept-steps{grid-template-columns:1fr}.accept-table{min-width:760px}}
 .items{display:grid;gap:10px;margin-top:15px}.item{padding:14px;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .item:hover{background:#f8faff}.item b{display:block}.item small{display:block;color:var(--muted);margin-top:3px}
 table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:#657791;background:#f5f8fd;font-weight:650}td,th{padding:12px 10px;border-bottom:1px solid #edf1f7;vertical-align:top}td:last-child{text-align:right}
@@ -41,11 +52,55 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 .field{display:grid;gap:7px;margin:12px 0}select,textarea{border:1px solid #cdd8e7;border-radius:8px;padding:10px 12px;background:#fff;color:var(--ink)}textarea{min-height:85px;resize:vertical;width:100%}
 .code{background:#f4f7fd;border-radius:8px;padding:12px;word-break:break-all;font:12px/1.7 ui-monospace,monospace;color:#3e5271}
 .notice{color:#945e14;background:#fff5e5;padding:13px 15px;border-radius:9px;margin:16px 0}
+.zd-demo-strip{display:grid;grid-template-columns:1.05fr 1.4fr;gap:14px;margin:14px 0 20px}
+.zd-demo-strip .zd-demo-summary{background:#fff;border:1px solid #d8e3f1;border-radius:13px;padding:15px 18px;min-width:0}
+.zd-demo-strip h2{font-size:15px;margin:2px 0 7px}
+.zd-demo-strip .numbers{display:flex;gap:20px;align-items:baseline;margin:8px 0}
+.zd-demo-strip .numbers strong{font-size:24px;color:#173e71}
+.zd-demo-strip .numbers span{display:block;font-size:11px;color:#64788f}
+.zd-demo-strip .zd-demo-summary>a{color:#205ab1;font-weight:700;display:inline-block;margin-top:8px}
+.zd-demo-strip .source-tag{display:inline-block;background:#e9f5f4;color:#187469;border-radius:20px;padding:2px 9px;font-size:11px}
+.zd-demo-strip .source-tag.demo{background:#fff2df;color:#925e21}
+@media(max-width:950px){.zd-demo-strip{grid-template-columns:1fr}}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}.toolbar a{padding:9px 12px;border:1px solid #cbd8e9;border-radius:8px;color:#2858b4;background:white}
 .err{border:1px solid #f2cccc;background:#fff3f2;padding:15px;border-radius:10px;color:#9b3737}
 #flash{position:fixed;bottom:25px;right:25px;z-index:30;padding:13px 18px;background:#173d63;color:white;border-radius:10px;display:none}
 @media(max-width:1120px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.cols{grid-template-columns:1fr}}
 @media(max-width:760px){.layout{grid-template-columns:1fr}aside{height:auto;position:static;padding:12px}.logo{padding:8px}.navtitle,.sidebar-foot{display:none}nav{display:flex;flex-wrap:wrap}nav a{padding:9px}.top{height:auto;padding:15px}.top h1{font-size:16px}.content{padding:16px}.userinfo{font-size:11px}}
+
+/* Desktop shell: keep navigation aligned with the viewport, with an independently
+   wheel-scrollable business workspace rather than a 3-screen document. */
+@media(min-width:761px){
+ html,body{height:100%;overflow:hidden}
+ .layout{height:100dvh;min-height:0;overflow:hidden}
+ .layout>aside{position:relative;top:auto;height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+ .layout>main{display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden}
+ .layout>main>.top{height:68px;min-height:68px;flex:0 0 68px;padding:0 26px}
+ .layout>main>.content{flex:1;min-height:0;width:100%;overflow-y:auto;overflow-x:hidden;
+    overscroll-behavior:contain;scrollbar-gutter:stable;padding:20px 25px 30px}
+}
+.content .cards{gap:11px;margin:13px 0}
+.content .card{padding:13px 16px}
+.content .card strong{font-size:26px;line-height:1.35}
+.content .grid{margin:11px 0;gap:12px}
+.content .panel{padding:16px}
+.content .item{padding:10px 12px}
+.content .sub{margin:6px 0 12px}
+.content .banner{padding:10px 13px;margin:0 0 12px}
+.content .zd-demo-strip{margin:11px 0 13px;gap:11px}
+.content .toolbar{margin:10px 0}
+#portalResearchClip{max-width:460px!important;width:100%;height:auto;max-height:260px}
+.zd-overview-quick{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-top:11px}
+.zd-overview-quick .panel{margin:0}
+.zd-overview-quick .toolbar{margin:8px 0}
+.zd-overview-quick .banner{margin:8px 0}
+@media(max-width:1120px){.zd-overview-quick{grid-template-columns:1fr}}
+#view .accept-table-scroller{max-height:calc(100dvh - 280px);min-height:280px;
+ overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;
+ border:1px solid var(--border);border-radius:10px}
+#view .accept-table-scroller thead th{position:sticky;top:0;z-index:2;background:#f0f5fc}
+#view .accept-table-scroller td{padding:9px 10px}
+@media(max-width:760px){#view .accept-table-scroller{max-height:65vh}}
 </style>
 </head>
 <body>
@@ -53,15 +108,22 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 <aside>
   <div class="logo"><b>ZD · 智能预警</b><small>重点场所 / 综合治理 / DEMO</small></div>
   <div class="navtitle">业务工作台</div>
-  <nav id="navigation">
-    <a data-tab="overview" href="/portal">◉ &nbsp;综合态势</a>
+  <nav id="navigation" aria-label="业务主导航">
+    <div class="navtitle">业务功能</div>
+    <a data-tab="overview" href="/portal">◈ &nbsp;综合态势</a>
+    <a href="/real">▣ &nbsp;视频监控</a>
+    <a class="state-only" href="/base">▤ &nbsp;场所人员底库 · 演示</a>
+    <a data-tab="alerts" href="/portal?tab=alerts">♢ &nbsp;预警中心</a>
+    <a href="/insights">⌕ &nbsp;智能检索与分析</a>
+    <div class="navtitle">业务操作</div>
     <a data-tab="places" href="/portal?tab=places">▦ &nbsp;场所监测</a>
-    <a data-tab="alerts" href="/portal?tab=alerts">◇ &nbsp;预警中心</a>
-    <a href="/monitor">◷ &nbsp;视频监测</a>
-    <a href="/insights">↗ &nbsp;智能分析</a>
-    <a class="state-only" href="/base">▤ &nbsp;模拟人员底库</a>
-    <a class="state-only" href="/business">⚙ &nbsp;规则与复核</a>
-    <a href="/admin">▣ &nbsp;系统管理</a>
+    <a class="state-only" href="/business">⚙ &nbsp;预警规则与复核</a>
+    <a href="/cctv">▥ &nbsp;抓拍证据与人工复核</a>
+    <a href="/recognition-results">◆ &nbsp;视觉识别成果</a>
+    <div class="navtitle">基础管理</div>
+    <a href="/monitor">◷ &nbsp;设备与采集</a>
+    <a href="/admin">⚑ &nbsp;辖区、场所与账号</a>
+    <a class="state-only" data-tab="acceptance" href="/portal?tab=acceptance">☑ &nbsp;需求验收</a>
   </nav>
   <div class="sidebar-foot">真实视频仅统计匿名目标事件；P### 人员、跨所关系及预警为合成演示。</div>
 </aside>
@@ -71,6 +133,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 </main>
 </div>
 <div id="flash"></div>
+<script src="/ui/role-navigation.js"></script>
 <script>
 (function(){
 'use strict';
@@ -81,7 +144,8 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\u0027':'&#39;'}[c]));
 const route=o=>'/portal?'+new URLSearchParams(o).toString();
 const dt=s=>s?new Date(s).toLocaleString('zh-CN',{hour12:false}):'—';
-let state={user:null,places:[],sources:[],dash:null,monitor:null,events:[]};
+let state={user:null,places:[],sources:[],dash:null,monitor:null,events:[],
+           excel:null,epflAudit:null,acceptanceError:null};
 async function api(url,opts){
   const o=Object.assign({},opts||{});o.headers=Object.assign({},h,o.headers||{});
   const r=await fetch(url,o);
@@ -110,16 +174,151 @@ function trend(arr){
 }
 function summary(){
  const syn=synthetic(),real=video(),c=syn.cards;
- const rank=syn.ranking.slice(0,6).map(p=>'<a class="item" href="'+placeLink(p)+'"><div><b>'+esc(p.place_name)+'</b><small>合成到访 '+p.visits+' · 模拟命中 '+p.alerts+'</small></div><span class="arrow">查看 →</span></a>').join('');
+ const rank=real.places.slice(0,6).map(p=>'<a class="item" href="'+placeLink(p.place_id)+'"><div><b>'+esc(p.place_name)+'</b><small>Frigate实际目标事件 '+p.person_objects+' · 抽样视频帧 '+p.sampled_frames+'</small></div><span class="arrow">查看 →</span></a>').join('');
  const hits=syn.recent_alerts.slice(0,7).map(a=>'<a class="item" href="'+alertLink(a)+'"><div><b>'+esc(a.type_name)+'</b><small>'+esc((a.place_names||[]).join('、'))+' · '+esc(a.status||'待复核')+'</small></div><span class="pill demo">合成</span></a>').join('');
- return title('OVERVIEW · 综合态势','辖区重点场所运行概览')+'<p class="sub">从辖区总览进入场所、证据和预警复核。所有统计按真实数据与合成场景分区展示。</p>'+notice()+
- '<div class="cards">'+stat('辖区场所',c.place_count,'当前账号授权范围')+stat('登记视频源',state.sources.length,'登记不代表实时在线')+stat('匿名目标事件（近7天）',real.counts.person_objects,'真实 Frigate 目标事件，非独立人数')+stat('模拟规则命中',c.rule_hits,'合成数据，不是实际风险')+'</div>'+
- '<div class="grid"><section class="panel"><div class="row"><h2>场所监测入口</h2><a class="arrow" href="'+route({tab:'places'})+'">全部场所 →</a></div><p class="smallnote">按辖区归属查看；尚未录入场所经纬度，不伪造地图坐标。</p><div class="items">'+(rank||'<div class="empty">没有场所或合成活动记录</div>')+'</div></section>'+
- '<section class="panel"><div class="row"><h2>近期规则命中</h2><a class="arrow" href="'+route({tab:'alerts'})+'">预警中心 →</a></div><p class="smallnote">以下为合成规则候选，待人工核实。</p><div class="items">'+(hits||'<div class="empty">尚无模拟规则命中</div>')+'</div></section></div>'+
- '<div class="grid"><section class="panel"><h2>合成场景 · 到访趋势</h2>'+trend(syn.trend)+'</section>'+
- '<section class="panel"><h2>真实视频 · 检测数据</h2><div class="statline"><span>Frigate person 事件</span><b>'+real.counts.person_objects+'</b></div><div class="statline"><span>OpenCV 抽样帧</span><b>'+real.counts.sampled_frames+'</b></div><div class="statline"><span>人脸检测框</span><b>'+real.counts.face_detections+'</b></div><p class="smallnote">不能据此计算不同人数或人脸识别准确率。</p><a class="arrow" href="/monitor">前往视频运行监测 →</a></section></div>'+
- (state.user.level===1?'<div class="toolbar"><button id="seed">初始化合成业务场景（不会写入视频数据）</button><a href="/base">生成模拟底库</a><a href="/business">配置规则和复核</a></div>':'');
+ return title('OVERVIEW · 实况证据优先','辖区重点场所运行概览')+
+ '<p class="sub">默认只统计实际监控数据。没有设备或没有目标事件就显示0，不使用合成P###、虚构到访或模拟规则补数。</p>'+
+ '<div class="banner"><strong>真实输入边界：</strong>实际Frigate目标事件、OpenCV视频抽帧和检测框不等于独立人数或确认身份。跨摄像机真人关联尚未可靠验收；研究视频与实况独立。</div>'+
+ '<div class="zd-demo-strip" aria-label="实际研究与合成业务分开统计">'+
+ '<div class="zd-demo-summary"><span class="source-tag">真实视频研究素材</span><h2>双机人体检测证据</h2>'+
+ '<div class="numbers"><div><strong id="overviewResearchPairs">—</strong><span>人体配对观测（非人数）</span></div>'+
+ '<div><strong id="overviewResearchFragments">—</strong><span>匿名活动候选片段（未验身份）</span></div></div>'+
+ '<a href="/real#video">播放实际视频并查看检测帧 →</a></div>'+
+ '<div class="zd-demo-summary"><span class="source-tag demo">合成业务演示 · 非真人身份</span><h2>场所人员与规则流程</h2>'+
+ '<div class="numbers"><div><strong>'+esc(c.unique_synthetic_people_in_window)+'</strong><span>模拟人员</span></div>'+
+ '<div><strong>'+esc(c.synthetic_visits)+'</strong><span>模拟到访</span></div>'+
+ '<div><strong>'+esc(c.rule_hits)+'</strong><span>预警规则命中</span></div></div>'+
+ '<div class="toolbar"><a href="/portal?tab=alerts">查看预警详情 →</a><a href="/insights">检索模拟人员 →</a><a href="/base">查看人员底库 →</a></div></div></div>'+
+ '<div class="cards">'+stat('辖区场所',real.places.length,'辖区授权范围')+
+ stat('登记视频源',state.sources.length,'登记不代表真实在线')+
+ stat('真实 person 事件（近7天）',real.counts.person_objects,'Frigate事件数，不是去重人数')+
+ stat('实际解码视频帧',real.counts.sampled_frames,'OpenCV抽帧，非身份到访')+'</div>'+
+ '<div class="grid"><section class="panel"><div class="row"><h2>按场所查看真实证据</h2><a class="arrow" href="/real">仅真实数据工作台 →</a></div>'+
+ '<p class="smallnote">实际目标事件和视频抽帧；无数据则保留0，不会用模拟人员填充。</p><div class="items">'+
+ (rank||'<div class="empty">当前没有场所或实际视频事件，请先连接授权设备</div>')+'</div></section>'+
+ '<section class="panel"><h2>原始视频证据</h2>'+
+ '<div class="statline"><span>Frigate person 事件</span><b>'+real.counts.person_objects+'</b></div>'+
+ '<div class="statline"><span>视频帧（OpenCV）</span><b>'+real.counts.sampled_frames+'</b></div>'+
+ '<div class="statline"><span>人脸候选框</span><b>'+real.counts.face_detections+'</b></div>'+
+ '<p class="smallnote">这三项均来自媒体实际处理，不是合成人员或身份匹配成功率。</p>'+
+ '<a class="arrow" href="/real">检查证据和UTC时间 →</a></section></div>'+
+ (state.user.level===1?
+ '<section class="panel" aria-label="双机真实录像"><div class="row"><h2>真实录像概览（独立研究素材）</h2><a class="arrow" href="/real#video">查看检测帧和研究证据 →</a></div>'+
+ '<p class="smallnote">38秒 EPFL 同一实验室双机研究录像；不能证明真人跨场所识别，也不计入上方Frigate现场统计。</p>'+
+ '<video id="portalResearchClip" controls playsinline preload="auto" style="display:block;width:100%;max-width:790px;aspect-ratio:16/9;background:#152c45;border-radius:10px"></video>'+
+ '<div id="portalResearchStatus" class="smallnote">正在检查真实研究录像…</div></section>':'')+
+ '<div class="zd-overview-quick"><section class="panel"><div class="row"><h2>业务操作入口</h2><span class="smallnote">按原Excel的业务链路组织，页面共用已有数据库和接口。</span></div>'+
+ '<div class="toolbar"><a href="/real">① 真实视频与检测 →</a><a href="/portal?tab=places">② 场所与辖区 →</a><a href="/portal?tab=alerts">③ 预警与复核 →</a><a href="/insights">④ 智能检索 →</a></div>'+
+ '<p class="smallnote">真人跨场所身份尚未验收；人员底库与七类规则的演示数据独立于真实视频。</p></section>'+
+ (state.user.level===1?'<section class="panel"><div class="row"><h2>单独的合成算法验证区（非真实业务结果）</h2><a href="/portal?tab=acceptance">查看真实/合成验收对照 →</a></div>'+
+ '<p class="smallnote">原有P###模拟底库和七类规则仅用于软件逻辑回归。不会写入真实人体库，不计入真实事件、预警或身份分析。</p>'+
+ '<div class="toolbar"><a href="/base">模拟底库</a><a href="/business">模拟规则</a><a href="/insights">合成统计</a></div>'+
+ (c.synthetic_visits===0?'<div class="banner"><strong>演示尚未准备：</strong>当前人员底库、七类预警和人员检索没有合成业务事件，进入相应页面会看到空结果。<button id="seed" type="button">初始化明确标注的演示数据</button></div>':
+ '<p class="smallnote">合成活动已准备：'+esc(c.synthetic_visits)+'次模拟到访。进入底库生成草稿、核验归并并发布。</p>')+
+ '</section>':'')+'</div>';
 }
+
+function acceptancePage(){
+ if(state.user.level!==1)
+  return '<div class="err">此功能仅供州级演示管理员核验交付声明。</div>';
+ if(state.acceptanceError)
+  return title('ACCEPTANCE · 项目交付','Excel 23项严格验收')+
+   '<div class="err">无法取得实际验收数据：'+esc(state.acceptanceError)+
+   '，不得把缺少报告视为全部通过。</div>';
+ if(!state.excel || !state.epflAudit)
+  return title('ACCEPTANCE · 项目交付','Excel 23项严格验收')+
+   '<div class="empty">正在读取原Excel需求及真实研究数据…</div>';
+ const a=state.excel, review=state.epflAudit,
+  names={verified_real:'已验证管理功能',synthetic_only:'仅合成人员业务',
+         partial:'部分实现',missing:'缺失'}, labels={verified_real:'real',
+         synthetic_only:'demo',partial:'partial',missing:'missing'};
+ const cards='<div class="cards">'+Object.keys(names).map(k=>
+    stat(names[k],a.counts[k],k==='verified_real'?
+      '真实管理/授权接口':'不能宣称真实身份能力')).join('')+'</div>';
+ const research=review.has_report?
+   '<div class="statline"><span>已导入的真实研究视频匿名跨机候选</span><b>'+
+    review.candidate_count+'条配对</b></div>'+
+   '<div class="statline"><span>已人工复核 / 待复核</span><b>'+
+    review.reviewed_count+' / '+review.pending_count+'</b></div>'+
+   '<div class="statline"><span>当前认为合理 / 误配 / 仍需复核</span><b>'+
+    review.plausible_count+' / '+review.false_match_count+' / '+
+    review.needs_review_count+'</b></div>'+
+   '<p class="smallnote">这不是独立人数；审核结论不能验证自然人身份。报告来源：'+
+    esc(review.origin||'未知')+'。</p>':
+   '<div class="empty">尚未导入研究人体关联候选。由州级管理员从 /cctv 一键载入CI内置报告。</div>';
+ const body=a.requirements.map(x=>'<tr data-acceptance-status="'+esc(x.status)+'"><td>#'+x.id+
+   '</td><td><b>'+esc(x.title)+'</b></td><td><span class="pill '+labels[x.status]+'">'+
+   esc(names[x.status])+'</span></td><td><div class="smallnote">'+
+   esc(x.verified_scope.length>64?x.verified_scope.slice(0,64)+'…':x.verified_scope)+
+   '</div><details class="accept-detail"><summary>当前做到什么 / 用什么替代 / 为什么能演示 / 下一步怎么做</summary>'+
+   '<p><b>实际已做：</b>'+esc(x.delivered_now)+'</p>'+
+   '<p><b>当前替代：</b>'+esc(x.alternative_used)+'</p>'+
+   '<p><b>为什么可用于演示：</b>'+esc(x.why_demo_usable)+'</p>'+
+   '<p><b>不等同于：</b>'+esc(x.not_equivalent_to)+'</p>'+
+   '<p><b>后续实施：</b>'+esc(x.future_implementation)+'</p>'+
+   '<p><b>正式验收证据：</b>'+esc(x.acceptance_gate)+'</p>'+
+   '<p><b>后续优先级：</b>'+esc(x.next_priority)+'</p>'+
+   '<p><b>原审计范围：</b>'+esc(x.verified_scope)+'</p>'+
+   '<p><b>尚缺：</b>'+esc(x.remaining_gap)+
+   '</p><p class="smallnote"><b>回归：</b>'+esc(x.evidence_files.join('、'))+
+   '</p></details></td><td>'+(x.status==='missing'?
+   '<span class="pill missing">暂无已验功能</span>':
+   '<a class="arrow" href="'+esc(x.demo_url)+'">'+
+   (x.status==='verified_real'?'进入已验功能 →':'查看已有部分演示 →')+'</a>')+
+   '</td></tr>').join('');
+ return title('EXCEL · DELIVERY','原Excel 23项逐项核对')+
+  '<p class="sub">唯一来源：'+esc(a.source_file)+'，工作表“'+
+   esc(a.source_worksheet)+'”。每一项对应现有页面与可核查缺口，不为验收造新身份数据。</p>'+
+  '<div class="banner"><strong>验收边界：</strong>'+esc(a.warning)+
+  '<br><b>替代只用于有限范围演示，不等于原需求验收。</b>每一项都可展开查看替代原因、不能替代的能力和后续验收门槛。'+
+  '<br><span class="smallnote">冻结审计基线：'+esc(a.delivery_assessment_date)+'</span></div>'+
+  cards+
+  '<section class="panel"><h2>演示顺序 · 复用现有系统，两条数据链路互不混合</h2>'+
+  '<div class="accept-steps"><a href="/cctv#epflResearchPanel"><strong>01 · 真实视频人体关联</strong><span>匿名跨机配对、证据审核，不确认身份。</span></a>'+
+  '<a href="/base"><strong>02 · 合成人员底库</strong><span>P###生成、归并、矫正、发布。</span></a>'+
+  '<a href="/business"><strong>03 · 七类模拟预警</strong><span>规则命中、审核，再到态势分析。</span></a></div>'+
+  '<p class="smallnote">先操作三条演示入口，再在下表按Excel逐项验收；不能把人体匹配转为真人身份。</p>'+
+  '<p class="smallnote"><a href="/geo">查看#17相邻技术演示：地图与虚构P###点位回放（原文真实轨迹仍缺失） →</a></p>'+
+  '<p class="smallnote"><a href="/face-lab">查看#14相邻技术实验：自行授权照片短期SFace相似度（原文监控人脸检索仍缺失） →</a></p></section>'+
+  '<section class="panel"><div class="row"><h2>真实双机人体关联 · 独立研究轨道</h2>'+
+  '<a class="arrow" href="/cctv#epflResearchPanel">查看并审核候选 →</a></div>'+
+  research+'<div class="toolbar"><a href="/monitor">查看真实检测帧 →</a>'+
+  '<a href="/base">打开合成P###底库 →</a><a href="/business">查看七类规则 →</a>'+
+  '<a href="/insights">统计与检索 →</a><a href="/admin">场所与账号 →</a></div></section>'+
+  '<section class="panel"><h2>原始23项：状态、已实证能力与待补缺口</h2>'+
+  '<div class="accept-tools"><label>验收状态<select id="acceptStatusFilter"><option value="all">全部23项</option>'+
+  Object.keys(names).map(k=>'<option value="'+k+'">'+esc(names[k])+' · '+a.counts[k]+'项</option>').join('')+
+  '</select></label><label>搜索需求<input id="acceptSearch" placeholder="17 / 轨迹 / 底库" autocomplete="off"></label>'+
+  '<span id="acceptVisibleCount" role="status">显示 23 / 23 项</span></div>'+
+  '<p class="smallnote">23项均保留，表格内可用鼠标滚轮向下查看；表头固定。</p><div class="scroller accept-table-scroller" tabindex="0" aria-label="Excel23项需求表，可用鼠标滚轮滚动"><table class="accept-table"><thead><tr><th>编号</th><th>需求名称</th>'+
+  '<th>严格状态</th><th>实际能力与缺口</th><th>演示入口</th>'+
+  '</tr></thead><tbody id="acceptanceRows">'+body+'</tbody></table></div></section>';
+}
+function applyAcceptanceFilter(){
+ const tbody=$('acceptanceRows');if(!tbody)return;
+ const filter=$('acceptStatusFilter').value,query=$('acceptSearch').value.trim().toLowerCase();
+ let count=0;
+ for(const row of tbody.querySelectorAll('tr[data-acceptance-status]')){
+  const cells=row.querySelectorAll('td');
+  const idAndName=(cells[0].textContent+' '+cells[1].textContent).toLowerCase();
+  row.hidden=!( (filter==='all'||row.dataset.acceptanceStatus===filter) &&
+                (!query||idAndName.includes(query)));
+  if(!row.hidden)count++;
+ }
+ $('acceptVisibleCount').textContent='显示 '+count+' / 23 项';
+}
+async function loadAcceptance(){
+ if(!state.user || state.user.level!==1)return;
+ try{
+  const [excel,epflAudit]=await Promise.all([
+    api('/api/demo/excel-acceptance'),api('/api/research/epfl/summary')]);
+  if(excel.requirements.length!==23||
+     Object.values(excel.counts).reduce((a,b)=>a+b,0)!==23)
+    throw Error('原Excel验收记录不完整');
+  state.excel=excel;state.epflAudit=epflAudit;state.acceptanceError=null;
+ }catch(e){state.acceptanceError=e.message;}
+}
+
 function listPlaces(){
  return title('PLACES · 场所监测','辖区场所列表')+'<p class="sub">选择一个场所，查看设备登记、真实匿名事件、合成业务概况。</p>'+notice()+
  '<section class="panel"><div class="scroller"><table><thead><tr><th>场所名称</th><th>所属辖区</th><th>状态</th><th>登记源</th><th>匿名事件（7天）</th><th>详情</th></tr></thead><tbody>'+
@@ -135,7 +334,7 @@ function showPlace(id){
  '<p class="sub">所属辖区：'+esc(p.region_path||'—')+'</p>'+notice()+
  '<div class="cards">'+stat('已登记视频源',src.length,'非实时在线数量')+stat('匿名目标事件（7天）',real.person_objects||0,'真实 person 事件数')+
  stat('合成到访',demo.visits||0,'虚构活动数据')+stat('合成规则命中',demo.alerts||0,'候选提示，非真实异常')+'</div>'+
- '<div class="grid"><section class="panel"><h2>视频源与设备</h2><p class="smallnote">显示已登记设备，不宣称在线播放或在线。</p><div class="items">'+(src.map(s=>'<div class="item"><div><b>'+esc(s.name)+'</b><small>'+esc(s.kind)+' · '+(s.enabled?'已启用':'已停用')+'</small></div><span class="pill real">视频源</span></div>').join('')||'<div class="empty">未登记视频源</div>')+'</div><div class="toolbar"><a href="/monitor">查看视频检测 →</a><a href="/admin">设备管理 →</a></div></section>'+
+ '<div class="grid"><section class="panel"><h2>视频源与设备</h2><p class="smallnote">显示已登记设备，不宣称在线播放或在线。</p><div class="items">'+(src.map(s=>'<div class="item"><div><b>'+esc(s.name)+'</b><small>'+esc(s.kind)+' · '+(s.enabled?'已启用':'已停用')+'</small></div><span class="pill real">视频源</span></div>').join('')||'<div class="empty">未登记视频源</div>')+'</div><div class="toolbar"><a href="/monitor">查看视频检测 →</a><a href="/admin">设备管理 →</a><a href="/geo?place_id='+encodeURIComponent(id)+'">地图点位 →</a></div></section>'+
  '<section class="panel"><h2>近期香港真实目标事件</h2><p class="smallnote">从最近 100 条已同步事件中筛选，不代表全部历史；不含人员身份。</p>'+
  (events.length?'<div class="scroller"><table><thead><tr><th>摄像机</th><th>发生时间</th><th>置信度</th><th>类型</th></tr></thead><tbody>'+
  events.map(e=>'<tr><td>'+esc(e.camera)+'</td><td>'+esc(dt(e.started_at))+'</td><td>'+esc(e.score==null?'—':Number(e.score).toFixed(2))+'</td><td>匿名 person</td></tr>').join('')+'</tbody></table></div>':'<div class="empty">近期无真实检测事件。可进入视频监测页面同步。</div>')+'</section></div>'+
@@ -145,21 +344,22 @@ function showPlace(id){
 function listAlerts(){
  const a=synthetic().recent_alerts;
  return title('ALERTS · 预警中心','业务规则候选与人工复核')+'<p class="sub">模拟规则采用统一列表、证据详情和审核结果；不将共同出现或跨场所活动直接认定为异常。</p>'+notice()+
+ (a.length===0&&state.user.level===1?'<div class="banner">当前没有规则候选。这不是已完成预警验收；尚未初始化合成业务活动。<button id="seed" type="button">初始化合成规则演示事件</button></div>':'')+
  '<section class="panel"><div class="scroller"><table><thead><tr><th>类型</th><th>规则命中说明</th><th>场所</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
- rows(a.map(x=>'<tr><td><span class="pill demo">'+esc(x.type_name)+'</span></td><td>'+esc(x.title)+'</td><td>'+esc((x.place_names||[]).join('、'))+'</td><td>'+esc(x.status||'待复核')+'</td><td><a class="arrow" href="'+alertLink(x)+'">证据详情 →</a></td></tr>'))+'</tbody></table></div><p class="smallnote">当前只展示最多 30 条近期合成规则候选；完整规则列表请从管理员业务验证台查看。</p></section>';
+ rows(a.map(x=>'<tr><td><span class="pill demo">'+esc(x.type_name)+'</span></td><td>'+esc(x.title)+'</td><td>'+esc((x.place_names||[]).join('、'))+'</td><td>'+esc(({needs_review:'待复核',confirmed:'已核实',dismissed:'已排除',approved:'已确认',rejected:'已驳回'})[x.status]||x.status||'待复核')+'</td><td><a class="arrow" href="'+alertLink(x)+'">证据详情 →</a></td></tr>'))+'</tbody></table></div><p class="smallnote">当前只展示最多 30 条近期合成规则候选；完整规则列表请从管理员业务验证台查看。</p></section>';
 }
 function showAlert(key){
  const a=synthetic().recent_alerts.find(x=>x.key===key);
  if(!a)return '<div class="err">该规则候选不在当前辖区或近期列表中。<a href="'+route({tab:'alerts'})+'">返回预警中心</a></div>';
- const people=(a.people||[]).map(x=>esc(x)).join('、')||'—';
+ const people=(a.people||[]).map(x=>'<a class="arrow" href="/insights?person='+encodeURIComponent(x)+'">'+esc(x)+' →</a>').join('、')||'—';
  const sites=(a.place_names||[]).map(x=>esc(x)).join('、')||'—';
  return '<div class="breadcrumb"><a href="/portal">综合态势</a> / <a href="'+route({tab:'alerts'})+'">预警中心</a> / 规则详情</div>'+
  title('ALERT DETAIL · 规则依据','合成业务规则候选')+'<p class="sub">只有经人工复核的业务模拟结论；不是对真实人物的风险判断。</p>'+notice()+
  '<div class="grid"><section class="panel"><div class="row"><h2>'+esc(a.type_name)+'</h2><span class="pill demo">合成演示</span></div>'+
  '<div class="statline"><span>规则候选</span><b>'+esc(a.title)+'</b></div>'+
  '<div class="statline"><span>涉及场所</span><b>'+sites+'</b></div>'+
- '<div class="statline"><span>虚构标识</span><b>'+people+'</b></div>'+
- '<div class="statline"><span>当前复核状态</span><b>'+esc(a.status||'待复核')+'</b></div>'+
+ '<div class="statline"><span>虚构标识（点击查看模拟到访）</span><b>'+people+'</b></div>'+
+ '<div class="statline"><span>当前复核状态</span><b>'+esc(({needs_review:'待复核',confirmed:'已核实',false_positive:'误报已排除'})[a.status]||a.status||'待复核')+'</b></div>'+
  '<h2>触发口径</h2><p>'+esc(a.detail||'请核对合成规则阈值和源数据。')+'</p>'+
  '<h2>原始模拟观测证据 ID</h2><div class="code">'+esc((a.observation_ids||[]).join(', ')||'—')+'</div><p class="smallnote">ID 对应合成观测；未附真实照片，也不表明真实身份匹配。</p></section>'+
  '<section class="panel"><h2>人工核查记录</h2>'+
@@ -179,8 +379,44 @@ function render(){
  else if(q.has('alert'))page=showAlert(q.get('alert'));
  else if(tab==='places')page=listPlaces();
  else if(tab==='alerts')page=listAlerts();
+ else if(tab==='acceptance')page=acceptancePage();
  else page=summary();
  $('view').innerHTML=page;
+ const clip=$('portalResearchClip'),status=$('portalResearchStatus');
+ if(clip&&status){
+  (async()=>{
+   try{
+    const available=await api('/api/real/showcase-media/status');
+    if(!available.ready){status.textContent='未安装研究录像，视频监控页可查看来源。';return;}
+    const response=await fetch('/api/real/showcase-media/video',{headers:h});
+    if(!response.ok)throw Error('HTTP '+response.status);
+    const blob=await response.blob();
+    if(!clip.isConnected)return;
+    const cover=await fetch('/api/real/showcase-media/poster',{headers:h});
+    if(cover.ok)clip.poster=URL.createObjectURL(await cover.blob());
+    clip.src=URL.createObjectURL(blob);clip.load();
+    status.textContent='已加载38秒真实双机录像；正在获取实际检测记录…';
+    try{
+     let activity=await api('/api/real/activity');
+     if(!activity.ready){
+       await api('/api/research/epfl/bundled/import',{method:'POST'});
+       activity=await api('/api/real/activity');
+     }
+     if(activity.ready){
+       if($('overviewResearchPairs'))$('overviewResearchPairs').textContent=activity.matched_pair_observations;
+       if($('overviewResearchFragments'))$('overviewResearchFragments').textContent=activity.anonymous_activity_fragments;
+       status.textContent='同批真实视频检测：'+activity.matched_pair_observations+
+        '次双机人体配对、'+activity.anonymous_activity_fragments+
+        '段短时匿名关联；不是独立人数或实名轨迹。';
+     }else status.textContent='真实录像可播放，但研究检测记录未导入。';
+    }catch(err){status.textContent='真实录像可播放；检测记录暂不可读取：'+err.message}
+   }catch(error){status.textContent='研究录像暂不可用：'+error.message}
+  })();
+ }
+ if(tab==='acceptance'&&!q.has('place')&&!q.has('alert')){
+  $('acceptStatusFilter')?.addEventListener('change',applyAcceptanceFilter);
+  $('acceptSearch')?.addEventListener('input',applyAcceptanceFilter);
+ }
  const seed=$('seed');if(seed)seed.onclick=async()=>{
   seed.disabled=true;try{await api('/api/business/seed',{method:'POST'});toast('已准备合成演示场景');await loadData();render();}
   catch(e){toast(e.message);}finally{seed.disabled=false;}
@@ -206,7 +442,10 @@ $('logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST'}).catc
   $('who').textContent=state.user.username+' · '+state.user.region_name;
   $('scope').textContent='当前授权辖区：'+state.user.region_name+' · '+['','州级','县市级','街道级','社区级'][state.user.level];
   if(state.user.level!==1)document.querySelectorAll('.state-only').forEach(x=>x.remove());
-  await loadData();render();
+  zdApplyRoleNavigation(state.user);
+  await loadData();
+  if(state.user.level===1)await loadAcceptance();
+  render();
  }catch(e){$('view').innerHTML='<div class="err">加载失败：'+esc(e.message)+'。检查服务、会话和数据权限。<br><button id="retry">重新加载</button></div>';const retry=$('retry');if(retry)retry.onclick=()=>location.reload();}
 })();
 })();

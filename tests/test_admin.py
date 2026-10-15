@@ -41,7 +41,8 @@ def test_four_level_regions_validate_hierarchy(case):
     path=next(r['path'] for r in all_regions if r['id']==branch[-1]['id'])
     assert path=='测试州乙 / 测试县市乙 / 测试街道乙 / 测试社区乙'
     assert c.get('/admin').status_code==200
-    assert '行政区域与场所设备' in c.get('/admin').text
+    assert '辖区、场所与账号管理' in c.get('/admin').text
+    assert '/ui/compact-sections.js' in c.get('/admin').text
 
 
 def test_region_scope_rollup_and_place_move(case):

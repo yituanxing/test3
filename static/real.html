@@ -1,0 +1,781 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>ZD · 视频监控与检测</title>
+<style>
+:root{--ink:#142c47;--muted:#627b96;--line:#dce7f2;--blue:#2865ab}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:#f2f6fb;color:var(--ink);font:14px/1.6 system-ui,'Microsoft YaHei'}
+header{background:#112d4e;color:#fff;padding:18px max(20px,calc((100vw - 1200px)/2));display:flex;gap:22px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+header a{color:#dbeafb;margin:0 7px;text-decoration:none}
+main{max-width:1200px;margin:auto;padding:25px 20px 50px}
+h1{font-size:25px;margin:0 0 5px}h2{font-size:17px;margin:0 0 9px}
+.box{background:white;border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:17px;box-shadow:0 6px 20px #1c38530b}
+.caveat{background:#eaf3ff;border-left:4px solid #2865ab;padding:15px 17px;border-radius:7px}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.card{background:white;border-radius:11px;padding:20px;border:1px solid var(--line)}
+.card strong{display:block;font-size:28px;line-height:1.6}
+.small{font-size:12px;color:var(--muted)}label{margin-right:15px}
+select,button{font:inherit;padding:9px 13px;border-radius:7px;border:1px solid #adc8e7}
+button{background:var(--blue);color:white;cursor:pointer}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;border-bottom:1px solid #e8eff8;padding:11px 7px}
+.scroll{overflow:auto}th{white-space:nowrap;color:#57718d}
+#message{color:#557395;font-size:12px}
+@media(max-width:800px){.cards{grid-template-columns:repeat(2,1fr)}main{padding:16px}header{padding:15px}}
+
+:root{--ink:#172942;--muted:#61718a;--line:#dfE6ef;--blue:#2862b2;--surface:#fff;--paper:#f5f7fb}
+html{scroll-behavior:smooth}
+body{background:var(--paper);font:15px/1.65 system-ui,"Microsoft YaHei",sans-serif}
+header{background:#142941;padding:14px max(24px,calc((100vw - 1240px)/2));gap:12px}
+header b{font-size:17px;letter-spacing:.3px}
+header nav{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+header nav a{font-size:13px;margin:0;padding:6px 10px;border-radius:6px}
+header nav a[aria-current="page"]{background:#244d78;color:white}
+main{max-width:1240px;padding:0 24px 75px}
+h1{font-size:34px;line-height:1.35;letter-spacing:-.025em}
+h2{font-size:21px;margin-bottom:10px;line-height:1.45}
+h3{font-size:16px}
+p{margin:8px 0 12px}
+button{background:#2862b2;border-color:#2862b2;border-radius:8px;font-weight:620}
+button:hover{background:#1b4b90}
+button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #83b8fb;outline-offset:3px}
+button:disabled{opacity:.55;cursor:wait}
+select{max-width:100%;background:white;color:#24364c}
+.box{margin-top:16px;box-shadow:0 1px 9px rgba(24,44,72,.04);border-radius:15px;padding:24px}
+.box .small{line-height:1.8}
+.cards{gap:10px}
+.card{border-radius:10px;background:#f5f8fc;padding:14px 16px;box-shadow:none}
+.card strong{font-size:30px;font-weight:760;line-height:1.4;color:#153d70}
+.card .small{line-height:1.45}
+.scroll{overflow:auto}
+table{width:100%;font-size:12px}
+td,th{padding:10px;border-color:#e7edf5}
+th{background:#f5f7fa}
+details{border-radius:10px}
+details>summary{cursor:pointer;color:#205a98;font-weight:650;list-style-position:inside}
+details>summary:hover{text-decoration:underline}
+.local-playback{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:22px;align-items:center;background:#fff}
+.local-playback h2{font-size:18px}
+.local-playback .choose-video{display:inline-flex;align-items:center;padding:10px 15px;border-radius:8px;background:#2862b2;color:white;cursor:pointer;font-weight:680;margin:7px 0 0}
+.local-playback .choose-video:hover{background:#194f98}
+.local-playback input[type=file]{font:12px/1.5 system-ui;display:block;max-width:100%;margin:8px 0;color:#4b6481}
+#demoClipPlayer{display:block;max-width:100%;width:100%;aspect-ratio:16/9;background:#122c46;border-radius:10px;min-height:190px}
+#demoClipPlayer[hidden]{display:none}
+@media(max-width:970px){.local-playback{grid-template-columns:1fr}}
+.story-hero{color:#fff;background:linear-gradient(125deg,#122c50,#1b5686 70%,#227a98);border-radius:0 0 21px 21px;padding:34px 36px 28px;margin:0 -12px 22px}
+.story-hero h1{color:white;margin:6px 0 12px}
+.story-hero p{color:#dceaf4;max-width:780px;line-height:1.85}
+.story-hero .topline{color:#a5dff4;letter-spacing:.12em;font-size:12px;font-weight:700}
+.story-hero .hero-links{display:flex;flex-wrap:wrap;gap:9px;margin-top:22px}
+.story-hero .hero-links a{color:white;text-decoration:none;background:rgba(255,255,255,.12);border:1px solid #ffffff32;padding:9px 13px;border-radius:9px;font-weight:600}
+.story-hero .hero-links a:hover{background:rgba(255,255,255,.2)}
+.source-notice{background:#ebf3fc;border:1px solid #cbdced;border-radius:12px;padding:14px 18px;color:#284969;display:flex;gap:14px;align-items:flex-start;margin-bottom:24px}
+.source-notice strong{white-space:nowrap;color:#1e4b7c}
+.story-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:27px}
+.story-steps a{background:white;border:1px solid var(--line);border-radius:12px;padding:14px 15px;color:#263c59;text-decoration:none}
+.story-steps a:hover{border-color:#6398d3;box-shadow:0 3px 16px #2b4f7518}
+.story-steps small{display:block;color:#66839f;font-size:12px;margin-bottom:4px}
+.story-steps strong{font-size:16px}
+.story-steps span{display:block;font-size:12px;color:var(--muted)}
+.stage-head{display:flex;gap:15px;align-items:flex-start;scroll-margin-top:24px;margin:40px 0 8px}
+.stage-number{background:#244f80;color:#fff;width:36px;height:36px;display:grid;place-items:center;border-radius:11px;font-weight:800;flex:none}
+.stage-head h2{margin:0 0 3px;font-size:22px}
+.stage-head p{margin:0;color:var(--muted);font-size:13px}
+.section-source{font-size:12px;color:#53728d}
+.flow-guide{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+.flow-guide article{border-radius:11px;background:#f3f7fc;padding:16px;border:1px solid #dce7f1}
+.flow-guide article strong{display:block;margin-bottom:4px}
+.flow-guide article p{font-size:13px;color:var(--muted);margin:0}
+.focus-table{margin:14px 0 0}
+.focus-table summary{padding:9px 0}
+#researchActivity .cards{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:16px}
+#realSceneAggregation{padding:27px}
+#realSceneAggregation>div[style*="display:flex;gap:22px"]{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,.94fr);gap:32px!important}
+#realSceneAggregation>div[style*="display:flex;gap:22px"]>div:first-child{min-width:0!important;flex:initial!important}
+#realSceneAggregation>div[style*="display:flex;gap:22px"]>div:last-child{min-width:0!important;flex:initial!important}
+#realSceneAggregation div[style*="position:relative;width:min(100%,320px)"]{width:min(100%,440px)!important;margin:14px auto 20px}
+#realSceneAggregation label{display:inline-block;font-size:13px;font-weight:650;color:#405a78}
+#sceneHeatGrid{box-shadow:0 0 0 9px #f1f5fa;border-radius:9px!important}
+#sceneHeatGrid button{color:#285073}
+#sceneFrameCursor{accent-color:#2862b2;cursor:pointer;margin:12px 0}
+#sceneMetrics{grid-template-columns:repeat(4,minmax(0,1fr));margin:18px 0!important}
+#sceneZoneSummary{font-size:13px;padding:10px 13px;background:#f3f7fc;border-radius:8px}
+#sceneVirtualCrossSummary{font-size:13px;line-height:1.8}
+#sceneTrackSummary{font-size:13px;line-height:1.8}
+#sceneZoneRows,#sceneEventRows,#sceneTrackRows,#sceneVirtualCrossRows{font-size:12px}
+#demoAlerts .scroll{max-height:230px}
+#sceneZoneRows,#sceneEventRows{max-height:220px}
+.disclosure-card{background:white;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:12px 0}
+.disclosure-card>summary{font-size:14px}
+.operation-notice{padding:12px 15px;background:#fff8eb;border-left:3px solid #cb933a;border-radius:6px;color:#665332;font-size:13px;margin-top:12px}
+.system-footer{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0}
+.system-footer a{background:white;border:1px solid var(--line);border-radius:11px;padding:15px;text-decoration:none;color:#205184;font-weight:700}
+.system-footer a span{display:block;color:var(--muted);font-size:12px;font-weight:400}
+#technicalArea{margin-top:40px;padding-top:3px}
+#technicalArea .box{margin-top:12px}
+#excelAcceptance .cards{grid-template-columns:repeat(4,minmax(0,1fr))}
+#message{color:#315c88}
+@media(max-width:970px){
+ .story-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .flow-guide{grid-template-columns:1fr}
+ #realSceneAggregation>div[style*="display:flex;gap:22px"]{grid-template-columns:1fr!important}
+ #sceneMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .system-footer{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+ main{padding:0 15px 45px}header{padding:13px}
+ .story-hero{margin:0 -15px 18px;padding:25px 22px}
+ h1{font-size:27px}
+ .story-steps{gap:8px}
+ .story-steps a{padding:10px}
+ .source-notice{display:block}
+ .source-notice strong{display:block;margin-bottom:5px}
+ .box{padding:17px}
+ #researchActivity .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #realSceneAggregation{padding:17px}
+ .card strong{font-size:26px}
+ #excelAcceptance .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+.video-proof{margin:17px 0 21px;padding:19px;border:2px solid #83a7d0;border-radius:12px;background:#f6faff}
+.video-proof video{display:block;width:100%;height:auto;background:#101820;border-radius:9px;margin:12px 0}
+.video-proof .clip-empty{min-height:110px;display:grid;place-items:center;text-align:center;border:1px dashed #7896b8;border-radius:9px;color:#345575;background:#e9f1fb;margin:12px 0;padding:20px}
+.video-proof .clip-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.video-proof input[type=file]{max-width:100%}
+.video-proof .frame-status{background:#e9f0fc;padding:10px 12px;border-radius:8px;font-size:13px;margin:9px 0;color:#163b65}
+button[data-evidence-frame]{font-size:12px;padding:3px 7px;background:#e3effc;border-color:#a2c2e6;color:#124777}
+button[data-evidence-frame]:hover{background:#c5e0fa}
+
+/* ZD operational application shell; views are independent, not stacked. */
+body{margin:0;background:#f4f7fb!important;color:#1b304a;font:14px/1.55 "Segoe UI","Microsoft YaHei",Arial,sans-serif}
+body>header{display:none!important}
+.zd-shell{display:grid;grid-template-columns:235px minmax(0,1fr);min-height:100vh}
+.zd-sidebar{position:sticky;top:0;left:0;height:100vh;background:#122d49;color:#f2f6fa;padding:24px 13px;display:flex;flex-direction:column;z-index:15}
+.zd-brand{font-size:17px;font-weight:800;display:flex;align-items:center;gap:11px;padding:0 10px 31px}
+.zd-logo{width:43px;height:43px;border-radius:13px;background:#418fe0;display:grid;place-items:center;color:white;font-weight:850;letter-spacing:.1em}
+.zd-brand small{display:block;color:#9eb9d1;font-size:11px;font-weight:400}
+.zd-menu-heading{padding:8px 14px;font-size:11px;letter-spacing:.12em;color:#7895ae;margin:11px 0 4px}
+.zd-sidebar .zd-nav{width:100%;font:500 14px/1.4 "Segoe UI","Microsoft YaHei",sans-serif;text-decoration:none;text-align:left;display:flex;align-items:center;gap:13px;color:#cfdeed;background:transparent;border:0;border-radius:9px;padding:13px 15px;margin:2px 0;cursor:pointer}
+.zd-sidebar .zd-nav span{font-size:17px;width:22px;text-align:center}
+.zd-sidebar .zd-nav:hover,.zd-sidebar .zd-nav.selected{background:#245274;color:white}
+.zd-sidebar .zd-nav.selected{font-weight:750;box-shadow:inset 3px 0 0 #65b5fa}
+.zd-sidebar-bottom{font-size:12px;color:#b0c7d6;border-top:1px solid #35556c;padding:16px 10px;margin-top:auto}
+.zd-sidebar-bottom a{color:#e0eefb;float:right;text-decoration:none}
+.zd-status-light{display:inline-block;background:#43c19a;width:8px;height:8px;border-radius:50%;margin-right:7px}
+.zd-work{min-width:0;max-width:100%}
+.zd-top{height:69px;background:#fff;border-bottom:1px solid #e0e9f1;display:flex;justify-content:space-between;align-items:center;padding:0 37px;color:#1a3854}
+.zd-top strong{font-size:16px}
+.zd-top span{font-size:12px;color:#8090a0}
+.zd-work main{max-width:1320px;margin:0 auto;padding:27px 38px 60px!important}
+/* Video module uses exactly the same fixed sidebar + scrollable work area as
+   portal and the other business pages. Keep video players inside the scroller. */
+@media(min-width:751px){
+ html,body{height:100%;overflow:hidden}
+ .zd-shell{height:100dvh;min-height:0;overflow:hidden}
+ .zd-sidebar{position:relative;top:auto;height:100%;min-height:0;overflow-y:auto;
+   scrollbar-gutter:stable;overscroll-behavior:contain}
+ .zd-work{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+ .zd-top{flex:0 0 62px;min-height:62px;height:62px}
+ .zd-work main{flex:1;min-height:0;width:100%;overflow-y:auto;overflow-x:hidden;
+   overscroll-behavior:contain;scrollbar-gutter:stable;
+   padding:21px 29px 36px!important}
+}
+
+.zd-panel[hidden],.zd-sidebar .zd-nav[hidden]{display:none!important}
+.zd-panel{animation:zd-appear .16s ease}
+@keyframes zd-appear{from{opacity:.6;transform:translateY(3px)}to{opacity:1;transform:none}}
+.zd-welcome{background:linear-gradient(120deg,#153f65,#246d9f);color:white;border-radius:17px;padding:29px 36px;margin-bottom:23px}
+.zd-welcome .zd-eyebrow{color:#bddcee;letter-spacing:.07em;font-weight:700;font-size:12px}
+.zd-welcome h1{font-size:29px;color:white;margin:6px 0 12px}
+.zd-welcome p{color:#dfedfa;font-size:14px;max-width:780px;line-height:1.9}
+.zd-welcome-actions{margin-top:20px;display:flex;gap:12px}
+.zd-welcome-actions button,.zd-primary-action{padding:11px 19px;border-radius:9px;color:#17496e!important;background:white!important;border:1px solid white!important;font-weight:750}
+.zd-welcome-actions .zd-ghost{background:transparent!important;color:white!important;border-color:#ffffff88!important}
+.zd-main-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(300px,.85fr);gap:18px}
+.zd-primary-card,.zd-summary-card{background:#fff;border:1px solid #dce7ef;border-radius:15px;padding:20px;box-shadow:0 4px 15px #182f4a08}
+.zd-card-title{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:13px}
+.zd-card-title b{font-size:17px}
+.zd-card-title span{font-size:11px;color:#8096aa}
+#overviewVideo{background:#081521;border-radius:11px;width:100%;min-height:260px;aspect-ratio:16/9;object-fit:contain;display:block}
+.zd-media-status{padding:13px 0;font-size:12px;color:#537b91}
+.zd-live-caption{border-radius:8px;padding:12px 14px;background:#ecf5fc;font-size:13px;color:#23557b}
+.zd-summary-card h2{font-size:20px;margin:0 0 8px}
+.zd-summary-card p{color:#75899a;font-size:13px}
+.zd-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:16px 0}
+.zd-summary-grid>div{padding:16px 12px;background:#f3f8fc;border:1px solid #e5edf3;border-radius:10px}
+.zd-summary-grid b{display:block;color:#195985;font-size:29px}
+.zd-summary-grid span{font-size:11px;color:#6b7d8d}
+.zd-success-note{background:#edf8f2;color:#3b7556;border-radius:8px;font-size:12px;padding:11px;margin-bottom:10px}
+.zd-inline-link{background:none!important;color:#21639a!important;padding:5px 0!important;border:none!important;box-shadow:none;text-align:left;font-weight:650}
+.zd-section-label{font-weight:800;margin:27px 0 12px;color:#2f455c;font-size:16px}
+.zd-action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.zd-action-grid>button{display:flex;flex-direction:column;align-items:flex-start;gap:7px;border:1px solid #dce6ee!important;color:#1a3b56!important;background:#fff!important;box-shadow:0 2px 10px #1529420a;padding:20px!important;border-radius:13px}
+.zd-action-grid>button:hover{border-color:#7ab1d5!important;transform:translateY(-1px)}
+.zd-step{font-size:12px;color:#4386ac}
+.zd-action-grid b{font-size:19px}
+.zd-action-grid small{color:#8090a1;font-size:12px;text-align:left}
+.zd-action-grid em{font-style:normal;color:#2678b1;margin-top:5px}
+.zd-bottom-info{font-size:12px;color:#8393a1;margin:24px 0}
+.zd-module-header{margin:5px 0 20px}
+.zd-module-header .zd-eyebrow{color:#2880ab;letter-spacing:.1em;font-size:12px;font-weight:800}
+.zd-module-header h1{font-size:29px;margin:6px 0}
+.zd-module-header p{color:#6c7d8e;font-size:14px;max-width:850px}
+.zd-panel .box{box-shadow:0 3px 18px #15294208!important;border-radius:13px}
+.zd-panel .story-hero,.zd-panel .story-steps,.zd-panel .stage-head{display:none!important}
+.zd-panel #videoEvidence{margin:14px 0!important}
+.zd-panel #researchActivity{margin:0!important}
+.zd-panel #realSceneAggregation{margin:0!important}
+.zd-panel #demoAlerts{margin:0!important}
+.zd-panel #excelRuleShowcase{margin:16px 0!important}
+.zd-panel details{max-width:100%}
+.zd-panel .video-proof h3{font-size:17px}
+.zd-panel .box h2{margin-top:0}
+#liveEvidence{display:block!important}
+#liveEvidence>summary{display:none}
+#liveEvidence:not([open])>*:not(summary){display:none!important}
+@media(max-width:1000px){.zd-shell{grid-template-columns:200px minmax(0,1fr)}.zd-main-grid{grid-template-columns:1fr}.zd-action-grid{grid-template-columns:1fr 1fr}.zd-work main{padding:23px!important}}
+@media(max-width:670px){.zd-shell{display:block}.zd-sidebar{height:auto;position:static;padding:12px;display:flex;flex-direction:row;flex-wrap:wrap;gap:2px}.zd-brand{width:100%;padding:4px 8px 10px}.zd-menu-heading,.zd-sidebar-bottom{display:none}.zd-sidebar .zd-nav{width:auto;font-size:12px;padding:8px 9px}.zd-sidebar .zd-nav span{display:none}.zd-top{height:48px;padding:0 16px}.zd-top span{display:none}.zd-work main{padding:15px!important}.zd-welcome{padding:20px}.zd-welcome h1{font-size:22px}.zd-main-grid,.zd-action-grid{grid-template-columns:1fr}.zd-summary-grid{grid-template-columns:repeat(2,1fr)}}
+
+</style></head><body>
+<header><b>ZD · 视频活动分析</b><nav aria-label="主导航">
+<a href="/real" aria-current="page">演示首页</a><a href="/cctv">双机检测证据</a><a href="/recognition-results">视觉识别成果</a>
+<a href="/monitor">设备接入</a><a href="/admin">区域与权限</a>
+<a href="#" id="logout">退出登录</a></nav></header>
+<main>
+<section class="story-hero" id="introDemo">
+<div class="topline">ZD VIDEO ANALYTICS · 技术原型演示</div>
+<h1>真实双机录像 → 检测证据 → 活动提醒</h1>
+<p>先打开会动的两路真实录像，再点击实际记录定位原始帧，查看匿名检测、空间活动和演示规则。没加载视频，就明确显示缺少画面，不能靠统计数字冒充视频。</p>
+<div class="hero-links"><a href="#researchActivity">开始演示 ↓</a><a href="#realSceneAggregation">查看空间活动</a><a href="#demoAlerts">查看提醒</a></div>
+</section>
+<div class="source-notice"><strong>数据来源：真实研究录像</strong><span>EPFL 同一实验室的两机同步录制视频，非你的实时摄像机。画面对应的配对、位置和短时间活动来自真实检测；区域划分和提醒阈值是演示规则，不代表风险。</span></div>
+<nav class="story-steps" aria-label="演示步骤">
+<a href="#researchActivity"><small>STEP 01 · 视频</small><strong>双机检测</strong><span>确认两路视频已经对应</span></a>
+<a href="#realSceneAggregation"><small>STEP 02 · 空间</small><strong>活动轨迹</strong><span>看短轨迹和虚拟跨区</span></a>
+<a href="#demoAlerts"><small>STEP 03 · 规则</small><strong>活动提醒</strong><span>修改区域和人数阈值</span></a>
+<a href="#technicalArea"><small>STEP 04 · 管理</small><strong>系统与验收</strong><span>查看设备、权限和Excel</span></a>
+</nav>
+<div class="stage-head"><span class="stage-number">1</span><div><h2>第一步：看到真实视频画面</h2><p>先选取授权双机 MP4，再导入同一批录像的识别记录；两者缺一不能算画面验收。</p></div></div>
+<section class="local-playback box" id="localVideoPlayback">
+<div class="local-playback-meta">
+<h2>真实双机视频与源帧检索，使用同一个播放器</h2>
+<p>点击下方链接，在真实连续画面区域选一次 MP4；随后读取检测记录，点击「看源帧」会直接定位同一个视频播放器。避免上方看视频、下方找不到视频的断链。</p>
+<p class="small">MP4 需要从 <a href="https://github.com/yituanxing/test3/actions/runs/38585465839" target="_blank" rel="noopener noreferrer">真实视频 CI 工件</a>或授权交付包选取，没有实际录像时不会伪造画面。</p>
+<div class="hero-links"><a href="#videoEvidence" class="choose-video" id="openRealVideo">打开实际双机视频与源帧 ↓</a><a href="#excelAcceptance">逐项核验原 Excel 23 条 →</a></div>
+<div class="operation-notice">下方的 EPFL 检测结果来自此前真实执行的模型；离线回放不意味着网页实时推理，也不代表识别出真实身份。</div>
+</div>
+</section>
+
+<section class="box" id="researchActivity">
+<h2>已检测的双摄像机录像</h2>
+<p class="small">使用两台摄像机拍摄的同一个真实实验室。程序会导入已经完成YOLO检测的录像证据；这里展示的是配对观测和短时匿名关联，<b>不是独立人数、实名身份或现场实时监控</b>。</p>
+
+<div class="video-proof" id="videoEvidence">
+<h3>① 两台摄像机的真实连续画面（不是热力图）</h3>
+<p>从 <a href="https://github.com/yituanxing/test3/actions/runs/38585465839" target="_blank" rel="noopener noreferrer">已通过的视频 CI</a> 下载并解压工件 <b>zd-licensed-epfl-real-continuous-38-second-research-clips</b>，选择文件 <b>真实原片连续双机画面_38秒.mp4</b>。这是独立研究/教学素材，不能当作具有商业分发许可，工件可能过期。</p>
+<div class="clip-tools"><label for="videoClipPicker"><b>选择双机 MP4：</b></label><input type="file" id="videoClipPicker" accept=".mp4,video/mp4" aria-label="选取已授权的EPFL双机连续视频"></div>
+<div id="videoClipPlaceholder" class="clip-empty">目前没有实际视频画面。检测数字、热力网格即使有数据，也不意味着已播放原录像。</div>
+<video id="videoClip" controls playsinline preload="metadata" hidden aria-label="真实EPFL双摄像机连续画面"></video>
+<p id="videoClipStatus" class="small" role="status">还未选取真实视频文件；视频仅在本地浏览器读取，不上传。</p>
+<p id="videoFrameStatus" class="frame-status" role="status">点击下方的“看源帧”定位画面；这段剪辑仅覆盖原录像60–98秒。</p>
+</div>
+<div><button id="loadActivity">② 读取同批录像的实际检测记录</button> <span id="activityState" class="small">尚未读取证据</span></div>
+<div id="activityStats" class="cards" style="margin-top:14px"></div>
+<details class="focus-table"><summary>查看各条匿名检测片段的详细帧号</summary><div class="scroll"><table><thead><tr><th>片段编号</th><th>录像开始</th><th>录像结束</th><th>双机配对帧数</th><th>研究范围</th></tr></thead>
+<tbody id="activityTable"><tr><td colspan="5">未导入时不生成任何人员数据</td></tr></tbody></table></div></details>
+<p id="activityEvidence" class="small"></p>
+</section>
+
+<div class="stage-head"><span class="stage-number">2</span><div><h2>再看看：人在实验室里怎样活动</h2><p>这是本次演示的核心。左边可选短轨迹并拖动进度，右边按你的区域与阈值展示结果。</p></div></div>
+<section class="box" id="realSceneAggregation">
+<h2>观察人在空间中的活动</h2>
+<p class="small">下方格子来自两路真实录制视频的匿名检测位置。先选择短时片段，再拖动时间进度条；可点击格子设置区域，查看检测数量变化。
+可以逐个录像采样时刻查看区域热度，已选择对应录像时会一并定位原始画面；<strong>颜色变化不等于同一个人的移动轨迹</strong>。
+网格不是实测建筑平面图、真实GPS或经纬度。红框代表你选择的演示区域，紫线是同一实验室的虚拟A/B分界。</p>
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+<label>同帧双机配对数阈值 <select id="sceneCountThreshold"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
+<button id="sceneRefresh">重新计算真实录像</button>
+<span id="sceneState" class="small">尚未读取真实录像</span></div>
+<div id="sceneMetrics" class="cards" style="margin:12px 0"></div>
+<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
+<div style="flex:0 1 350px;min-width:260px">
+<div class="small" style="margin-bottom:6px">室内局部投影示意（红框为演示区域，点击任意格子设置）</div>
+<div style="position:relative;width:min(100%,320px);aspect-ratio:1">
+<div id="sceneHeatGrid" style="width:100%;height:100%;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:1px solid #dce7f2;border-radius:7px;overflow:hidden" aria-label="真实录像匿名检测的8×8局部投影热区示意"></div>
+<svg id="sceneTrackOverlay" viewBox="0 0 320 320" preserveAspectRatio="none"
+ style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" aria-label="真实摄像机同一实验室内经过独立核验的约1秒匿名短轨迹线段"></svg>
+</div>
+<label style="display:block;margin-top:8px">已核验匿名短时片段（两机同一实验室）
+<select id="sceneTrackSelect"><option value="">显示全部短片段</option></select>
+</label>
+<p id="sceneTrackSummary" class="small">等待导入真实视频匹配数据；这里只能展示可靠的短时匿名片段。</p>
+<div class="small"><b>示意区域：紫色虚线以上为室内虚拟A区，下方为B区（视频投影Y=150）；</b>
+两区只是同一个EPFL实验室内的演示分区，绝非两个真实场所。</div>
+<p id="sceneVirtualCrossSummary" class="small">等待真实录像核验。</p>
+<div class="scroll" style="max-height:140px"><table><thead><tr><th>短时匿名片段</th><th>真实观测帧</th><th>虚拟区域变化</th></tr></thead>
+<tbody id="sceneVirtualCrossRows"><tr><td colspan="3">未导入时不生成跨区记录</td></tr></tbody></table></div></details>
+<details class="focus-table"><summary>查看短轨迹的源视频帧号</summary><div class="scroll" style="max-height:180px"><table><thead><tr><th>匿名片段</th><th>真实录像帧</th><th>双摄像机来源</th></tr></thead><tbody id="sceneTrackRows"><tr><td colspan="3">尚无已验证短时片段</td></tr></tbody></table></div></details>
+<div style="margin-top:10px">
+<label>真实录像采样帧：<span id="sceneFrameLabel">汇总热度</span></label>
+<input type="range" id="sceneFrameCursor" min="0" max="0" value="0" style="width:100%">
+<div style="display:flex;gap:8px;align-items:center">
+<button id="scenePlay" type="button">▶ 逐个采样时刻</button>
+<button id="sceneOverview" type="button">查看累计热度</button>
+</div></div>
+<p id="sceneFrameInfo" class="small">选择采样帧，只显示该时刻落入各格子的双摄像机配对观测次数。</p>
+</div>
+<div style="flex:1;min-width:300px">
+<h3 style="margin:0 0 5px;font-size:17px">区域提醒：红框内出现了什么？</h3>
+<p id="sceneZoneSummary" class="small">视频加载后显示源帧号和观测数量；区域是人为指定的演示规则，不是实际警情。</p>
+<details class="focus-table"><summary>展开查看逐帧区域证据</summary><div class="scroll"><table><thead><tr><th>录像帧</th><th>区域配对观测</th><th>依据</th><th>性质</th></tr></thead>
+<tbody id="sceneZoneRows"><tr><td colspan="4">等待真实视频证据</td></tr></tbody></table></div></details>
+<h3 style="margin:16px 0 5px;font-size:17px">检测数量达到阈值的时刻</h3>
+<details class="focus-table"><summary>展开查看达到阈值的录像帧</summary><div class="scroll"><table><thead><tr><th>录像帧</th><th>配对观测</th><th>规则阈值</th></tr></thead>
+<tbody id="sceneEventRows"><tr><td colspan="3">等待真实视频证据</td></tr></tbody></table></div></details>
+</div></div>
+<p class="small"><strong>验收边界：</strong>这里的点位只在录像标定坐标系中有效，聚合观测次数不能当作独立人数。
+已验证的约1秒匿名跨帧片段在图上以短线段显示，支持查询来源帧及两机检测框索引；不会跨越没有被证实的时间间隔，也不代表人脸实名身份。
+**两机属于同一个实验室，因此这是跨摄像机/局部区域示意，绝不是跨真实场所或GPS路径。**</p>
+</section>
+
+<div class="stage-head"><span class="stage-number">3</span><div><h2>最后观察：哪些活动触发提醒</h2><p>仅使用真实录像产生的观察记录，规则为演示用途，不产生真实警情。</p></div></div>
+<section class="box" id="demoAlerts">
+<h2>实际检测触发的演示提醒</h2>
+<p class="small"><b>真实输入：</b>EPFL 两路录制视频中的人体检测和跨时刻活动片段。<b>模拟部分：</b>触发规则由 Demo 设定，不代表现实违法、危险、实名身份，也不会向任何人发送告警。
+一条告警必须包含可追溯的真实匹配记录；跨时间关联若未通过核验则不产生对应告警。</p>
+<span id="demoAlertState" class="small">等待已验证的活动证据</span>
+<details class="focus-table" open><summary>14条提醒的实际证据与录像时间（可折叠）</summary><div class="scroll"><table><thead><tr><th>演示告警ID</th><th>规则</th><th>录像时间</th><th>来源</th><th>证据</th><th>性质</th></tr></thead>
+<tbody id="demoAlertRows"><tr><td colspan="6">暂无由真实视频活动触发的演示告警</td></tr></tbody></table></div></details>
+</section>
+
+<div id="technicalArea">
+<div class="stage-head"><span class="stage-number">4</span><div><h2>管理、设备和需求验收</h2><p>上面的流程适合现场展示；下面才是管理员、技术人员需要检查的内容。</p></div></div>
+<div class="system-footer">
+<a href="/monitor">设备与采集状态 →<span>视频源 / RTSP / Frigate / 采集健康</span></a>
+<a href="/admin">场所与人员权限 →<span>四级区域结构、账号、授权范围</span></a>
+<a href="/cctv">查看原始研究证据 →<span>检测来源、研究关联和人工审核</span></a>
+</div>
+<details class="disclosure-card" id="liveEvidence"><summary>查看实际接入设备的事件（没有连接摄像机时显示0）</summary>
+<p class="operation-notice">这里是你自己设备的实时事件，和上方的EPFL历史研究录像是两条独立数据链。刚安装时为0是正确的，不会补造假数据。</p>
+<div class="box"><label>实况窗口（UTC）<select id="days"><option value="1">近1天</option>
+<option value="7" selected>近7天</option><option value="30">近30天</option></select></label>
+<button id="refresh">刷新真实证据</button> <span id="message">尚未加载</span></div>
+
+<div class="cards" style="margin-top:16px">
+<div class="card"><span class="small">实际 Frigate person 事件</span><strong id="realEvents">—</strong><span class="small">事件数，不是人数</span></div>
+<div class="card"><span class="small">实际视频抽样帧</span><strong id="frames">—</strong><span class="small">不含模拟观测</span></div>
+<div class="card"><span class="small">实际检测到的人脸框</span><strong id="faces">—</strong><span class="small">不代表身份识别</span></div>
+<div class="card"><span class="small">可信跨机身份</span><strong>未验证</strong><span class="small">不编造全球Person ID</span></div>
+</div>
+
+<section class="box"><h2>真实视频 · 按场所的证据统计</h2>
+<p class="small">仅返回当前账号授权辖区；无接入则显示0而不造事件。</p>
+<div class="scroll"><table><thead><tr><th>场所</th><th>真实目标事件</th><th>视频抽样帧</th><th>人脸候选框</th><th>已绑定Frigate摄像机</th></tr></thead><tbody id="places"><tr><td colspan="5">加载中</td></tr></tbody></table></div></section>
+
+<section class="box"><h2>可追溯的实际 Frigate 目标事件</h2>
+<p class="small">包含真实发生时间、摄像机、上游事件ID、检测评分。无真实事件不展示模拟记录。</p>
+<div class="scroll"><table><thead><tr><th>发生时间（UTC）</th><th>场所</th><th>摄像机</th><th>上游事件ID</th><th>检测置信度</th><th>结束时间</th></tr></thead>
+<tbody id="events"><tr><td colspan="6">加载中</td></tr></tbody></table></div><p id="tail" class="small"></p></section>
+
+</details>
+<details class="disclosure-card" id="researchAudit"><summary>研究证据来源和当前能力边界</summary>
+<section class="box"><h2>真实研究视频的独立证据</h2>
+<div id="research">加载中</div><p class="small">这里展示官方公开片段的相机内轨迹标注，不代表已经自动完成跨机同人识别，也不是实时监控数据。</p>
+<a href="/cctv">核对原片帧、人体框和关联研究 →</a></section>
+
+<section class="box"><h2>真实业务仍需解决的条件</h2>
+<p>多场所真实身份关联必须依赖经过验证的 ReID 或人工核实；目前不会将相机A与B的匿名轨迹自动合并为同一个人。</p>
+<p>没有可信身份时，可展示匿名目标事件、检测质量、来源摄像机和时间；不能生成“此人跨场所”“某人异常”的身份级结论。</p>
+<a href="/monitor">查看实际视频接入、RTSP/GB28181/Frigate运行状态 →</a></section>
+
+</details>
+<section class="box" id="excelAcceptance">
+<h2>原 Excel 23 项 · 严格验收与缺口</h2>
+<p class="small">按原始需求逐项核对，已实现、模拟业务、部分实现、缺失严格区分。可跳转的页面是<strong>演示入口，不代表原需求通过</strong>。</p>
+<div id="excelAcceptanceStats" class="cards"></div>
+<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">展开核验全部23项（含剩余缺口）</summary>
+<div class="scroll"><table><thead><tr><th>Excel项</th><th>原要求</th><th>严格状态</th><th>本版有的东西</th><th>仍缺什么</th><th>操作入口</th></tr></thead>
+<tbody id="excelAcceptanceRows"><tr><td colspan="6">正在读取真实验收矩阵</td></tr></tbody></table></div>
+</details><p id="excelAcceptanceNote" class="small"></p>
+</section>
+
+<details class="box" id="excelRuleShowcase">
+<summary style="cursor:pointer;font-weight:600">仅供Excel算法技术核对：七类旧规则的虚构测试样本（默认不加载、不作为真实预警）</summary>
+<h2>旧版七类规则单独验算（不属于本真实视频链路）</h2>
+<p class="small"><b>注意：此区的人员 P###、到访和场所全部是明确虚构的规则样本。</b>它调用项目已实现的七种规则算法，
+不是硬编码警情，不读取或改写 EPFL 视频数据，不能把命中称为真实人员预警。</p>
+<button id="reloadExcelRules">核验七种原Excel规则</button> <span class="small" id="excelRuleStatus">未读取</span>
+<div class="scroll"><table><thead><tr><th>Excel条目</th><th>预警类型</th><th>模拟命中</th><th>示例命中与原始模拟观测</th></tr></thead>
+<tbody id="excelRuleRows"><tr><td colspan="4">仅按需手动运行模拟算法核对</td></tr></tbody></table></div>
+</details>
+
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const token=sessionStorage.getItem('zd_access_token');
+if(!token)location.replace('/login');
+const esc=x=>String(x??'').replace(/[&<>"']/g,k=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[k]));
+async function api(url,method='GET'){
+ const r=await fetch(url,{method,headers:{Authorization:'Bearer '+token}});
+ if(r.status===401){sessionStorage.removeItem('zd_access_token');location.replace('/login');throw Error('登录状态失效')}
+ const d=await r.json();if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:r.status);
+ return d;
+}
+
+const CLIP_SOURCE_START_SEC=60;
+let clipObjectURL=null,clipReady=false,clipFPS=null;
+function resetClip(message){
+ const player=$('videoClip');player.pause();player.removeAttribute('src');player.load();player.hidden=true;
+ if(clipObjectURL)URL.revokeObjectURL(clipObjectURL);
+ clipObjectURL=null;clipReady=false;$('videoClipPlaceholder').hidden=false;
+ $('videoClipStatus').textContent=message;
+ $('videoFrameStatus').textContent='没有实际视频画面，检测结果与热力图不算画面验收。';
+}
+function seekVideoSourceFrame(frame){
+ const f=Number(frame),note=$('videoFrameStatus'),player=$('videoClip');
+ if(!Number.isSafeInteger(f)||f<0)return;
+ if(!clipReady){note.textContent='第'+f+'帧：只有检测记录，还没有打开实际视频。';return;}
+ if(!clipFPS){note.textContent='缺少源视频 FPS，不能核实帧位置。';return;}
+ const sec=f/clipFPS,offset=sec-CLIP_SOURCE_START_SEC;
+ if(offset<0||offset>=player.duration){
+  note.textContent='第'+f+'帧（原录像'+sec.toFixed(2)+'秒）不在本次60–98秒剪辑内，不用其它画面冒充。';return;
+ }
+ player.pause();player.currentTime=Math.min(offset,player.duration-0.04);
+ note.textContent='已定位：源录像第'+f+'帧 / '+sec.toFixed(2)+'秒，对应上方实际视频'+offset.toFixed(2)+'秒。';
+}
+$('videoClipPicker').onchange=event=>{
+ const file=event.target.files?.[0];
+ if(!file){resetClip('还未选择视频文件');return;}
+ resetClip('正在检查视频…');
+ if(!file.name.includes('真实原片连续双机画面_38秒')||!file.name.toLowerCase().endsWith('.mp4')){
+  $('videoClipStatus').textContent='请选择CI研究视频工件里的「真实原片连续双机画面_38秒.mp4」，不能拿测试视频或单机视频替代。';return;
+ }
+ clipObjectURL=URL.createObjectURL(file);
+ const player=$('videoClip');
+ player.onloadedmetadata=()=>{
+  if(!Number.isFinite(player.duration)||player.duration<36||player.duration>40||
+     player.videoWidth<1200||player.videoHeight<480){
+   resetClip('与已验的双机同屏38秒视频规格不一致，不能作为对应画面。');return;
+  }
+  clipReady=true;player.hidden=false;$('videoClipPlaceholder').hidden=true;
+  $('videoClipStatus').textContent='已打开本地实际视频：'+player.duration.toFixed(1)+'秒，两机同屏。浏览器可解码，但当前未对本地文件做SHA256来源校验。';
+  if(sceneData?.frame_cells?.length&&sceneFrameIndex>0)seekVideoSourceFrame(sceneData.frame_cells[sceneFrameIndex-1].video_frame);
+ };
+ player.onerror=()=>resetClip('此MP4无法解码，尚未完成画面验收。');
+ player.src=clipObjectURL;player.load();
+};
+function jumpEvidenceFrame(frame){
+ if(!sceneData?.frame_cells?.length){
+  $('videoFrameStatus').textContent='尚未读取对应的模型采样记录。先点击“② 读取同批录像的实际检测记录”。';return;
+ }
+ const n=Number(frame),index=sceneData.frame_cells.findIndex(row=>row.video_frame===n);
+ if(index<0){$('videoFrameStatus').textContent='第'+n+'帧不属于已保存的采样时刻，不冒充已有模型结果。';return;}
+ sceneStop();sceneFrameIndex=index+1;scenePaint();
+ $('videoEvidence').scrollIntoView({block:'center',behavior:'smooth'});
+}
+document.querySelector('main').addEventListener('click',event=>{
+ const button=event.target.closest('button[data-evidence-frame]');
+ if(button)jumpEvidenceFrame(button.dataset.evidenceFrame);
+});
+
+async function reload(){
+ $('message').textContent='从服务器读取实际记录…';$('refresh').disabled=true;
+ try{
+ const d=await api('/api/real/evidence?days='+$('days').value);
+ $('realEvents').textContent=d.real_event_counts.person_objects;
+ $('frames').textContent=d.real_event_counts.sampled_frames;
+ $('faces').textContent=d.real_event_counts.face_detections;
+ $('places').innerHTML=d.by_place.map(p=>'<tr><td>'+esc(p.place_name)+'</td><td>'+p.person_objects+
+  '</td><td>'+p.sampled_frames+'</td><td>'+p.face_detections+'</td><td>'+esc((p.cameras||[]).join(', ')||'未绑定')+'</td></tr>').join('')||
+  '<tr><td colspan="5">本辖区尚无场所</td></tr>';
+ $('events').innerHTML=d.recent_frigate_events.map(e=>'<tr><td>'+esc(e.started_at)+'</td><td>'+esc(e.place_name)+
+  '</td><td>'+esc(e.camera)+'</td><td>'+esc(e.event_id)+'</td><td>'+
+  (e.confidence===null?'—':Number(e.confidence).toFixed(3))+'</td><td>'+esc(e.ended_at||'进行中 / 未收到结束时间')+'</td></tr>').join('')||
+  '<tr><td colspan="6">此UTC时间窗口尚无实际 Frigate person 目标事件。没有用虚构P###填充。</td></tr>';
+ $('tail').textContent=d.recent_events_truncated?'仅显示最近80条真实事件；完整事件仍保存在源数据中。':'显示已授权范围内最近记录（最多80条）';
+ const v=d.decoded_media_evidence;
+ $('research').textContent='公开CAVIAR原片（仅研究证据）：'+v.fixed_camera_sources+' 个固定视频源，'+
+  v.camera_local_tracks+' 段相机内标注轨迹，'+v.manual_person_boxes+' 个人工标注框。它们不计入今日实况。';
+ $('message').textContent='加载完成，未使用任何合成人员或预警';
+ }catch(e){$('message').textContent='获取真实证据失败：'+e.message}
+ finally{$('refresh').disabled=false;}
+}
+async function loadActivity(){
+ const state=$('activityState'),button=$('loadActivity');
+ button.disabled=true;
+ try{
+  let response=await api('/api/real/activity');
+  if(!response.ready){
+   let availability=await api('/api/research/epfl/bundled');
+   if(!availability.available)throw Error('本机没有真实视频生成的双机研究包；请使用官方双机 CI 导出的源码包');
+   await api('/api/research/epfl/bundled/import','POST');
+   response=await api('/api/real/activity');
+  }
+  if(!response.ready)throw Error('导入成功前没有可显示的数据');
+  clipFPS=Number(response.video_fps)>0?Number(response.video_fps):null;
+  const cards=[
+   ['双机匹配观测（非人数）',response.matched_pair_observations],
+   ['有检测的录像时刻',response.sampled_video_instants],
+   ['匿名活动片段',response.anonymous_activity_fragments],
+   ['已核验短时关联',response.multi_instant_fragments]
+  ];
+  $('activityStats').innerHTML=cards.map(x=>'<div class="card"><span class="small">'+esc(x[0])+
+   '</span><strong>'+x[1]+'</strong></div>').join('');
+  $('activityTable').innerHTML=response.activities.slice(0,40).map(v=>{
+   const when=(f,t)=>'第'+f+'帧'+(t==null?'':' / '+Number(t).toFixed(2)+'秒');
+   return '<tr><td>'+esc(v.activity_id)+'</td><td>'+when(v.first_video_frame,v.first_video_second)+
+    '</td><td>'+when(v.last_video_frame,v.last_video_second)+'</td><td>'+
+    v.synchronized_pair_observations+'</td><td>同一实验室，摄像机0/1 <button type="button" data-evidence-frame="'+v.first_video_frame+'">看源帧</button></td></tr>';
+  }).join('')||'<tr><td colspan="5">实际视频当前没有匹配成功的匿名片段</td></tr>';
+  state.textContent='已导入实际双机视频识别结果；'+
+   (response.cross_time_temporal_linkage_verified?'跨帧身份片段已独立评估':
+    '跨帧关联未通过验证，只展示真实同帧双机活动')+'；不含合成人员';
+  $('activityEvidence').textContent='视频源SHA256: '+response.camera_sha256.map(x=>x.slice(0,16)+'…').join(' / ')+
+    '；片段V编号仅在本段录像内有效，不代表自然人身份、唯一人数或跨场所轨迹。';
+  await loadDemoAlerts();
+  await loadSceneAggregate();
+ }catch(e){state.textContent='读取真实双机活动失败：'+e.message}
+ finally{button.disabled=false}
+}
+async function loadDemoAlerts(){
+ try{
+  const data=await api('/api/real/demo-alerts');
+  $('demoAlertState').textContent=data.alerts.length+' 条演示规则触发，全部有真实录像证据；不是实际风险预警';
+  $('demoAlertRows').innerHTML=data.alerts.map(a=>
+   '<tr><td>'+esc(a.demo_alert_id)+'</td><td>'+esc(a.rule_name)+'</td><td>'+
+   esc(a.start_video_second)+'秒 → '+esc(a.end_video_second)+'秒</td><td>'+
+   esc(a.anonymous_fragment_id)+' / EPFL 两摄像机</td><td>'+
+   a.supporting_candidate_keys.length+'条源匹配 <button type="button" data-evidence-frame="'+a.start_video_frame+'">看源帧</button></td><td>演示规则，非真实警情</td></tr>'
+  ).join('')||'<tr><td colspan="6">无经过视频证据支持的预警。不会制造假人员或假到访。</td></tr>';
+ }catch(e){$('demoAlertState').textContent='演示告警查询失败：'+e.message}
+}
+let sceneData=null,sceneFrameIndex=0,sceneZoneX=2,sceneZoneY=3,sceneTimer=null;
+function sceneTracksPaint(){
+ if(!sceneData)return;
+ const verified=sceneData.short_anonymous_tracklets_verified===true;
+ const selected=$('sceneTrackSelect').value;
+ const items=verified?(sceneData.short_anonymous_tracklets||[]):[];
+ $('sceneTrackSummary').textContent=verified?
+  '两台相机同一实验室的'+items.length+'条已核验约1秒匿名短关联；下方每条带原始录像帧。红线不连接跨越未验证时间间隔。':
+  '未取得可靠的跨时间同目标认证（或人工否定过候选）；不绘制假路线。';
+ const transitions=verified?(sceneData.short_virtual_zone_crossings||[]):[];
+ $('sceneVirtualCrossSummary').textContent=verified?
+  '真实短时片段穿过室内虚拟A/B分界线 '+transitions.length+
+  ' 次（规则为演示划分，同一真实实验室，非跨地理场所）。':
+  '没有已验证的室内跨区片段；禁止冒充真实跨所记录。';
+ $('sceneVirtualCrossRows').innerHTML=transitions.map(t=>
+  '<tr><td>'+esc(t.fragment_id)+'</td><td>'+
+  esc(t.source_frames.join(' → '))+'</td><td>'+
+  esc(t.from_virtual_area)+' → '+esc(t.to_virtual_area)+' <button type="button" data-evidence-frame="'+t.source_frames[0]+'">看源帧</button></td></tr>'
+ ).join('')||'<tr><td colspan="3">没有真实录像证据触发的虚拟A/B跨区示意</td></tr>';
+ $('sceneTrackRows').innerHTML=items.map(t=>
+  '<tr><td>'+esc(t.fragment_id)+'</td><td>'+
+  esc(t.points.map(p=>p.video_frame).join(' → '))+
+  '</td><td>'+esc(t.camera_pair.join(' / '))+' <button type="button" data-evidence-frame="'+t.points[0].video_frame+'">看源帧</button></td></tr>'
+ ).join('')||'<tr><td colspan="3">无可独立核验的短时关联，未生成轨迹</td></tr>';
+ $('sceneTrackSelect').innerHTML='<option value="">显示全部短片段</option>'+
+ items.map(t=>'<option value="'+esc(t.fragment_id)+'">'+esc(t.fragment_id)+
+  '：第'+t.points[0].video_frame+'→'+t.points[t.points.length-1].video_frame+'帧</option>').join('');
+ if(selected&&items.some(t=>t.fragment_id===selected))$('sceneTrackSelect').value=selected;
+ sceneTracksDraw();
+}
+function sceneTracksDraw(){
+ const overlay=$('sceneTrackOverlay');
+ if(!sceneData||!sceneData.short_anonymous_tracklets_verified){
+  overlay.innerHTML='';return;
+ }
+ const selected=$('sceneTrackSelect').value;
+ const frame=sceneFrameIndex>0?sceneData.frame_cells[sceneFrameIndex-1]?.video_frame:null;
+ let html='<line data-virtual-border="true" x1="0" y1="150" x2="320" y2="150" stroke="#9048b9" stroke-width="2" stroke-dasharray="7 5"/>';
+ for(const t of sceneData.short_anonymous_tracklets){
+  if(selected&&t.fragment_id!==selected)continue;
+  for(let i=0;i<t.points.length-1;i++){
+   const a=t.points[i],b=t.points[i+1];
+   if([a,b].some(p=>p.x<0||p.x>=320||p.y<0||p.y>=320))continue;
+   if(frame!==null&&frame!==a.video_frame&&frame!==b.video_frame)continue;
+   // All SVG numbers originate from server-side checked, finite coordinates.
+   html+='<line data-short-trace="true" x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+
+     '" stroke="'+(selected?'#d92929':'#e55336')+'" stroke-width="'+
+     (selected?'5':'3')+'" stroke-linecap="round" opacity=".9"/>'+
+     '<circle cx="'+a.x+'" cy="'+a.y+'" r="4" fill="#073b69"/>'+
+     '<circle cx="'+b.x+'" cy="'+b.y+'" r="4" fill="#ffdf5b" stroke="#753700"/>';
+  }
+ }
+ overlay.innerHTML=html;
+}
+$('sceneTrackSelect').onchange=()=>{sceneTracksDraw();const t=sceneData?.short_anonymous_tracklets?.find(x=>x.fragment_id===$('sceneTrackSelect').value);if(t?.points?.length)jumpEvidenceFrame(t.points[0].video_frame);};
+function sceneStop(){if(sceneTimer){clearInterval(sceneTimer);sceneTimer=null}$('scenePlay').textContent='▶ 逐个采样时刻'}
+function scenePaint(){
+ if(!sceneData)return;
+ const sample=sceneFrameIndex>0?sceneData.frame_cells[sceneFrameIndex-1]:null;
+ const values=new Map((sample?sample.cells:sceneData.heat_cells).map(
+  cell=>[cell.x_bin+','+cell.y_bin,cell.paired_detection_count]));
+ const peak=Math.max(1,...values.values());
+ let markup='';
+ for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+  const n=values.get(x+','+y)||0;
+  const strength=n?Math.min(.95,.13+.82*n/peak):0;
+  const inside=x>=sceneZoneX&&x<sceneZoneX+2&&y>=sceneZoneY&&y<sceneZoneY+2;
+  markup+='<button type="button" data-scene-x="'+x+'" data-scene-y="'+y+
+   '" title="格子 '+x+','+y+'：真实配对观测 '+n+' 次；点击设置演示区域" '+
+   'aria-label="区域格子 '+x+'-'+y+'，'+n+'次观测'+
+   (inside?'，当前演示区':'')+'" style="padding:0;border:0;border-radius:0;'+
+   'border-inline:1px solid #edf3fb;border-bottom:1px solid #edf3fb;'+
+   'background:rgba(27,112,179,'+strength.toFixed(3)+');'+
+   (inside?'box-shadow:inset 0 0 0 3px #e75a58;':'')+
+   'font-size:11px;text-align:center;line-height:1;color:'+
+   (strength>.65?'white':'#17476a')+'">'+(n||'')+'</button>';
+ }
+ $('sceneHeatGrid').innerHTML=markup;
+ sceneTracksDraw();
+ $('sceneFrameCursor').value=sceneFrameIndex;
+ $('sceneFrameLabel').textContent=sample?'第'+sample.video_frame+'帧':'累计热度';
+ $('sceneFrameInfo').textContent=sample?
+  '当前真实录像采样帧：'+sample.paired_detection_count+
+  '次同步双机配对；高亮区域内有'+
+  sample.cells.filter(c=>c.x_bin>=sceneZoneX&&c.x_bin<sceneZoneX+2&&
+     c.y_bin>=sceneZoneY&&c.y_bin<sceneZoneY+2)
+      .reduce((sum,c)=>sum+c.paired_detection_count,0)+
+  '次配对观测。只展示匿名空间分布，不推断个人移动路线。':
+  '全录像的累计热度。选择下方进度条查看采样时刻；真实画面需要加载上方视频。';
+ if(sample)seekVideoSourceFrame(sample.video_frame);
+}
+async function loadSceneAggregate(){
+ try{
+  const threshold=Number($('sceneCountThreshold').value);
+  const url='/api/real/scene-aggregate?minimum_observations='+threshold+
+    '&zone_x_bin='+sceneZoneX+'&zone_y_bin='+sceneZoneY;
+  const data=await api(url);
+  sceneData=data;
+  sceneTracksPaint();
+  if(sceneFrameIndex>data.frame_cells.length)sceneFrameIndex=0;
+  $('sceneFrameCursor').max=data.frame_cells.length;
+  $('sceneMetrics').innerHTML=[
+   ['真实双机配对',data.total_observations],
+   ['累计有活动网格',data.heat_cells.length],
+   ['红框区域命中时刻',data.demo_zone_events.length],
+   ['多目标阈值命中时刻',data.demo_scene_events.length]
+  ].map(a=>'<div class="card"><span class="small">'+esc(a[0])+
+   '</span><strong>'+a[1]+'</strong></div>').join('');
+  $('sceneZoneRows').innerHTML=data.demo_zone_events.slice(0,24).map(e=>
+   '<tr><td>第'+e.video_frame+'帧</td><td>'+e.paired_detection_count_in_zone+
+   '</td><td>真实视频投影检测</td><td>演示区域规则 <button type="button" data-evidence-frame="'+e.video_frame+'">看源帧</button></td></tr>').join('')||
+   '<tr><td colspan="4">当前区域无真实观测，未生成演示提醒</td></tr>';
+  $('sceneEventRows').innerHTML=data.demo_scene_events.slice(0,24).map(e=>
+   '<tr><td>第'+e.video_frame+'帧</td><td>'+e.paired_detection_count+
+   '</td><td>≥'+e.threshold+'（演示） <button type="button" data-evidence-frame="'+e.video_frame+'">看源帧</button></td></tr>').join('')||
+   '<tr><td colspan="3">没有达到当前阈值的真实录像时刻</td></tr>';
+  $('sceneZoneSummary').textContent='红框区域从 ('+sceneZoneX+','+sceneZoneY+
+   ') 开始，覆盖2×2格；真实视频命中 '+data.demo_zone_events.length+
+   '个采样时刻。规则可调整，不代表危险或人员身份。';
+  $('sceneState').textContent=data.ready?'已加载真实双摄像机视频证据':'缺少视频证据，无预警';
+  scenePaint();
+ }catch(e){$('sceneState').textContent='视频空间示意无法加载：'+e.message}
+}
+$('sceneHeatGrid').onclick=event=>{
+ const button=event.target.closest('[data-scene-x]');
+ if(!button||!sceneData)return;
+ sceneZoneX=Math.min(6,Number(button.dataset.sceneX));
+ sceneZoneY=Math.min(6,Number(button.dataset.sceneY));
+ sceneStop();loadSceneAggregate();
+};
+$('sceneFrameCursor').oninput=event=>{
+ sceneStop();sceneFrameIndex=Number(event.target.value);scenePaint();
+};
+$('scenePlay').onclick=()=>{
+ if(!sceneData?.frame_cells?.length)return;
+ if(sceneTimer){sceneStop();return}
+ if(sceneFrameIndex===0)sceneFrameIndex=1;
+ scenePaint();
+ $('scenePlay').textContent='Ⅱ 停止播放';
+ sceneTimer=setInterval(()=>{
+  sceneFrameIndex=sceneFrameIndex>=sceneData.frame_cells.length?1:sceneFrameIndex+1;
+  scenePaint();
+ },800);
+};
+$('sceneOverview').onclick=()=>{sceneStop();sceneFrameIndex=0;scenePaint()};
+$('sceneRefresh').onclick=()=>{sceneStop();loadSceneAggregate()};
+async function loadExcelRules(){
+ const status=$('excelRuleStatus');
+ try{
+  const data=await api('/api/real/excel-rule-demo');
+  const kinds=['cross_place','companion','interaction','gathering','absence','appearance','headcount'];
+  const counts=new Map(data.rule_counts.map(x=>[x.type,x]));
+  $('excelRuleRows').innerHTML=kinds.map((key,i)=>{
+    const info=counts.get(key)||{count:0,name:key};
+    const hits=data.alerts.filter(a=>a.type===key);
+    const sample=hits[0];
+    return '<tr><td>#'+(i+6)+'</td><td>'+esc(info.name)+'</td><td>'+info.count+
+      '</td><td>'+(sample?esc(sample.title)+'（模拟观测 '+sample.observation_ids.length+' 条）':
+      '当前模拟样本未触发')+'</td></tr>';
+  }).join('');
+  status.textContent='7种规则全部执行；'+data.alerts.length+'条模拟命中，0条真实风险，来源与真实视频隔离。';
+ }catch(e){status.textContent='规则计算异常：'+e.message}
+}
+$('reloadExcelRules').onclick=loadExcelRules;
+async function loadExcelAcceptance(){
+ try{
+  const data=await api('/api/real/excel-acceptance');
+  const statuses=[
+    ['verified_real','管理功能已验收'],
+    ['synthetic_only','仅模拟业务'],
+    ['partial','部分实现'],
+    ['missing','关键能力缺失']
+  ];
+  $('excelAcceptanceStats').innerHTML=statuses.map(([code,label])=>
+    '<div class="card"><span class="small">'+label+'</span><strong>'+
+    (data.status_counts[code]||0)+'</strong></div>').join('');
+  const labels=Object.fromEntries(statuses);
+  // Acceptance UX: do not offer fake/disabled features as working links.
+  $('excelAcceptanceRows').innerHTML=data.requirements.map(row=>{
+    let link;
+    if(row.status==='missing'){
+      link='<span class="small">关键能力缺失：不提供假入口</span>';
+    }else if(row.status==='synthetic_only'&&(row.id===3||row.id===21)){
+      link='<span class="small">真实人脸底库未实现；合成归并只在隔离测试模式</span>';
+    }else{
+      const label=row.status==='verified_real'?'进入已验收管理功能':
+        row.status==='synthetic_only'?'查看只读模拟规则':'查看现有有限证据';
+      link='<a href="'+esc(row.demo_route)+'">'+label+' →</a>';
+    }
+    return '<tr><td>#'+row.id+'</td><td>'+esc(row.title)+'</td><td>'+esc(labels[row.status])+'</td><td>'+
+      esc(row.delivered_now)+'</td><td>'+esc(row.remaining_gap)+'</td><td>'+link+'</td></tr>';
+  }).join('');
+  $('excelAcceptanceNote').textContent='来源：'+data.source_file+'｜'+data.source_worksheet+
+   '工作表 '+data.source_rows+'行；不是23项全部通过。';
+ }catch(e){$('excelAcceptanceNote').textContent='Excel核验读取失败：'+e.message}
+}
+async function initializeResearchMode(){
+ try{
+  const me=await api('/api/auth/me');
+  if(me.level!==1){
+   if($('introDemo'))$('introDemo').hidden=true;
+   if($('localVideoPlayback'))$('localVideoPlayback').hidden=true;
+   if(document.querySelector('.story-steps'))document.querySelector('.story-steps').hidden=true;
+   document.querySelectorAll('.stage-head').forEach(el=>el.hidden=true);
+   $('liveEvidence').open=true;
+   for(const id of ['researchActivity','demoAlerts','realSceneAggregation',
+                    'excelRuleShowcase','excelAcceptance']){
+    $(id).hidden=true;
+   }
+   const hint=document.createElement('div');
+   hint.className='caveat';
+   hint.textContent='当前登录辖区仅可查看授权范围内真实视频事件。EPFL研究配对、室内研究热区和Excel全局验收仅州级管理员可访问。';
+   document.querySelector('main').prepend(hint);
+   return;
+  }
+  // Real-only screen never automatically calls the synthetic P### generator.
+  loadExcelAcceptance();
+  loadActivity();
+ }catch(e){
+  $('message').textContent='身份权限检查失败：'+e.message;
+ }
+}
+$('loadActivity').onclick=loadActivity;
+initializeResearchMode();
+$('days').onchange=reload;$('refresh').onclick=reload;
+$('logout').onclick=async ev=>{ev.preventDefault();await api('/api/auth/logout','POST').catch(()=>{});sessionStorage.removeItem('zd_access_token');location.replace('/login')};
+reload();
+</script>
+<script src="/ui/showcase.js"></script>
+</body></html>

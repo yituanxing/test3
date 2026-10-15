@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 from unittest.mock import Mock, patch
 import httpx
 import pytest
@@ -33,6 +34,11 @@ def test_real_api_contract_mocked_upsert(tmp_path, monkeypatch):
         client=TestClient(app)
         bind=client.post('/api/frigate/cameras',json={'camera':'demo','place_id':1})
         assert bind.status_code == 200,bind.text
+        # These are freshly observed events *after* an explicit site binding.
+        # A 2024 historic event cannot be assigned to a site first registered
+        # in 2026 without separately verified earlier physical provenance.
+        time.sleep(0.01)
+        data[0]['start_time']=time.time()
         fake=Mock()
         fake.status_code=200
         fake.json.return_value=data
@@ -41,7 +47,7 @@ def test_real_api_contract_mocked_upsert(tmp_path, monkeypatch):
             first=client.post('/api/frigate/sync')
             assert first.status_code == 200,first.text
             assert first.json()['inserted']==1 and first.json()['skipped']==2
-            data[0]['end_time']=1728000012
+            data[0]['end_time']=data[0]['start_time']+12
             second=client.post('/api/frigate/sync')
             assert second.json()['inserted']==0 and second.json()['updated']==1
         events=client.get('/api/frigate/events').json()
@@ -96,11 +102,14 @@ def test_upstream_track_ids_scoped_to_camera_and_migration_preserves_events(tmp_
         primary={r['name']:r['pk'] for r in c.execute('PRAGMA table_info(frigate_object_events)')}
         assert primary['camera']>0 and primary['event_id']>0
         c.execute("INSERT INTO frigate_camera_bindings(camera,place_id) VALUES('CAM2',2)")
+        from app.site_model import record_frigate_initial
+        record_frigate_initial(c,'CAM2',2)
+    time.sleep(0.012)
     fake=Mock()
     fake.raise_for_status.return_value=None
     fake.json.return_value=[
       {'id':'SAME','camera':'CAM1','label':'person','start_time':1791795600.0},
-      {'id':'SAME','camera':'CAM2','label':'person','start_time':1791795660.0}
+      {'id':'SAME','camera':'CAM2','label':'person','start_time':time.time()}
     ]
     client=TestClient(main.app)
     with patch('app.main.httpx.get',return_value=fake):
@@ -136,6 +145,8 @@ def test_rebinding_camera_does_not_reassign_historical_person_events(tmp_path,mo
     response.json.return_value=[first_event]
     assert cli.post('/api/frigate/cameras',
                     json={'camera':'CAM1','place_id':1}).status_code==200
+    time.sleep(0.012)
+    first_event['start_time']=time.time()
     with patch('app.main.httpx.get',return_value=response):
         initial=cli.post('/api/frigate/sync').json()
         assert initial['inserted']==1
@@ -143,9 +154,11 @@ def test_rebinding_camera_does_not_reassign_historical_person_events(tmp_path,mo
         assert original['place_id']==1
         assert cli.post('/api/frigate/cameras',
                         json={'camera':'CAM1','place_id':2}).status_code==200
+        time.sleep(0.012)
+        later_event['start_time']=time.time()
         # An upstream replay of the old event must NOT migrate it to B.
         response.json.return_value=[
-          {**first_event,'end_time':1791795630.0,
+          {**first_event,'end_time':first_event['start_time']+30,
            'data':{'top_score':0.7},'has_snapshot':False},later_event]
         changed=cli.post('/api/frigate/sync').json()
         assert changed['updated']==1 and changed['inserted']==1

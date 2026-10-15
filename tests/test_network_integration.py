@@ -13,6 +13,11 @@ def test_real_loopback_http_contract(tmp_path, monkeypatch):
     c=TestClient(m.app)
     place = c.get('/api/places').json()[0]['id']
     assert c.post('/api/frigate/cameras',json={'camera':'demo','place_id':place}).status_code == 200
+    # A new source does not prove where it was two years earlier. Emulate
+    # *current* upstream events sent after the camera was registered.
+    import time
+    time.sleep(0.012)
+    recent_start=time.time()
 
     class FakeUpstreamHTTP(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -21,7 +26,7 @@ def test_real_loopback_http_contract(tmp_path, monkeypatch):
             elif self.path.startswith('/api/events'):
                 content=json.dumps([
                     {'id':'person-0001','camera':'demo','label':'person',
-                     'start_time':1728000000.0,'end_time':1728000005.0,'data':{'top_score':0.89},
+                     'start_time':recent_start,'end_time':recent_start+5,'data':{'top_score':0.89},
                      'has_snapshot':True},
                     {'id':'car-0002','camera':'demo','label':'car','start_time':1728000000.0},
                 ]).encode()

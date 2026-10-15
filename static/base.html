@@ -14,7 +14,7 @@ label{display:flex;flex-direction:column;gap:5px;min-width:170px;font-size:13px;
 #toast{display:none;position:fixed;bottom:25px;right:24px;z-index:4;background:#143a63;color:white;padding:12px 17px;border-radius:8px;max-width:410px;box-shadow:0 9px 34px #20304040}#toast.error{background:#ac3434}
 footer{font-size:12px;color:#657994;margin-top:19px}
 @media(max-width:950px){.grid{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}header .wrap{display:block}nav{margin-top:14px}.flow{grid-template-columns:repeat(2,1fr)}}@media(max-width:550px){.wrap{padding:0 13px}.grid{grid-template-columns:1fr 1fr}h1{font-size:20px}.card{padding:12px}.card .big{font-size:26px}}
-</style><script>
+</style><script src="/ui/role-navigation.js"></script><script>
 (function(){
 const token=sessionStorage.getItem('zd_access_token');
 if(!token){location.replace('/login');return}
@@ -42,6 +42,7 @@ window.addEventListener('load',async()=>{
     const r=await fetch('/api/auth/me');
     if(!r.ok)return;
     const user=await r.json();
+    zdApplyRoleNavigation(user);
     const badge=document.createElement('div');badge.style.cssText='position:fixed;right:12px;top:6px;z-index:500;background:#132c4a;color:#fff;border-radius:8px;padding:5px 12px;font:12px system-ui';
     badge.textContent=user.username+' · '+user.region_name+' · '+user.role+'　';
     const btn=document.createElement('button');btn.textContent='退出';btn.style.cssText='background:#3e648f;color:#fff;padding:3px 8px;border:0;border-radius:5px;cursor:pointer';
@@ -50,7 +51,7 @@ window.addEventListener('load',async()=>{
 });
 })();
 </script></head><body>
-<header><div class="wrap"><div><small>ZD SYSTEM / FEATURE 03 & 21 · SYNTHETIC TESTBED</small><h1>场所人员底库 · 生成与人工矫正</h1><small>生成批次 / 时间归属 / 次数归属 / 人工裁决 / 发布 / 历史审计</small></div><nav><a href="/portal">综合首页</a><a href="/insights">态势检索</a><a href="/monitor">综合监控</a><a href="/business">七类规则</a><a href="/admin">场所管理</a><a href="/base" class="active">底库管理</a><a href="/docs">API</a></nav></div></header>
+<header><div class="wrap"><div><small>ZD SYSTEM / FEATURE 03 & 21 · SYNTHETIC TESTBED</small><h1>场所人员底库 · 生成与人工矫正</h1><small>生成批次 / 时间归属 / 次数归属 / 人工裁决 / 发布 / 历史审计</small></div><nav><a href="/portal">综合首页</a><a href="/insights">态势检索</a><a href="/monitor">综合监控</a><a href="/business">七类规则</a><a href="/portal?tab=acceptance">Excel验收</a><a href="/admin">场所管理</a><a href="/base" class="active">底库管理</a><a href="/docs">API</a></nav></div></header>
 <main class="wrap">
 <div class="callout"><b>数据范围说明：</b>本页面使用 <b>P001–P999 虚构人员标识</b> 和明确构造的合成场所活动记录。不是对真实人物进行人脸识别、聚类或跨场所追踪。真实 Frigate 的匿名目标检测事件不会自动写入本底库。</div>
 <div class="flow"><div class="step">① 初始化演示观测</div><div class="step">② 选取天数并生成</div><div class="step">③ 跨场所归并 / 人工裁决</div><div class="step">④ 发布底库驱动规则</div></div>
@@ -76,7 +77,7 @@ const fmt=s=>{try{return new Date(s).toLocaleString('zh-CN',{hour12:false})}catc
 async function api(p,m='GET',b){let r=await fetch(p,{method:m,headers:{'Content-Type':'application/json'},body:b===undefined?undefined:JSON.stringify(b)});let x=await r.json();if(!r.ok){let d=x.detail;throw Error(typeof d==='string'?d:JSON.stringify(d))}return x}
 function toast(s,error=false){let e=$('toast');e.textContent=s;e.className=error?'error':'';e.style.display='block';clearTimeout(window._hide);window._hide=setTimeout(()=>e.style.display='none',6200)}
 async function runAction(f,msg){try{await f();await load();toast(msg)}catch(e){toast('操作失败：'+e.message,true)}}
-async function load(){let [b,p,r,a,act]=await Promise.all([api('/api/base'),api('/api/places'),api('/api/base/runs'),api('/api/base/audit'),api('/api/base/active')]);state=b;places=p;active=act;
+async function load(){const actor=await api('/api/auth/me');if(zdGateStateOnlyPage(actor,'合成人员底库'))return;let [b,p,r,a,act]=await Promise.all([api('/api/base'),api('/api/places'),api('/api/base/runs'),api('/api/base/audit'),api('/api/base/active')]);state=b;places=p;active=act;
 const d=b.run?await api('/api/base/runs/'+b.run.id+'/diff'):null;
 const maintenance=await api('/api/base/maintenance/config');
 $('autoRoster').checked=!!maintenance.enabled;
@@ -102,4 +103,4 @@ let chosen=prompt(`人员 ${person} 归属哪个场所？输入场所编号：\n
 async function removePerson(person){if(!state.run||state.run.state!=='draft'){toast('已发布版本不可修改；请先生成矫正草稿',true);return}let reason=prompt(`确认把虚构人员 ${person} 移出当前底库？填写理由：`,'演示数据人工移出');if(reason===null)return;await runAction(()=>api(`/api/base/runs/${state.run.id}/decide`,'POST',{person,place_id:null,action:'remove',reason}),'已从本批次底库移出；原始观测保留。')}
 async function addPerson(){if(!state.run||state.run.state!=='draft'){toast('已发布版本不可修改；请先生成新草稿',true);return}let person=prompt('输入虚构人员编码 P001–P999：','P007');if(person===null)return;person=person.trim().toUpperCase();if(!/^P\d{3}$/.test(person)){toast('必须是 P000–P999 格式',true);return}await choose(person)}
 load().catch(e=>toast('加载失败：'+e.message,true));
-</script></body></html>
+</script><script src="/ui/site-navigation.js"></script><script src="/ui/compact-sections.js"></script></body></html>

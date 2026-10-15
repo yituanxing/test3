@@ -16,6 +16,11 @@ def test_product_portal_serves_integrated_workbench(tmp_path, monkeypatch):
     assert '匿名目标事件' in page.text and '合成演示' in page.text
     assert '/api/insights/overview?days=7' in page.text
     assert '/api/frigate/events?limit=100' in page.text
+    assert 'src="/ui/role-navigation.js"' in page.text
+    js=client.get('/ui/role-navigation.js')
+    assert js.status_code==200
+    assert 'zdApplyRoleNavigation' in js.text
+    assert 'zdGateStateOnlyPage' in js.text
     assert client.get('/api/insights/overview').status_code == 401
     assert client.get('/api/frigate/events').status_code == 401
     with main.db() as c:
@@ -51,6 +56,11 @@ def test_portal_place_scope_enforced_for_lower_role(tmp_path, monkeypatch):
 def test_legacy_workbenches_link_back_to_portal():
     from pathlib import Path
     base=Path(__file__).resolve().parents[1]/'static'
-    for name in ('index','admin','base','business','insights','monitor'):
+    # Archived synthetic UIs remain pytest-only, while operational pages
+    # must navigate back to the real-evidence workbench.
+    for name in ('index','base','business','insights'):
         page=(base/(name+'.html')).read_text(encoding='utf-8')
         assert 'href="/portal"' in page, name
+    for name in ('admin','monitor','cctv','real'):
+        page=(base/(name+'.html')).read_text(encoding='utf-8')
+        assert 'href="/real"' in page, name

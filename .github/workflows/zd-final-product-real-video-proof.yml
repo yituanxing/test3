@@ -1,0 +1,127 @@
+name: ZD Final Product Real Video Screen Proof
+on:
+  push:
+    branches:
+      - agent/continuous-capture-mvp-v1
+    paths:
+      - .github/workflows/zd-final-product-real-video-proof.yml
+      - scripts/browser_operational_site_with_video.py
+      - scripts/browser_each_page_acceptance.py
+      - tests/test_demo_first_run_ready.py
+      - scripts/demo_bootstrap.py
+      - scripts/package_local_demo.py
+      - RECOGNITION_RESULTS_DELIVERY_20261015.md
+      - static/**
+      - app/main.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  browser-on-shipped-licensed-video:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download previous verified real-video research excerpts
+        uses: actions/download-artifact@v4
+        with:
+          name: zd-licensed-epfl-real-continuous-38-second-research-clips
+          run-id: 38585465839
+          github-token: ${{ github.token }}
+          path: /tmp/zd-authorized-research
+      - name: Download real YOLO-derived EPFL candidate manifest (not a fake seed)
+        uses: actions/download-artifact@v4
+        with:
+          name: zd-p0-excel-demo-source
+          run-id: 38598197003
+          github-token: ${{ github.token }}
+          path: /tmp/zd-official-owner-source
+      - name: Restore official model-derived candidate evidence from scored owner job
+        shell: bash
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile
+          from io import BytesIO
+          from pathlib import Path
+          outer=ZipFile('/tmp/zd-official-owner-source/dist/zd-demo-local-source.zip')
+          payload=outer.read('zd-demo/config/epfl6p_real_pair_candidates_v1.json')
+          assert len(payload)>5000, len(payload)
+          path=Path('config/epfl6p_real_pair_candidates_v1.json')
+          path.parent.mkdir(parents=True,exist_ok=True)
+          path.write_bytes(payload)
+          print('RESTORED_REAL_OWNER_CANDIDATES',len(payload))
+          PY
+      - name: Install exact approved video in app media path
+        shell: bash
+        run: |
+          set -euo pipefail
+          find /tmp/zd-authorized-research -maxdepth 3 -type f
+          mkdir -p samples/demo-media
+          file="$(find /tmp/zd-authorized-research -name '真实原片连续双机画面_38秒.mp4' -type f -print -quit)"
+          test -n "$file"
+          cp "$file" samples/demo-media/epfl-dual-60-98.mp4
+          test "$(stat -c%s samples/demo-media/epfl-dual-60-98.mp4)" -gt 1000000
+      - name: Install application and Chromium
+        shell: bash
+        run: |
+          python -m pip install -q -r requirements.txt -r requirements-business.txt
+          python -m pip install -q playwright
+          python -m playwright install --with-deps chromium
+      - name: Verify first-run demo is populated and real-only data stays untouched
+        run: python -m pytest -q tests/test_demo_first_run_ready.py tests/test_real_only_runtime.py
+      - name: Verify real original video renders on home and every site module works
+        shell: bash
+        run: |
+          mkdir -p reports
+          python scripts/browser_operational_site_with_video.py
+      - name: Build complete Windows local demo with the genuine 38-second research clip
+        shell: bash
+        run: |
+          python -m scripts.package_local_demo
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          z=Path('dist/zd-demo-local-source.zip')
+          with ZipFile(z) as archive:
+              assert archive.testzip() is None
+              names=set(archive.namelist())
+              for required in (
+                  'zd-demo/static/portal.html',
+                  'zd-demo/static/site_navigation.js',
+                  'zd-demo/static/compact_sections.js',
+                  'zd-demo/static/recognition_results.html',
+                  'zd-demo/scripts/browser_each_page_acceptance.py',
+                  'zd-demo/RECOGNITION_RESULTS_DELIVERY_20261015.md',
+                  'zd-demo/static/showcase_ui.js',
+                  'zd-demo/scripts/start_local_demo_windows.bat',
+                  'zd-demo/scripts/start_local_demo_windows.ps1',
+                  'zd-demo/samples/demo-media/epfl-dual-60-98.mp4',
+                  'zd-demo/config/epfl6p_real_pair_candidates_v1.json',
+              ):
+                  assert required in names,required
+          print('EXCEL_BUSINESS_WEB_WINDOWS_BUNDLE_OK',z.stat().st_size)
+          PY
+      - name: Upload single complete Windows demo with real video
+        uses: actions/upload-artifact@v4
+        with:
+          name: zd-final-excel-business-web-windows-with-real-video
+          path: dist/zd-demo-local-source.zip
+          retention-days: 7
+          if-no-files-found: error
+      - name: Publish ACTUAL authenticated browser proof screenshots (not source AVI)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zd-real-video-product-browser-evidence
+          path: |
+            reports/ui-shipped-*.png
+            reports/accept-*.png
+            reports/every-page-acceptance.json
+            reports/excel-business-actual-browser-audit.json
+            reports/actual-product-server.log
+          retention-days: 2
+          if-no-files-found: warn

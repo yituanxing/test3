@@ -142,3 +142,114 @@ def test_unknown_region_returns_404(client):
     assert client.get('/api/insights/overview?region_id=98765').status_code==404
     assert client.get('/api/insights/people?region_id=98765').status_code==404
     assert client.get('/api/insights/people/P001?region_id=98765').status_code==404
+
+
+def test_common_analytics_period_and_scoped_flows():
+    """One denominator for #4 / #5 / #19: synthetic visits, not frames."""
+    from app.insights import overview
+
+    def visit(person, dest, date):
+        return {'person':person,'place_id':dest,
+                'started_at':date+'T11:00:00+00:00',
+                'ended_at':date+'T11:05:00+00:00',
+                'observation_ids':[1], 'raw_observations':1}
+
+    # Equal-length period: previous 10-11 Oct; current 12-13 Oct.
+    visits=[
+        visit('P001',10,'2026-10-11'), visit('P002',20,'2026-10-11'),
+        visit('P003',10,'2026-10-10'),
+        visit('P001',20,'2026-10-12'),visit('P001',20,'2026-10-13'),
+        visit('P002',10,'2026-10-13'),visit('P003',10,'2026-10-12'),
+        # A hidden destination; must not enter the selected scope.
+        visit('P002',30,'2026-10-13')]
+    data={'simulation_time_utc':'2026-10-13T12:00:00+00:00',
+          'visits':visits,'alerts':[],'rule_counts':[],
+          'registry_status':{'state':'not_published'},
+          'affiliation':[{'person':'P001','place_id':10},
+                         {'person':'P002','place_id':20},
+                         {'person':'P003','place_id':30}]}
+    places=[{'id':10,'name':'可见场所A'},{'id':20,'name':'可见场所B'}]
+    found=overview(data, places,days=2)
+    c=found['comparison'];m=found['movement']
+    assert found['cards']['synthetic_visits']==4
+    assert c['previous_visits']==3
+    assert c['period_start_day_utc']=='2026-10-10'
+    assert c['period_end_day_utc']=='2026-10-11'
+    assert c['visits_change']==1
+    assert c['visits_change_pct']==33.3
+    assert sum(t['visits'] for t in found['trend'])==c['current_visits']
+    assert sum(p['visits'] for p in found['ranking'])==4
+    assert sum(p['previous_visits'] for p in found['ranking'])==3
+    assert m['cross_home_inbound']==4 and m['previous_cross_home_inbound']==1
+    assert m['scoped_outbound']==3 and m['previous_scoped_outbound']==0
+    assert m['flows']==[
+        {'from_place_id':10,'to_place_id':20,'synthetic_visits':2,
+         'from_place_name':'可见场所A','to_place_name':'可见场所B'},
+        {'from_place_id':20,'to_place_id':10,'synthetic_visits':1,
+         'from_place_name':'可见场所B','to_place_name':'可见场所A'}]
+    assert '30' not in str(m['flows'])
+    assert '2026-10-13' not in str(c['period_end_day_utc'])
+    # Single-place filter must not reveal names of external home places.
+    one=overview(data,places[:1],days=2)
+    assert one['cards']['synthetic_visits']==2
+    assert one['movement']['cross_home_inbound']==2
+    assert one['movement']['scoped_outbound']==0
+    assert one['movement']['flows']==[]
+
+
+def test_analytics_comparison_zero_baseline_not_fabricated_percentage(client):
+    seed(client)
+    actual=client.get('/api/insights/overview?days=7')
+    assert actual.status_code==200,actual.text
+    data=actual.json()['synthetic']
+    assert data['comparison']['current_visits']==data['cards']['synthetic_visits']
+    assert sum(p['cross_home_inbound'] for p in data['ranking'])==data['movement']['cross_home_inbound']
+    # API contract prevents invented growth percentage when prior count is zero.
+    if data['comparison']['previous_visits']==0:
+        assert data['comparison']['visits_change_pct'] is None
+    p=client.get('/api/places').json()[0]['id']
+    narrowed=client.get(f'/api/insights/overview?days=7&place_id={p}').json()['synthetic']
+    assert len(narrowed['ranking'])==1
+    assert sum(f['synthetic_visits'] for f in narrowed['movement']['flows']) <= narrowed['cards']['synthetic_visits']
+
+
+def test_cross_region_alert_does_not_leak_hidden_place_ids_or_observation_ids():
+    """A partial venue overlap must never return a full cross-site alert.
+
+    Prior _filtered used set.intersection, leaking the OTHER county's place
+    ID, people, and sensitive observation IDs to a user scoped to venue 10.
+    """
+    from app.insights import _filtered, overview, people_search, person_detail
+    stamp='2026-10-13T12:00:00+00:00'
+    analysis={
+        'simulation_time_utc':stamp,
+        'visits':[{'person':'P001','place_id':10,'started_at':stamp,
+                   'ended_at':stamp,'observation_ids':[123],'raw_observations':1}],
+        'alerts':[
+            {'type':'cross_site','place_ids':[10,999],
+             'people':['P001','P999'],'observation_ids':[123,999999],
+             'key':'forbidden-region-evidence'},
+            {'type':'appeared','place_ids':[10],
+             'people':['P001'],'observation_ids':[123],
+             'key':'visible-evidence'}],
+        'rule_counts':[],'registry_status':{'state':'not_published'},
+        'affiliation':[{'person':'P001','place_id':999}],
+        'config':{'encounter_window_minutes':10},
+    }
+    view=[{'id':10,'name':'仅可见的学校'}]
+    scoped=_filtered(analysis,days=1,place_ids={10})
+    assert len(scoped['alerts'])==1
+    assert scoped['alerts'][0]['key']=='visible-evidence'
+    dashboard=overview(analysis,view,days=1)
+    assert dashboard['cards']['rule_hits']==1
+    assert len(dashboard['recent_alerts'])==1
+    assert '999999' not in str(dashboard)
+    assert 'forbidden-region-evidence' not in str(dashboard)
+    roster=people_search(analysis,view,days=1)['people']
+    assert len(roster)==1 and roster[0]['affiliation_place_id'] is None
+    person=person_detail(analysis,view,'P001',days=1)
+    assert person['affiliation_place_id'] is None
+    assert person['affiliation_place_name'] is None
+    assert len(person['alerts'])==1
+    assert person['alerts'][0]['key']=='visible-evidence'
+    assert 'P999' not in str(person)

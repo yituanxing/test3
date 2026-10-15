@@ -1,0 +1,3 @@
+# Optional, only needed to evaluate published CAVIAR GT with existing ByteTrack.
+# Not a person detector, biometric ReID or multi-camera identity solution.
+trackers==2.6.0

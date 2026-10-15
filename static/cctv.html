@@ -1,0 +1,662 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ZD · 真实固定监控验收</title>
+<style>
+:root{--nav:#112846;--ink:#183355;--bg:#f4f7fb;--line:#dae4ef;--accent:#285fc4}*{box-sizing:border-box}
+body{font:14px/1.5 system-ui,"Microsoft YaHei",sans-serif;background:var(--bg);margin:0;color:var(--ink)}
+header{background:var(--nav);color:white;padding:21px max(3%,calc((100% - 1220px)/2))}
+h1{margin:0;font-size:24px}header p{color:#b8cce4;margin:6px 0 14px}nav{display:flex;gap:18px;flex-wrap:wrap}
+nav a{color:#dbe9fb;text-decoration:none}
+main{max-width:1240px;padding:17px 16px 65px;margin:auto}h2{font-size:19px;margin:4px 0 9px}
+.panel{background:white;border:1px solid var(--line);border-radius:13px;margin:15px 0;padding:20px}
+.notice{background:#eaf4ff;border-color:#c9ddf7}.warning{color:#77531b;background:#fff5e1;padding:12px;border-radius:8px}
+.small{font-size:12px;color:#64758c}.row{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin:12px 0}
+label{display:grid;gap:5px;font-size:12px;font-weight:bold}
+select,input{padding:10px;border:1px solid #cad5e3;border-radius:7px;font:inherit;background:#fff}
+button{border:0;border-radius:7px;padding:10px 14px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5}button.secondary{background:#e9f1ff;color:var(--accent)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.viewport{background:#101e30;min-height:260px;display:grid;place-items:center;border-radius:9px;overflow:hidden}
+.viewport img{width:100%;height:auto;image-rendering:auto;max-height:420px;object-fit:contain}
+table{border-collapse:collapse;width:100%}td,th{padding:11px;text-align:left;border-bottom:1px solid #e7ecf3}th{background:#f4f7fc}
+.scroller{overflow:auto}.scroller table{min-width:560px}.badge{display:inline-block;background:#e5f5ee;color:#12805d;padding:3px 10px;border-radius:20px}
+.badge.yellow{background:#fff0d9;color:#95620e}
+.jumpnav{display:flex;gap:8px;flex-wrap:wrap;padding:12px;background:#fff;border:1px solid var(--line);border-radius:12px;margin:12px 0}
+.jumpnav a{font-size:13px;color:#315f9c;text-decoration:none;border:1px solid #d7e6f7;border-radius:8px;padding:9px 12px;background:#f5f9ff;font-weight:650}
+.jumpnav a:hover{background:#e6f1ff}#epflResearchPanel,#qualityPanel,#researchPanel,#caviarImport{scroll-margin-top:12px}
+#epflResearchPanel{border:2px solid #bed6f4;box-shadow:0 8px 30px #1d487013}
+#epflResearchPanel h2{color:#1b4e91}#epflReviewPanel{border-top:1px solid var(--line);padding-top:14px;margin-top:12px}
+#epflReviewPanel .scroller{max-height:560px;overflow:auto}#epflReviewPanel table{min-width:850px}
+#epflReviewPanel th{position:sticky;top:0;z-index:1}#epflReviewPanel tr:nth-child(even){background:#f8faff}
+#epflReviewStatus{max-width:900px;overflow-wrap:anywhere}
+.flowsteps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}
+.flowsteps div{border:1px solid #e0e8f6;border-radius:9px;background:#f6faff;padding:11px 13px}
+.flowsteps b{display:block;margin-bottom:4px}.flowsteps small{color:#5d7288;font-size:12px}
+.advanced-evidence summary{cursor:pointer;color:#2a5dae;font-weight:700;font-size:13px}
+.advanced-evidence .scroller{max-height:290px;overflow:auto;margin:10px 0}
+.nav-pager{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+@media(max-width:780px){.flowsteps{grid-template-columns:1fr}.jumpnav a{padding:7px 9px}}
+@media(max-width:780px){.grid{grid-template-columns:1fr}}
+
+/* Research and decoding actions are hidden until the state administrator is
+   verified by /api/auth/me. Even incomplete requests must fail closed. */
+#epflResearchPanel,#researchPanel,#process,
+.jumpnav a[href="#epflResearchPanel"]{display:none!important}
+body[data-state-ui="yes"] #epflResearchPanel,
+body[data-state-ui="yes"] #researchPanel{display:block!important}
+body[data-state-ui="yes"] #process,
+body[data-state-ui="yes"] .jumpnav a[href="#epflResearchPanel"]{display:inline-block!important}
+</style><script src="/ui/role-navigation.js"></script></head><body>
+<header><h1>真实监控与人体关联 · 验收工作台</h1><p>真实视频、匿名人体检测、跨机位候选与人工审核分别存证</p>
+<nav><a href="/real">← 真实数据首页</a><a href="/monitor">视频运行</a><a href="/admin">摄像机/场所管理</a></nav></header>
+<main>
+<div class="jumpnav" aria-label="工作区快速导航">
+<a href="#epflResearchPanel">① 实际人体跨机匹配</a>
+<a href="#caviarImport">② CAVIAR研究原片</a>
+<a href="#qualityPanel">③ 本机目标审核</a>
+<a href="#researchPanel">④ UTC人工研究标签</a>
+<a href="/real">返回真实事件与证据 →</a>
+</div>
+<section class="panel notice">
+<b>此页同时包含CAVIAR原片和EPFL研究双摄像机候选，数据彼此独立。</b>
+CAVIAR验证局部轨迹，EPFL评估同步几何人体配对。两者都不代表跨场所真人身份识别。
+两台固定摄像机拍摄的是<b>同一条商场走廊</b>，因此应绑定同一个场所。CAVIAR 的 XML 是人工标注的人体框和<b>各机位局部轨迹 ID</b>；
+此页不会将两个摄像机局部 ID 自动识别为同一自然人，也不能据此声称跨场所身份匹配或人脸识别成功。
+<p class="small">素材：EC Funded CAVIAR project / IST 2001 37540；CC BY-SA。官方下载并保存在本地 data 目录，不进 Git 和演示源码包。需要联网下载。</p>
+</section>
+<section class="panel" id="caviarImport"><h2>CAVIAR · 绑定场所、导入两路真实监控</h2>
+<p>先选择一个 Excel 意义上的业务场所。走廊和正向视角是<b>两路摄像机</b>，不是“场所A/场所B”。演示默认固定场所归属，无需动漫镜头分场景。</p>
+<div class="row"><label>真实视频所属于哪一个管理场所<select id="place"></select></label>
+<button id="loadPair">导入同一场所的两路 CAVIAR 视频</button>
+<span id="status" role="status" class="small">正在读取场所…</span></div>
+<div class="warning">下载两段真实 MPEG 视频及随附的逐帧 CVML XML，文件体积小；网络失败会明确报错，不会假装导入成功。只有管理员可以导入。</div>
+</section>
+<section class="panel"><h2>② 固定机位与公开人工轨迹真值</h2>
+<div class="scroller"><table><thead><tr><th>机位</th><th>所属场所</th><th>视频帧数</th><th>人工框记录</th><th>机位内局部轨迹</th><th>查看</th></tr></thead><tbody id="sources"><tr><td colspan="6">尚未导入公开视频</td></tr></tbody></table></div>
+<p class="small">局部轨迹数量是标注对象数；两台摄像机可能拍到同一批人，因此局部轨迹数量不能简单相加成为全场去重人数。这里没有直接生成 P### 模拟身份。</p>
+</section>
+<section class="panel" id="occurrencePanel">
+<h2>③ 公共匿名出现事件 · 摄像机级去重</h2>
+<p class="small">统一数据契约：Frigate真实目标事件与CAVIAR官方逐帧标注分开统计。<b>单个摄像机的100帧同一轨迹只记作1条局部出现事件</b>，两路摄像机同名轨迹仍然是两条不同证据；没有跨机位真实人物去重，也不进入P###人库或业务到访统计。</p>
+<div id="occurrenceCounts" class="row"><span class="small">正在查询局部轨迹…</span></div>
+<div class="scroller"><table><thead><tr><th>视频来源</th><th>场所</th><th>机位/摄像机</th><th>匿名局部事件</th><th>逐帧原始人体框</th><th>时间依据</th></tr></thead>
+<tbody id="occurrenceRows"><tr><td colspan="6">暂无已验证局部事件</td></tr></tbody></table></div>
+<div class="row"><button class="secondary" id="loadOccurrences" onclick="refreshOccurrences()">刷新匿名事件</button>
+<span id="occurrenceNote" class="small">这是摄像机局部目标段，不是唯一人员数；无论多少帧，都不生成自然人身份。</span></div>
+</section>
+<section class="grid">
+<div class="panel"><h2>④ 实际 MPEG 帧与原始标注框</h2><div class="row"><label>当前机位<select id="source"></select></label>
+<label>视频帧<input type="number" min="1" value="1" id="frame" style="max-width:135px"></label>
+<button id="viewFrame" class="secondary">解码并显示帧</button></div>
+<div class="viewport"><img id="photo" alt="未选择真实监控文件"></div>
+<p id="frameNote" class="small">绿色方框：官方 CAVIAR 人工标注，并不是模型检测结果。</p>
+</div>
+<div class="panel"><h2>⑤ 实际视频解码与人员检测分开验收</h2>
+<p>第一条链路：从官方素材读取视频帧。第二条链路：CAVIAR 官方人体框帮助验证目标出现。第三条链路：我们自己的模型检测与跟踪必须单独评估。</p>
+<div class="row"><button id="process" class="secondary">当前帧人脸候选框（不识别身份）</button>
+<label>成熟跟踪算法<select id="trackerAlgorithm"><option value="bytetrack">ByteTrack</option><option value="ocsort">OC-SORT</option></select></label>
+<button id="benchmarkTracker" class="secondary">验证现成算法的本机跟踪</button>
+<button id="benchmarkPair" class="secondary">双摄像机×ByteTrack/OC-SORT联合验证</button>
+<label>人体检测输入尺度<select id="yoloImageSize"><option value="640">640 · 默认</option><option value="960">960 · 远处小行人研究</option></select></label>
+<button id="benchmarkDetector" class="secondary">真实YOLO11n人体检测→ByteTrack</button></div>
+<p class="small">ByteTrack 使用 Roboflow 已有开源实现，输入是官方 CAVIAR 人工人体框，不是我们的检测预测。只验证本机自动跟踪稳定性，不能识别跨镜头同一真人；需安装可选跟踪依赖。</p>
+<pre id="trackerBaseline" class="small" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+<p class="small">目前项目已有 OpenCV 的人脸候选检测；监控分辨率仅384×288，可能检测到0张脸。这不等于没有人员！后续的人体检测必须单独实测。</p>
+<pre id="detection" class="small" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+<h3 style="margin-top:22px">当前机位内的人工轨迹</h3>
+<div id="tracks" class="small">选择视频源后加载</div>
+</div>
+</section>
+<section class="panel" id="qualityPanel">
+<h2>⑥ 匿名局部目标 · 证据质量人工复核</h2>
+<p class="small">从现有视频匿名事件中挑选一条局部轨迹，评估目标框是否合理。<b>这是“是否为有效局部检测”的质检，不是确认自然人身份，不合并跨摄像机轨迹，更不会创建真实人员底库或预警。</b> 每次审核只追加新记录，源数据改变时旧审核会自动提示过期。</p>
+<div class="row"><label>匿名事件<select id="qaOccurrence"><option value="">暂无真实轨迹</option></select></label>
+<label>审核结论<select id="qaVerdict"><option value="valid_local_target">合理的局部人体目标</option>
+<option value="false_positive">误检/错误标注</option><option value="needs_review">仍需复核</option></select></label>
+<label>审核理由<input id="qaReason" maxlength="400" style="min-width:280px" value="已核查原始视频帧和摄像机局部轨迹证据"></label>
+<button id="qaSave" class="secondary" onclick="saveOccurrenceQuality()">追加审核记录</button></div>
+<div class="row"><button id="qaPrev" class="secondary" disabled onclick="changeQualityPage(-1)">上一页</button>
+<button id="qaNext" class="secondary" disabled onclick="changeQualityPage(1)">下一页</button>
+<span id="qaPageStatus" class="small">匿名事件列表第一页，按权限分页而不是截断成最多200条</span></div>
+<p id="qaStatus" class="small">暂无可审核目标；此处不会制造虚构人员或自动身份。</p>
+<div class="row"><button class="secondary" id="qaModelPreviewButton" onclick="viewSelectedModelEvidence()">查看本次YOLO轨迹的真实模型框画面</button>
+<span id="qaModelPreviewStatus" class="small">需选择上方已实际保存的 YOLO+ByteTrack 局部事件；官方GT帧与模型预测不会混淆。</span></div>
+<div class="viewport" id="qaModelPreviewContainer" hidden><img id="qaModelPreview" alt="真实视频上叠加经过存证的自动检测模型框，蓝色框，非CAVIAR人工GT" loading="lazy"></div>
+<div class="scroller"><table><thead><tr><th>审核记录ID</th><th>结论</th><th>依据</th><th>证据摘要</th></tr></thead>
+<tbody id="qaHistory"><tr><td colspan="4">选择一条实际匿名事件</td></tr></tbody></table></div>
+</section>
+<section class="panel" id="epflResearchPanel">
+<h2>EPFL · 双摄像机匿名人体关联与人工审核</h2>
+<div class="flowsteps">
+<div><b>01 · 加载候选</b><small>CI真实视频的同步人体配对，交付包只附匿名数据。</small></div>
+<div><b>02 · 核对证据</b><small>检测框编号、同步帧及空间距离；对应视频证据在CI工件。</small></div>
+<div><b>03 · 人工复核</b><small>合理、误配、待复核；不确认自然人身份。</small></div>
+</div>
+<p class="warning">这是<b>研究数据上的候选配对审查</b>，不是现实身份识别、跨场所到访或七类预警。与上面的 CAVIAR 场所数据、下方 Frigate 人工研究关联互不混合。配对方法使用同步固定机位与地面单应矩阵；官方六人真值仅用于计算核验结果。</p>
+<div class="row"><label>本地打开 CI 中的六人研究报告 JSON（不会上传服务器）
+<input type="file" id="epflReportInput" accept=".json,application/json"></label>
+<button type="button" class="secondary" id="epflClearReport">清空研究报告</button>
+<button type="button" id="epflUseBundled" hidden>一键载入交付包内置真实人体关联候选</button>
+<button type="button" id="epflImportReport" hidden>导入当前候选到已有审核库（研究专用）</button>
+<button type="button" class="secondary" id="epflRefreshCandidates" hidden>刷新已保存的候选</button>
+<a class="small" href="https://github.com/yituanxing/test3/actions/workflows/zd-frigate-real-person.yml" target="_blank" rel="noopener noreferrer">查看已有 CI 工件来源</a></div>
+<p class="small" id="epflReportStatus">请选择 CI 工件内 verify-epfl-six-person-cross-camera.json。只读、浏览器本地核对，文件本身不能代替 GitHub CI 与媒体 SHA256 的可信来源验证。配对截图在同一 CI 工件中。</p>
+<div class="row" id="epflSummary"></div>
+<details class="advanced-evidence"><summary>按需展开离线官方GT逐帧评估明细（高级研究数据）</summary>
+<div class="scroller"><table><thead><tr><th>时间帧（从0开始）</th><th>测试集</th><th>模型框（0 / 1）</th><th>自动配对</th><th>官方真值同人</th><th>错配 / 无法核验</th></tr></thead>
+<tbody id="epflAuditRows"><tr><td colspan="6">尚未导入研究报告；默认不把匿名检测结果解释为真实人员身份。</td></tr></tbody></table></div></details>
+<div id="epflReviewPanel" hidden>
+<p class="small">下面是持久化到同一个SQLite的匿名配对候选，具有管理员权限、追加式人工复核和审计。<b>导入者提交的研究JSON并非服务器自动认证的官方结果；禁止直接晋升到真实身份、底库或预警。</b></p>
+<div class="row"><label>人工复核理由<input id="epflReviewReason" maxlength="500" style="min-width:340px" value="对照原始同步研究视频及配对证据进行匿名目标审核"></label>
+<span id="epflReviewStatus" class="small">尚无候选审核记录</span></div>
+<div class="scroller"><table><thead><tr><th>研究帧</th><th>测试集</th><th>摄像机0/1检测框序号</th><th>投影距离</th><th>当前审核</th><th>操作（不认证真人身份）</th></tr></thead>
+<tbody id="epflReviewRows"><tr><td colspan="6">需要州级管理员导入报告</td></tr></tbody></table></div>
+<div class="row nav-pager"><button type="button" class="secondary" id="epflPrevPage" hidden>上一页</button>
+<button type="button" class="secondary" id="epflLoadMore" hidden>下一页</button>
+<span id="epflPageNote" class="small">每页12条审核候选</span></div>
+</div>
+<p class="small">每行是<b>一个同步帧时刻</b>，同一人可在多个时间点被重复计入。百分比是“两个机位均检测并且可用官方标注核验”的条件关联指标，不是个人识别准确率。选择文件仅在浏览器核验离线GT结果；点击「导入当前候选」或「一键载入」会将匿名配对存入研究审核SQLite，但绝不修改P###底库。</p>
+</section>
+<section class="panel" id="researchPanel" hidden>
+<h2>⑦ 研究样本匿名轨迹 · 人工关联与候选到访</h2>
+<p class="warning">仅最高级管理员的人工研究演示：首先为上方 <b>有UTC时钟和历史位置证据</b> 的 Frigate 局部目标审核“合理目标”，再把不同机位证据人工关联到匿名 D### 标签。<b>这不是机器识别同一真人</b>，不进入 P### 底库或真实预警。只有 CAVIAR 原片帧号的轨迹不能冒充具体时刻的到访。</p>
+<div class="row">
+<label>演示匿名标签<input id="researchAlias" value="D001" maxlength="4" pattern="D[0-9]{3}"></label>
+<label>人工确认依据<input id="researchReason" maxlength="500" style="min-width:320px" value="受控样本人工核对本机目标证据，仅用于研究分组"></label>
+<button class="secondary" id="researchAttach" onclick="saveResearchLink('attach')">关联上方选中的匿名事件</button>
+<button class="secondary" id="researchDetach" onclick="saveResearchLink('detach')">撤销该事件关联</button>
+<button class="secondary" onclick="refreshResearch()">重新核对候选到访</button>
+</div>
+<p class="small" id="researchStatus">尚未建立人工研究关联；不能当作真人到访或自动跨所识别。</p>
+<div class="scroller"><table><thead><tr><th>研究匿名标签</th><th>业务场所</th><th>开始时间 UTC</th><th>机位数</th><th>匿名事件</th><th>性质</th></tr></thead>
+<tbody id="researchRows"><tr><td colspan="6">尚无通过证据门槛的人工研究候选到访</td></tr></tbody></table></div>
+</section>
+<section class="panel"><h2>Excel 场所功能的真实边界</h2>
+<p>摄像机与场所关联、视频导入、实际帧、匿名框/本机局部轨迹可以采用真实数据。
+原 #3 人员底库、#6跨场所、#7同行、#17轨迹等需要跨摄像机身份关联时，先沿用明确标识的合成业务流程；
+<b>公开标注的单机位轨迹不能冒充已经识别的真实跨场所人员。</b></p>
+</section>
+</main>
+<script>
+const token=sessionStorage.getItem('zd_access_token');if(!token)location.replace('/login');
+const $=id=>document.getElementById(id);
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let imported=[],lastImage=null,qaOffset=0,qaNextOffset=null,qaPageSize=200;
+let qaPageRecords=new Map(),qaModelBlobUrl=null;
+let epflPendingReport=null,epflCurrentReportDigest=null,epflCandidateOffset=0;
+const EPFL_PAGE_SIZE=6;
+async function api(path,method='GET',body){const r=await fetch(path,{method,
+ headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+ body:body===undefined?undefined:JSON.stringify(body)});
+ if(r.status===401){sessionStorage.removeItem('zd_access_token');location.replace('/login');throw Error('登录失效')}
+ const v=await r.json();if(!r.ok)throw Error(typeof v.detail==='string'?v.detail:JSON.stringify(v));return v}
+const setStatus=(v,isError=false)=>{$('status').textContent=v;$('status').style.color=isError?'#a6402b':'#4a6985'};
+const current=()=>Number($('source').value);
+async function refresh(){const d=await api('/api/cctv/sources');imported=d.sources;
+ const original=current();
+ $('sources').innerHTML=imported.map(s=>`<tr><td><span class="badge">CAVIAR /${esc(s.camera_view)}</span></td>
+ <td>${esc(s.place_name)}</td><td>${s.frames_available}</td><td>${s.annotation_boxes}</td>
+ <td>${s.local_track_count}</td><td><button class="secondary" onclick="choose(${s.source_id})">查看真实视频</button></td></tr>`).join('')||
+ '<tr><td colspan="6">尚无研究监控视频；先在上方点击导入。</td></tr>';
+ $('source').innerHTML=imported.map(x=>`<option value="${x.source_id}">${esc(x.camera_view)} / ${esc(x.place_name)}</option>`).join('');
+ if(imported.some(x=>x.source_id===original))$('source').value=String(original);
+ if(imported.length)await loadTracks();
+ await refreshOccurrences();
+ await refreshQuality();
+}
+async function refreshQuality(){
+ try{
+   const response=await api('/api/site/occurrences?limit='+qaPageSize+'&offset='+qaOffset);
+   qaNextOffset=response.next_offset;
+   $('qaPrev').disabled=qaOffset===0;
+   $('qaNext').disabled=qaNextOffset===null;
+   $('qaPageStatus').textContent='当前第 '+(Math.floor(qaOffset/qaPageSize)+1)+
+      ' 页；本页 '+response.returned+' 条匿名局部事件'+
+      (qaNextOffset===null?'（末页）':'（仍有下一页）');
+   const saved=$('qaOccurrence').value;
+   qaPageRecords=new Map(response.occurrences.map(x=>[x.occurrence_key,x]));
+   $('qaOccurrence').innerHTML=response.occurrences.map(x=>
+     '<option value="'+x.occurrence_key+'">'+esc(x.provider)+' / '+esc(x.camera_key)+
+     ' / '+esc(x.track_id)+
+     (x.run_key?' / '+esc(x.run_key.slice(0,12)):'')+
+     '（'+esc(x.venue_name)+'）</option>').join('');
+   if(response.occurrences.some(x=>x.occurrence_key===saved))$('qaOccurrence').value=saved;
+   if(response.occurrences.length)await loadOccurrenceQuality();
+   else{$('qaStatus').textContent='没有可供审核的真实匿名局部目标；未生成模拟数据。';
+        $('qaHistory').innerHTML='<tr><td colspan="4">还没有可审核的目标</td></tr>';}
+ }catch(e){$('qaStatus').textContent='读取匿名证据失败：'+e.message}
+}
+async function changeQualityPage(direction){
+  if(direction>0){if(qaNextOffset===null)return;qaOffset=qaNextOffset}
+  else{qaOffset=Math.max(0,qaOffset-qaPageSize)}
+  await refreshQuality();
+}
+async function viewSelectedModelEvidence(){
+ const record=qaPageRecords.get($('qaOccurrence').value);
+ if(!record||record.provider!=='yolo_bytetrack'||!record.run_key||!record.source_id){
+  $('qaModelPreviewStatus').textContent='请选择有模型运行哈希的真实YOLO本机目标；不能用官方人工GT替代模型预测。';
+  $('qaModelPreviewContainer').hidden=true;return;
+ }
+ const url='/api/cctv/sources/'+record.source_id+'/model-frame?run_key='+
+    encodeURIComponent(record.run_key)+'&frame='+encodeURIComponent(record.first_seen);
+ try{
+  const reply=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+  if(!reply.ok){const payload=await reply.json();throw Error(payload.detail||'模型证据无法读取')}
+  if(qaModelBlobUrl)URL.revokeObjectURL(qaModelBlobUrl);
+  qaModelBlobUrl=URL.createObjectURL(await reply.blob());
+  $('qaModelPreview').src=qaModelBlobUrl;
+  $('qaModelPreviewContainer').hidden=false;
+  $('qaModelPreviewStatus').textContent='已根据原视频SHA256和模型版本 '+record.run_key.slice(0,12)+
+    ' 读取第 '+record.first_seen+' 帧蓝色真实自动模型框。此画面不是CAVIAR绿色人工真值，更不是身份证明。';
+ }catch(e){$('qaModelPreviewContainer').hidden=true;
+   $('qaModelPreviewStatus').textContent='真实模型证据不可用：'+e.message}
+}
+async function loadOccurrenceQuality(){
+ const key=$('qaOccurrence').value;if(!key)return;
+ $('qaModelPreviewContainer').hidden=true;
+ try{
+   const d=await api('/api/site/occurrences/'+key+'/quality');
+   const latest=d.reviews.at(-1);
+   $('qaStatus').textContent='当前局部目标质量状态：'+d.quality_status+
+      (d.review_stale?'（视频证据已有变化，先前审核不再有效）':'')+
+      '。已有 '+d.reviews.length+' 条不可覆盖的审核记录；不会生成真人身份或到访。';
+   $('qaHistory').innerHTML=d.reviews.map(x=>
+      '<tr><td>#'+x.id+'</td><td>'+esc(x.verdict)+
+      '</td><td>'+esc(x.reason)+'</td><td>'+esc(x.evidence_signature.slice(0,14))+
+      '…</td></tr>').join('')||'<tr><td colspan="4">尚未审核，可根据原始画面提交质量结论</td></tr>';
+ }catch(e){$('qaStatus').textContent='读取审核状态失败：'+e.message}
+}
+async function saveOccurrenceQuality(){
+ const key=$('qaOccurrence').value;if(!key){$('qaStatus').textContent='没有实际目标可审核';return}
+ $('qaSave').disabled=true;
+ try{
+   await api('/api/site/occurrences/'+key+'/quality','POST',{
+        verdict:$('qaVerdict').value,reason:$('qaReason').value.trim()});
+   await loadOccurrenceQuality();
+   // A QA verdict changes the REVIEW overlay, never raw Frigate counts.
+   // Refresh the shared live/archive counters immediately after the append.
+   await refreshOccurrences();
+ }catch(e){$('qaStatus').textContent='质量复核未保存：'+e.message}
+ finally{$('qaSave').disabled=false}
+}
+$('qaOccurrence').addEventListener('change',loadOccurrenceQuality);
+async function refreshResearch(){
+ if($('researchPanel').hidden)return;
+ try{
+ const [link,visits]=await Promise.all([
+     api('/api/research/links'),api('/api/research/visits')]);
+ $('researchRows').innerHTML=visits.visits.map(x=>
+   '<tr><td>'+esc(x.research_alias)+'</td><td>'+esc(x.place_name)+'</td>'+
+   '<td>'+esc(x.start_utc)+'</td><td>'+x.camera_count+'</td>'+
+   '<td>'+x.local_occurrence_count+'</td><td>人工声明 · 非实名</td></tr>'
+ ).join('')||'<tr><td colspan="6">没有可信位置、质检与人工证据同时通过的候选到访</td></tr>';
+ $('researchStatus').textContent='人工关联当前有效 '+link.active+' 条，'+
+   '其余关联可能已撤销、质检过期或来源缺失；候选场所会话 '+visits.visits.length+
+   ' 条。没有验证真人身份、没有进入七类真实预警。';
+ }catch(e){$('researchStatus').textContent='研究证据读取失败：'+e.message}
+}
+async function saveResearchLink(action){
+ const key=$('qaOccurrence').value;
+ if(!key){$('researchStatus').textContent='请先在上方选择实际 Frigate 局部目标';return}
+ const alias=$('researchAlias').value.trim();
+ const reason=$('researchReason').value.trim();
+ $('researchAttach').disabled=true;$('researchDetach').disabled=true;
+ try{
+  const done=await api('/api/research/links','POST',{
+    occurrence_key:key,alias,action,reason});
+  $('researchStatus').textContent='已记录不可覆盖的人工审核 #'+done.review_id+
+      '。该分组不是自动人脸识别或实名身份验证。';
+  await refreshResearch();
+ }catch(e){$('researchStatus').textContent='关联未通过证据门槛：'+e.message}
+ finally{$('researchAttach').disabled=false;$('researchDetach').disabled=false}
+}
+async function refreshOccurrences(){
+ try{
+   // Monitoring overview uses the SAME rolling UTC calendar-day window.
+   // CAVIAR is historical clip-relative reference; it has no UTC calendar date.
+   const [summary,quality]=await Promise.all([
+     api('/api/site/occurrences/summary?days=7'),
+     api('/api/site/quality/summary?days=7')]);
+   const gt=summary.by_provider.caviar_ground_truth||{cameras:0,camera_local_occurrences:0,annotated_frames:0};
+   const live=summary.by_provider.frigate||{cameras:0,camera_local_occurrences:0,annotated_frames:0};
+   const reviewed=quality.by_provider.frigate||{valid_local_target:0,false_positive:0,needs_review:0,stale_review:0,not_reviewed:0};
+   const yolo=summary.by_provider.yolo_bytetrack||{cameras:0,camera_local_occurrences:0,annotated_frames:0};
+   const yoloQA=quality.by_provider.yolo_bytetrack||{valid_local_target:0,false_positive:0,needs_review:0,stale_review:0,not_reviewed:0};
+   $('occurrenceCounts').innerHTML=
+     '<span class="badge">历史研究整片 '+gt.cameras+' 路 / '+gt.camera_local_occurrences+' 条局部轨迹</span>'+
+     '<span class="badge yellow">官方整片人工框 '+gt.annotated_frames+' 条（不是人数）</span>'+
+     '<span class="badge">Frigate近7个UTC自然日 '+live.cameras+' 路 / '+live.camera_local_occurrences+' 条原始匿名事件</span>'+
+     '<span class="badge">同期局部目标质检：合理 '+reviewed.valid_local_target+' / 误检 '+reviewed.false_positive+
+       ' / 待审 '+(reviewed.not_reviewed+reviewed.needs_review)+' / 过期 '+reviewed.stale_review+'</span>'+
+     '<span class="badge">真实YOLO11n+ByteTrack历史研究：'+yolo.camera_local_occurrences+
+       ' 段本机目标 / '+yolo.annotated_frames+' 个模型帧框（不是独立真人）</span>'+
+     '<span class="badge">YOLO目标复核：合理 '+yoloQA.valid_local_target+
+       ' / 误检 '+yoloQA.false_positive+' / 待审 '+
+       (yoloQA.not_reviewed+yoloQA.needs_review)+' / 过期 '+yoloQA.stale_review+'</span>';
+   $('occurrenceRows').innerHTML=summary.by_camera.map(x=>
+     '<tr><td>'+esc(x.provider==='caviar_ground_truth'?'CAVIAR研究标注':
+       x.provider==='yolo_bytetrack'?'YOLO11n→ByteTrack自动本机跟踪':'Frigate匿名事件')+
+     '</td><td>'+esc(x.venue_name)+'</td><td>'+esc(x.camera_key)+
+     '</td><td>'+x.local_occurrences+'</td><td>'+(x.annotated_frames??'—')+
+     '</td><td>'+esc(x.time_basis==='archival_video_frame_number'?'原片帧号':'UTC事件时间')+
+     '</td></tr>').join('')||'<tr><td colspan="6">当前没有已导入的真实匿名事件；不会生成模拟数。</td></tr>';
+   $('occurrenceNote').textContent='已查询 '+summary.visible_cameras+
+       ' 个机位；Frigate原始数和质检后状态分列、质检不删除原始事件。'+
+       '不合并跨机位轨迹，CAVIAR整片历史帧不进入近7日实时计数；'+
+       '不将视频帧累计为人数、不混合研究视频与实时UTC。';
+ }catch(e){$('occurrenceNote').textContent='读取局部事件失败：'+e.message}
+}
+async function evaluateBothTrackers(){
+ const source=current();
+ if(!source){$('trackerBaseline').textContent='请先导入两个官方固定摄像机';return}
+ const btn=$('benchmarkPair');btn.disabled=true;
+ $('trackerBaseline').textContent='正在调用现有ByteTrack和OC-SORT，分别核对同一场所两台真实摄像机的官方目标框…';
+ try{
+  const r=await api('/api/cctv/sources/'+source+'/pair-tracking-baseline?max_frames=400');
+  $('trackerBaseline').textContent='同一个场所 #'+r.place_id+' 的 '+r.camera_count+
+    ' 路摄像机，现成跟踪算法结果：\n'+r.cameras.map(camera=>
+    camera.camera_view+'：'+camera.algorithms.map(a=>
+      a.algorithm+'＝输入人工框'+a.ground_truth_boxes+
+      '／分配'+a.assigned_boxes+'／局部身份切换'+a.local_id_changes).join('；')
+    ).join('\n')+
+    '\n结论：本机自动跟踪已经执行，摄像机本机编号不能跨机自动确认为同一自然人；这是人工GT驱动的算法测试，不是人体检测准确率。';
+ }catch(e){$('trackerBaseline').textContent='双摄像机验证未完成：'+e.message}
+ finally{btn.disabled=false}
+}
+async function evaluateRealPersonDetector(){
+ const source=current();if(!source){$('trackerBaseline').textContent='先导入官方CAVIAR视频';return}
+ const btn=$('benchmarkDetector');btn.disabled=true;
+ $('trackerBaseline').textContent='正从本地已校验的官方MPEG帧调用已有YOLO11n人体检测+ByteTrack；不使用人工GT框作为检测输入。';
+ try{
+  const r=await api('/api/cctv/sources/'+source+
+       '/person-detector-run?max_frames=32&sample_every=1&image_size='+$('yoloImageSize').value,'POST');
+  $('trackerBaseline').textContent='真实预训练检测 '+r.model+
+    ' + 现成 '+r.tracker+'\n摄像机：'+r.camera_view+
+    '\n真实解码帧：'+r.frames_decoded+'；模型推理帧：'+r.frames_inferred+
+    '；实际检出人体框：'+r.predicted_person_boxes+
+    '；已分配本机跟踪框：'+r.tracker_assigned_boxes+
+    '；模型产生本机轨迹：'+r.camera_local_tracker_ids+
+    '；已存证据框：'+r.stored_local_boxes+'；记录版本：'+r.run_key+
+    '\n模型输入尺度：'+r.detector_image_size+'像素（研究本机视角）'+
+    '\n同帧官方人工框（独立参考，绝未喂给YOLO）：'+r.published_gt_boxes_on_inferred_frames+
+    '\n独立检测质量（对官方人工框 IoU≥0.50）：TP '+r.detection_evaluation.true_positives+
+    ' / FP '+r.detection_evaluation.false_positives+' / FN '+r.detection_evaluation.false_negatives+
+    '；帧级精确率 '+(r.detection_evaluation.precision??'未定义')+
+    '；召回率 '+(r.detection_evaluation.recall??'未定义')+
+    '；本机轨迹覆盖率 '+(r.tracker_assignment_coverage_of_yolo_detections??'未定义')+
+    '\n上述数据是人体框检测质量，不是跨机位身份准确率。'+
+    '\n原始模型目标已进入统一匿名事件、来源与人工QA；没有跨机身份识别或真实到访。许可：'+r.model_license;
+  await refreshOccurrences();await refreshQuality();
+  const marker=r.run_key.slice(0,12);
+  const target=[...$('qaOccurrence').options].find(x=>
+      x.textContent.includes('yolo_bytetrack')&&x.textContent.includes(marker));
+  if(target){
+     $('qaOccurrence').value=target.value;
+     await loadOccurrenceQuality();
+     $('qaOccurrence').focus();
+     $('trackerBaseline').textContent+='\n已选择本次真实模型的首条本机轨迹供质量复核。';
+  }else{
+     $('trackerBaseline').textContent+='\n本次运行没有可见的本机轨迹，或事件在下一页；绝不伪造检测目标。';
+  }
+ }catch(e){$('trackerBaseline').textContent='现成人体检测链路未通过：'+e.message}
+ finally{btn.disabled=false}
+}
+async function evaluateExistingTracker(){
+ const source=current();
+ if(!source){$('trackerBaseline').textContent='尚未导入研究视频';return}
+ const button=$('benchmarkTracker');button.disabled=true;
+ $('trackerBaseline').textContent='正在调用外部 ByteTrack，核验官方逐帧人体框的局部轨迹…';
+ try{
+  const r=await api('/api/cctv/sources/'+source+'/tracking-baseline?max_frames=400&algorithm='+encodeURIComponent($('trackerAlgorithm').value));
+  $('trackerBaseline').textContent='现成算法：Roboflow '+r.algorithm+'\n'+
+    '摄像机：'+r.camera_view+'；官方人体框：'+r.ground_truth_boxes+
+    '；人工局部轨迹：'+r.ground_truth_local_track_count+
+    '；确认框：'+r.assigned_boxes+'；待确认：'+r.unconfirmed_boxes+
+    '\n分配覆盖率：'+r.assignment_coverage+'；局部ID变换：'+r.local_id_changes+
+    '\n这是人工GT框→现成自动跟踪器的测试；没有运行人体检测器，也没有跨机真人身份匹配。';
+ }catch(e){$('trackerBaseline').textContent='未能运行基线：'+e.message}
+ finally{button.disabled=false}
+}
+function choose(id){$('source').value=String(id);$('frame').value='1';loadTracks();viewFrame()}
+async function loadPair(){
+ const b=$('loadPair');b.disabled=true;
+ try{const place_id=Number($('place').value);
+   for(const view of ['corridor','front']){
+     setStatus('下载并校验 '+view+' 固定监控 MPEG 和人工 XML 标注…');
+     const d=await api('/api/cctv/datasets/import','POST',{
+       place_id,scenario:'enter_exit_crossing_paths_1',view});
+     setStatus(view+': '+d.status+'，摄像机源 #'+d.source_id);
+     await refresh();
+   }
+   setStatus('两路真实固定摄像机已归于同一个场所；可以解码和查看。');
+ }catch(e){setStatus('导入未完成：'+e.message,true);await refresh().catch(()=>{})}
+ finally{b.disabled=false}
+}
+async function viewFrame(){
+ const id=current();if(!id)return;
+ const n=Number($('frame').value)||1;
+ const r=await fetch('/api/cctv/sources/'+id+'/frame?frame='+n,{headers:{Authorization:'Bearer '+token}});
+ if(!r.ok){const err=await r.json();$('frameNote').textContent=err.detail||'帧读取失败';return}
+ const blob=await r.blob();if(lastImage)URL.revokeObjectURL(lastImage);
+ lastImage=URL.createObjectURL(blob);$('photo').src=lastImage;
+ $('frameNote').textContent='当前视频源 #'+id+'、实际第 '+n+' 帧；绿色框为CAVIAR官方人工标注，非自动识别。';
+}
+async function loadTracks(){
+ const id=current();if(!id)return;
+ try{const d=await api('/api/cctv/sources/'+id+'/activity');
+ $('tracks').innerHTML=d.local_tracks.slice(0,18).map(t=>
+ `<span class="badge yellow">本机轨迹#${esc(t.camera_local_track_id)}：
+ ${t.annotated_frames}帧（${t.first_frame}—${t.last_frame}）</span> `).join('')||
+ '本机位无人工轨迹标注';
+ }catch(e){$('tracks').textContent=e.message}
+}
+async function detect(){
+ const id=current();if(!id)return;
+ $('process').disabled=true;$('detection').textContent='正在实际解码，并运行原有人脸候选检测…';
+ try{const d=await api('/api/sources/'+id+'/process?max_frames=80&sample_every=8','POST');
+ $('detection').textContent=JSON.stringify(d,null,2);
+ }catch(e){$('detection').textContent='实际检测未成功：'+e.message}
+ finally{$('process').disabled=false}
+}
+async function start(){
+ try{
+ const [p,,actor]=await Promise.all([api('/api/places'),api('/api/cctv/datasets'),api('/api/auth/me')]);
+ document.body.dataset.stateUi=actor.level===1?'yes':'no';
+ zdApplyRoleNavigation(actor);
+ $('researchPanel').hidden=actor.level!==1;
+ $('epflImportReport').hidden=actor.level!==1;
+ $('epflUseBundled').hidden=actor.level!==1;
+ if(actor.level===1){
+  try{
+   const status=await api('/api/research/epfl/bundled');
+   $('epflUseBundled').disabled=!status.available;
+   $('epflUseBundled').title=status.available?
+    ('内置真实双机候选 '+status.candidate_count+' 条'):
+    (status.reason||'当前不是含研究结果的CI演示包');
+   if(status.available){
+    $('epflReportStatus').textContent='已包含真实EPFL双机匿名关联结果 '+status.candidate_count+
+     ' 条。点击“一键载入”即可进入审核，不需要另下载视频。';
+   }
+  }catch(e){$('epflUseBundled').disabled=true}
+ }
+ $('epflRefreshCandidates').hidden=actor.level!==1;
+ $('epflReviewPanel').hidden=actor.level!==1;
+ if(actor.level===1)await loadEpflCandidates();
+ $('place').innerHTML=p.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+ await refresh();await refreshResearch();
+ setStatus('已读取：'+imported.length+' 路公开固定监控视频。');
+ }catch(e){setStatus('无法加载：'+e.message,true)}
+}
+
+function clearEpflResearchReport(){
+ epflPendingReport=null;
+ $('epflReportStatus').textContent='未加载研究文件；没有自动确认人员身份。';
+ $('epflSummary').textContent='';
+ $('epflAuditRows').innerHTML='<tr><td colspan="6">尚未加载研究报告</td></tr>';
+ $('epflReportInput').value='';
+}
+async function openEpflResearchReport(event){
+ const file=event.target.files?.[0];if(!file)return;
+ try{
+  if(file.size>5*1024*1024)throw Error('研究报告JSON超过5MiB上限');
+  const report=JSON.parse(await file.text());
+  if(report.dataset!=='laboratory_six_person_four_synced_views'||
+      report.matching_gt_is_never_input!==true||
+      report.production_real_roster_or_alerts!==false||
+      !Array.isArray(report.selected_cameras)||
+      report.selected_cameras.join(',')!=='0,1'||
+      report.model!=='yolo11n.pt'||
+      !Array.isArray(report.frame_audits)||
+      !Array.isArray(report.holdout_frame_audits)||
+      report.frame_audits.length===0||
+      !report.per_camera?.['0']?.sha256||!report.per_camera?.['1']?.sha256)
+   throw Error('文件不是完整的EPFL六人独立真值研究格式');
+  const rows=[...report.frame_audits.map(x=>({...x,kind:'基线'})),
+              ...report.holdout_frame_audits.map(x=>({...x,kind:'冻结留出集'}))];
+  for(const row of rows){
+   if(!Number.isInteger(row.frame_0_based)||row.frame_0_based<0||
+      !Number.isInteger(row.cross_camera_candidates)||
+      !Number.isInteger(row.verified_same_gt_person_matches)||
+      !Number.isInteger(row.verified_different_gt_person_matches)||
+      !Number.isInteger(row.unscorable_pairs_no_two_sided_gt)||
+      row.cross_camera_candidates!==row.verified_same_gt_person_matches+
+       row.verified_different_gt_person_matches+row.unscorable_pairs_no_two_sided_gt)
+     throw Error('关联候选计数或官方核验计数不一致');
+  }
+  const sum=key=>rows.reduce((v,x)=>v+x[key],0);
+  const same=sum('verified_same_gt_person_matches');
+  const diff=sum('verified_different_gt_person_matches');
+  const unknown=sum('unscorable_pairs_no_two_sided_gt');
+  const pairs=sum('cross_camera_candidates');
+  $('epflSummary').innerHTML=[
+   '同步时刻 '+rows.length,
+   '匿名配对 '+pairs,'真值一致 '+same,
+   '不同人错配 '+diff,'无法核验 '+unknown,
+   '条件可评分精确率 '+(same+diff?((100*same/(same+diff)).toFixed(2)+'%'):'未知')
+  ].map(x=>'<span class="badge">'+esc(x)+'</span>').join(' ');
+  $('epflAuditRows').innerHTML=rows.sort((a,b)=>a.frame_0_based-b.frame_0_based)
+   .map(x=>'<tr><td>'+x.frame_0_based+'</td><td>'+esc(x.kind)+'</td><td>'+
+       Number(x.camera_0_predicted_person_boxes)+' / '+Number(x.camera_1_predicted_person_boxes)+
+       '</td><td>'+x.cross_camera_candidates+'</td><td>'+
+       x.verified_same_gt_person_matches+'</td><td>'+
+       x.verified_different_gt_person_matches+' / '+x.unscorable_pairs_no_two_sided_gt+
+       '</td></tr>').join('');
+  epflPendingReport={
+    dataset:report.dataset,model:report.model,
+    matching_algorithm:report.matching_algorithm,
+    matching_gt_is_never_input:report.matching_gt_is_never_input,
+    production_real_roster_or_alerts:report.production_real_roster_or_alerts,
+    selected_cameras:report.selected_cameras,
+    per_camera:{'0':{sha256:report.per_camera['0'].sha256,fps:report.per_camera['0'].fps},
+                '1':{sha256:report.per_camera['1'].sha256,fps:report.per_camera['1'].fps}},
+    frame_audits:report.frame_audits.map(x=>({
+     frame_0_based:x.frame_0_based,cross_camera_candidates:x.cross_camera_candidates,
+     candidate_evidence:x.candidate_evidence.map(c=>({
+       cam0_model_box_index:c.cam0_model_box_index,
+       cam1_model_box_index:c.cam1_model_box_index,
+       calibration_distance:c.calibration_distance,
+       cam0_ground_xy:c.cam0_ground_xy,
+       cam1_ground_xy:c.cam1_ground_xy}))})),
+    holdout_frame_audits:report.holdout_frame_audits.map(x=>({
+     frame_0_based:x.frame_0_based,cross_camera_candidates:x.cross_camera_candidates,
+     candidate_evidence:x.candidate_evidence.map(c=>({
+       cam0_model_box_index:c.cam0_model_box_index,
+       cam1_model_box_index:c.cam1_model_box_index,
+       calibration_distance:c.calibration_distance,
+       cam0_ground_xy:c.cam0_ground_xy,
+       cam1_ground_xy:c.cam1_ground_xy}))}))
+   };
+  $('epflReportStatus').textContent='本地研究文件：'+file.name+
+   '。官方6人标签只用于审计。视频摘要：cam0 '+
+   report.per_camera['0'].sha256.slice(0,16)+'… / cam1 '+
+   report.per_camera['1'].sha256.slice(0,16)+
+   '…。请另行核对原CI工件来源，禁止把本地文件内容视为人员身份证明。';
+ }catch(e){
+  $('epflSummary').textContent='';
+  $('epflAuditRows').innerHTML='<tr><td colspan="6">文件没有通过本地结构和计数检查</td></tr>';
+  $('epflReportStatus').textContent='不能读取该研究报告：'+e.message;
+ }
+}
+async function importEpflResearchCandidates(){
+ if(!epflPendingReport){$('epflReviewStatus').textContent='先选择真实CI研究报告JSON';return}
+ $('epflImportReport').disabled=true;
+ try{
+   const receipt=await api('/api/research/epfl/import','POST',epflPendingReport);
+   epflCurrentReportDigest=receipt.report_digest;epflCandidateOffset=0;
+   $('epflReviewStatus').textContent='导入 '+receipt.candidate_count+
+     ' 条研究匿名候选；真实身份仍未验证。'+(receipt.already_present?'（已有持久记录）':'');
+   await loadEpflCandidates();
+ }catch(e){$('epflReviewStatus').textContent='研究导入失败：'+e.message}
+ finally{$('epflImportReport').disabled=false}
+}
+async function loadEpflCandidates(next=false,previous=false){
+ try{
+   const requestOffset=next?epflCandidateOffset+EPFL_PAGE_SIZE:
+     (previous?Math.max(0,epflCandidateOffset-EPFL_PAGE_SIZE):epflCandidateOffset);
+   const query='?limit='+EPFL_PAGE_SIZE+'&offset='+requestOffset+
+       (epflCurrentReportDigest?'&report_digest='+encodeURIComponent(epflCurrentReportDigest):'');
+   const result=await api('/api/research/epfl/candidates'+query);
+   epflCurrentReportDigest=result.report_digest;
+   epflCandidateOffset=requestOffset;
+   $('epflReviewPanel').hidden=false;
+   $('epflReviewRows').innerHTML=result.candidates.map(x=>
+    '<tr><td>'+x.frame_0_based+'</td><td>'+esc(x.eval_split)+'</td><td>'+
+    x.cam0_box_index+' / '+x.cam1_box_index+'</td><td>'+
+    Number(x.ground_distance).toFixed(2)+'</td><td>'+
+    esc(x.verdict||'待复核')+'</td><td>'+
+    '<button type="button" class="secondary" data-epfl-key="'+esc(x.candidate_key)+
+    '" data-epfl-verdict="plausible_same_target">认为合理</button> '+
+    '<button type="button" class="secondary" data-epfl-key="'+esc(x.candidate_key)+
+    '" data-epfl-verdict="false_match">误配</button> '+
+    '<button type="button" class="secondary" data-epfl-key="'+esc(x.candidate_key)+
+    '" data-epfl-verdict="needs_review">待复核</button></td></tr>'
+   ).join('')||'<tr><td colspan="6">该报告没有本页候选，未产生任何身份</td></tr>';
+   $('epflReviewStatus').textContent='研究候选 '+result.candidate_count+
+     '，已复核 '+result.reviewed_count+
+     '。无法核实原视频的候选请标记「待复核」，不进入真实人员底库。';
+   $('epflPageNote').textContent='第 '+(Math.floor(epflCandidateOffset/EPFL_PAGE_SIZE)+1)+
+     ' 页，显示 '+(result.candidates.length?epflCandidateOffset+1:0)+'–'+
+     (epflCandidateOffset+result.candidates.length)+' / '+result.candidate_count+' 条';
+   $('epflPrevPage').hidden=epflCandidateOffset===0;
+   $('epflLoadMore').hidden=result.next_offset===null;
+ }catch(e){$('epflReviewStatus').textContent='无法读取研究候选：'+e.message}
+}
+async function saveEpflReview(key,verdict){
+ const reason=$('epflReviewReason').value.trim();
+ try{
+  const saved=await api('/api/research/epfl/reviews','POST',{
+    candidate_key:key,verdict,reason});
+  $('epflReviewStatus').textContent='追加审核 #'+saved.review_id+
+    '。只是匿名研究候选判断，未认证自然人身份。';
+  await loadEpflCandidates();
+ }catch(e){$('epflReviewStatus').textContent='无法保存审核：'+e.message}
+}
+$('epflReviewRows').addEventListener('click',e=>{
+ const b=e.target.closest('button[data-epfl-key]');
+ if(b)saveEpflReview(b.dataset.epflKey,b.dataset.epflVerdict);
+});
+async function useBundledEpflCandidates(){
+ $('epflUseBundled').disabled=true;
+ try{
+  const result=await api('/api/research/epfl/bundled/import','POST',{});
+  epflCurrentReportDigest=result.report_digest;epflCandidateOffset=0;
+  $('epflSummary').innerHTML='<span class="badge">真实视频生成 '+result.candidate_count+
+   ' 条同步匿名候选</span><span class="badge yellow">不包含脸部身份或真实预警</span>';
+  await loadEpflCandidates();
+  $('epflReportStatus').textContent='已使用交付包内置CI研究候选，不需要重新下载或训练视频。'+
+    '原视频及GT不在包内，候选审核不是现实人物身份认证。';
+ }catch(e){$('epflReviewStatus').textContent='内置研究候选无法加载：'+e.message}
+ finally{$('epflUseBundled').disabled=false}
+}
+$('epflUseBundled').addEventListener('click',useBundledEpflCandidates);
+$('epflImportReport').addEventListener('click',importEpflResearchCandidates);
+$('epflRefreshCandidates').addEventListener('click',()=>{epflCandidateOffset=0;loadEpflCandidates()});
+$('epflLoadMore').addEventListener('click',()=>loadEpflCandidates(true));
+$('epflPrevPage').addEventListener('click',()=>loadEpflCandidates(false,true));
+$('epflReportInput').addEventListener('change',openEpflResearchReport);
+$('epflClearReport').addEventListener('click',clearEpflResearchReport);
+
+$('loadPair').onclick=loadPair;$('viewFrame').onclick=()=>viewFrame().catch(e=>$('frameNote').textContent=e.message);
+$('process').onclick=detect;
+$('benchmarkTracker').onclick=evaluateExistingTracker;
+$('benchmarkPair').onclick=evaluateBothTrackers;
+$('benchmarkDetector').onclick=evaluateRealPersonDetector;
+$('source').onchange=loadTracks;start();
+</script><script src="/ui/site-navigation.js"></script><script src="/ui/compact-sections.js"></script></body></html>

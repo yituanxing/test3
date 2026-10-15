@@ -27,6 +27,7 @@ DEFAULT_CONFIG = {
     'visit_gap_minutes': 20,
     'encounter_window_minutes': 10,
     'companion_min_episodes': 2,
+    'companion_min_people': 2,
     'gathering_min_people': 3,
     'gathering_min_episodes': 1,
     'interaction_min_rounds': 1,
@@ -39,6 +40,8 @@ DEFAULT_CONFIG = {
     'activity_end_hour': 18,
     'activity_timezone_offset_hours': 0,
     'watch_place_id': 0,
+    'watch_place_ids': [],
+    'watch_person_ids': [],
     'enabled_rules': list(RULE_NAMES),
     'affiliation_mode': 'earliest',
 }
@@ -157,22 +160,38 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
                 [affiliation[v['person']], v['place_id']], v['observation_ids'],
                 '这是按合成主归属规则得到的模拟命中，不能单凭跨场所出现推断风险。'))
 
-    # Count distinct episodes shared by people with the same synthetic home,
-    # in a common *other* place; a single sustained visit counts once.
+    # Reusable synthetic cohort rule (#7). The original two-person rule
+    # remains byte-for-byte compatible in its default (N=2) behavior. For
+    # N>=3, identify a STABLE cohort of N or more fictional people sharing
+    # one fictional home at a common other location in separate windows.
+    # The same cohort, not unrelated pairwise edges, must repeat.
+    min_companions = config.get('companion_min_people', 2)
     shared = defaultdict(list)
     for ep in episodes:
         by_person = {v['person']: v for v in ep['visits']}
-        for a, b in combinations(sorted(by_person), 2):
-            if affiliation[a] == affiliation[b] and affiliation[a] != ep['place_id']:
-                shared[(a, b)].append(ep)
-    for (a, b), eps in shared.items():
+        if min_companions == 2:
+            for a,b in combinations(sorted(by_person),2):
+                if affiliation[a] == affiliation[b] and affiliation[a] != ep['place_id']:
+                    shared[(a,b)].append(ep)
+        else:
+            same_home = defaultdict(set)
+            for person in by_person:
+                home = affiliation.get(person)
+                if home is not None and home != ep['place_id']:
+                    same_home[home].add(person)
+            for cohort in same_home.values():
+                if len(cohort) >= min_companions:
+                    shared[tuple(sorted(cohort))].append(ep)
+    for cohort, eps in shared.items():
         if len(eps) >= config['companion_min_episodes']:
-            ids = [i for ep in eps for v in ep['visits'] if v['person'] in (a, b)
+            ids = [i for ep in eps for v in ep['visits'] if v['person'] in cohort
                    for i in v['observation_ids']]
-            alerts.append(_hit('companion', [a, b],
-                f"{a} 与 {b} 在其他场所共同出现 {len(eps)} 个时间窗口",
-                [a, b], [ep['place_id'] for ep in eps], ids,
-                '窗口共同出现仅为时间关联，不能确定实际同行关系。'))
+            members = '、'.join(cohort)
+            key_parts = list(cohort) if min_companions == 2 else [min_companions, *cohort]
+            alerts.append(_hit('companion', key_parts,
+                f"{members} 在其他场所共同出现 {len(eps)} 个时间窗口",
+                cohort, [ep['place_id'] for ep in eps], ids,
+                '同一合成成员组重复共同出现；不证明现实中的结伴同行。'))
 
     # Directional encounters in BOTH participants' simulated home places.
     interaction = defaultdict(lambda: defaultdict(list))
@@ -222,13 +241,21 @@ def analyze(observations: list[dict], config: dict, *, now: datetime | None = No
                 [affiliation[person]], last['observation_ids'],
                 '无观测不代表实际未到访；设备离线和漏检均可导致缺失。'))
 
-    watch = config['watch_place_id']
-    if watch:
+    # Shared target selectors (#11): many fictional people and places use
+    # one rule evaluation, not independent per-page or per-place logic.
+    # New list overrides legacy scalar only when non-empty.
+    watched_places = set(config.get('watch_place_ids', []))
+    if not watched_places and config.get('watch_place_id'):
+        watched_places.add(config['watch_place_id'])
+    watched_people = set(config.get('watch_person_ids', []))
+    if watched_places:
         for v in visits:
-            if v['place_id'] == watch:
-                alerts.append(_hit('appearance', [watch, v['person'], v['start'].isoformat()],
-                    f"{v['person']} 出现在演示指定场所 {watch}", [v['person']],
-                    [watch], v['observation_ids'], '仅用于虚构样本的可配置位置事件示例。'))
+            if v['place_id'] in watched_places and (not watched_people or v['person'] in watched_people):
+                alerts.append(_hit('appearance',
+                    [v['place_id'], v['person'], v['start'].isoformat()],
+                    f"{v['person']} 出现在合成关注场所 {v['place_id']}",
+                    [v['person']], [v['place_id']], v['observation_ids'],
+                    '仅基于明确虚构身份与指定场所的模拟到访；未识别任何真实人员。'))
 
     # Excel #12: activity headcount must be evaluated after closing time.
     # Fixed UTC offset makes the demo stable on GitHub runners and local PCs.

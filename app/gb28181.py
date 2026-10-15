@@ -300,6 +300,11 @@ def stop(session_id:int,request:Request):
         c.execute("UPDATE gb28181_stream_sessions SET state='stopped',stopped_at=? WHERE id=?",
                   (_now(),session_id))
         c.execute('UPDATE sources SET enabled=0 WHERE id=?',(session['source_id'],))
+        # A stopped upstream GB session must not leave a capture worker
+        # retrying a permanently disabled RTSP source.
+        c.execute("""UPDATE capture_jobs SET desired_enabled=0,
+            state=CASE WHEN owner_token IS NULL THEN 'stopped' ELSE 'stopping' END,
+            updated_at=? WHERE source_id=?""", (_now(), session['source_id']))
         admin.audit(c,'gb28181_stop',f"gb-session:{session_id}",None,
                     {'session_id':session_id,'source_id':session['source_id']})
     return {'session_id':session_id,'state':'stopped','source_enabled':False}
