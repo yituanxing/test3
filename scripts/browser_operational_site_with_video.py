@@ -196,9 +196,17 @@ def main():
                             expect(bar).to_be_visible()
                             expect(bar.get_by_role("tab",name=__import__("re").compile(selected))).to_have_attribute("aria-selected","true")
                             primary=page.locator('main .panel:not(.zd-compact-hidden),main .card:not(.zd-compact-hidden)')
+                            if route=="/cctv":
+                                expect(page.locator("#epflResearchPanel")).to_be_visible()
+                                expect(page.locator("#caviarImport")).to_be_hidden()
+                                expect(page.locator("#researchPanel")).to_be_hidden()
                             page.screenshot(path=str(OUT/("ui-shipped-compact-"+label+"-primary.png")),full_page=True)
                             bar.get_by_role("tab",name=__import__("re").compile(secondary)).click()
                             expect(bar.get_by_role("tab",name=__import__("re").compile(secondary))).to_have_attribute("aria-selected","true")
+                            if route=="/cctv":
+                                expect(page.locator("#epflResearchPanel")).to_be_hidden()
+                                expect(page.locator("#researchPanel")).to_be_hidden()
+                                expect(page.locator("#caviarImport")).to_be_visible()
                             page.screenshot(path=str(OUT/("ui-shipped-compact-"+label+"-secondary.png")),full_page=True)
                         # Check the first screen reports both independent data sources.
                         page.goto(base+"/portal")
