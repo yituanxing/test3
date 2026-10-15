@@ -105,6 +105,11 @@ def verify_all_business_pages(page,base,out,read):
                    return el?.scrollTop||0}""")
                 assert after>metrics['top']+35,(route,'wheel failed to scroll right content',metrics,after)
                 result['wheel_scroll_pixels']=after-metrics['top']
+                # A reviewer should be able to see the same page after using
+                # the mouse wheel; keep that screenshot, not only the top view.
+                wheelshot='accept-wheel-'+str(n).zfill(2)+'-'+route.strip('/').replace('/','-').replace('?','-').replace('=','-')+'.png'
+                page.screenshot(path=str(out/wheelshot),full_page=True)
+                result['images'].append(wheelshot)
                 page.mouse.wheel(0,-2000)
                 page.wait_for_timeout(150)
             slug=f'{n:02d}-'+route.strip('/').replace('/','-').replace('?','-').replace('=','-')
