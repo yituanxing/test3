@@ -90,11 +90,12 @@
     const main=document.querySelector("main.container");
     if(!main)return;
     const headings=[...main.querySelectorAll(":scope > .section-title")];
-    if(headings.length!==3)return;
+    if(headings.length!==4)return;
     titles=[
-      ["situation","综合分析","场所统计与趋势"],
-      ["search","人员检索","按编号查询完整活动"],
-      ["real","视频统计","独立真实检测"]
+      ["recorded","真实活动记录","人体检测与匿名片段"],
+      ["situation","模拟分析","合成业务统计"],
+      ["search","模拟人员检索","按 P### 查看合成到访"],
+      ["real","视频统计","实时事件来源"]
     ];
     targets=headings.map((heading)=>{
       const els=[heading];
@@ -104,7 +105,8 @@
     });
     parentNode=main;
     insertBefore=headings[0];
-    defaultGroup="search";
+    // Alert links to P### must still open their own synthetic timeline.
+    defaultGroup=/^P[0-9]{3}$/.test(params.get("person")||"") ? "search" : "recorded";
   }else if (groups[path]) {
     const cfg=groups[path];
     targets=[...document.querySelectorAll(cfg.card)].map(el=>[el]);
