@@ -37,6 +37,18 @@ html body{margin:0!important;background:#f5f7fb}
 .zd-global-body>main{width:auto!important;max-width:1370px!important;box-sizing:border-box;margin:0 auto!important;padding:22px 26px 65px!important}
 .zd-global-body>main.wrap{max-width:1370px!important}
 .zd-global-body>.wrap{max-width:1370px;margin:auto}
+@media(min-width:751px){
+ html,body{height:100%;overflow:hidden}
+ .zd-global-shell{height:100dvh;min-height:0;overflow:hidden}
+ .zd-global-nav{position:relative;top:auto;height:100%;min-height:0;overflow-y:auto;
+  overscroll-behavior:contain;scrollbar-gutter:stable}
+ .zd-global-body{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+ .zd-global-body>.zd-global-top{flex:0 0 62px;min-height:62px;height:62px}
+ .zd-global-body>main{flex:1;min-height:0;width:100%!important;max-width:none!important;
+  overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;
+  padding:17px 23px 26px!important}
+ .zd-global-body main .zd-workspace-tabs{position:sticky;top:0}
+}
 @media(max-width:750px){.zd-global-shell{display:block}.zd-global-nav{height:auto;position:static;display:flex;flex-direction:row;flex-wrap:wrap;gap:2px;padding:9px}.zd-global-nav .zd-brand-name{width:100%;padding:4px 8px 8px}.zd-global-nav .zd-nav-group,.zd-global-nav .zd-global-note{display:none}.zd-global-nav a{padding:7px 8px!important;font-size:12px!important}.zd-global-top small{display:none}.zd-global-body>.zd-global-top{padding:11px 17px;min-height:45px}.zd-global-body>main{padding:16px!important}}
 `;
 document.head.append(styles);
