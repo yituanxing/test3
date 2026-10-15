@@ -15,6 +15,15 @@
         ["history", "审计记录", [7], "修改与复核历史"]
       ]
     },
+    "/cctv": {
+      before: "main > section", card: "main > section",
+      titles: [
+        ["epfl","双机视频证据",[0,6],"研究录像与匿名配对"],
+        ["caviar","录像及轨迹",[1,2,3,4],"另一组真实研究录像"],
+        ["review","人工核对",[5,7],"局部目标与标注复核"],
+        ["limits","适用范围",[8],"验证范围及未实现能力"]
+      ]
+    },
     "/base": {
       before: ".panel", card: "main .panel",
       titles: [
@@ -56,6 +65,7 @@
     .zd-workspace-tabs button[aria-selected="true"] small{color:#d8eaff}
     .zd-compact-hidden{display:none!important}
     .zd-workspace-tabs + .layout, .zd-workspace-tabs + .grid{margin-top:0}
+    main:has(.zd-workspace-tabs) > .jumpnav{display:none!important}
     @media(max-width:750px){.zd-workspace-tabs{position:relative;top:auto;flex-wrap:nowrap;
       overflow-x:auto}.zd-workspace-tabs button{min-width:150px;flex-shrink:0}}
     `;
