@@ -60,6 +60,27 @@ window.addEventListener('load',async()=>{
 <main class="container">
 <div class="notice"><b>演示数据：</b>P###人员、活动及关联为合成示例；视频检测数据独立展示，不代表真实身份或互动。</div>
 <div class="controls"><label>分析时间范围<select id="days"><option value="1">近1天</option><option value="7" selected>近7天</option><option value="14">近14天</option><option value="30">近30天</option></select></label><label>辖区范围<select id="region"><option value="">全部辖区</option></select></label><label>场所<select id="place"><option value="">全部场所</option></select></label><button id="reload">更新态势</button><button id="seed" style="background:#0d8478">初始化合成示例</button><span id="message" role="status" style="color:#647991;font-size:12px"></span></div>
+
+<div class="section-title"><h2>真实视频中的匿名人员活动</h2><p>真实双机检测数据 · 无真人身份推断</p></div>
+<section class="panel" id="realActivityPanel">
+ <div class="panel-head"><h3>从录像检测结果直接生成的活动记录</h3><span class="tag">真实研究视频</span></div>
+ <p class="info">来源：EPFL 同一研究场所的两路录像，经人体检测、空间配对及保守短时关联得到。每个 V 编号仅代表匿名活动片段，不是独立人数或跨场所真人身份。</p>
+ <div class="cards" style="margin:13px 0 18px;grid-template-columns:repeat(3,minmax(0,1fr))">
+  <div class="card a"><div class="caption">真实双机配对观测</div><div class="value" id="realPairs">—</div><div class="small">重复时刻的检测记录，非人数</div></div>
+  <div class="card b"><div class="caption">匿名活动片段</div><div class="value" id="realFragments">—</div><div class="small">不等于去重自然人</div></div>
+  <div class="card c"><div class="caption">经过核验的跨时关联</div><div class="value" id="realTemporal">—</div><div class="small">审核变化将取消原核验</div></div>
+ </div>
+ <div class="search-controls" style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+  <label>按匿名活动编号检索<input id="realActivityQuery" placeholder="例如 V001"></label>
+  <button id="realActivityRefresh" type="button">刷新真实记录</button>
+  <a href="/real" class="tag">查看真实视频及检测画面 →</a>
+  <span id="realActivityStatus" role="status" class="info">正在读取实际图像处理结果…</span>
+ </div>
+ <div class="scroller"><table aria-label="来自真实视频的匿名活动片段">
+  <thead><tr><th>匿名活动编号</th><th>录像时间</th><th>同步配对观测</th><th>证据与核查</th></tr></thead>
+  <tbody id="realActivityRows"><tr><td colspan="4">正在读取真实录像检测结果…</td></tr></tbody>
+ </table></div>
+</section>
 <div class="section-title"><h2>01 · 合成业务态势</h2><p id="clock">基于虚构观测的演示时钟（UTC）</p></div>
 <div class="cards"><div class="card a"><div class="caption">场所数量</div><div class="value" id="kPlaces">—</div><div class="small">当前查询范围</div></div><div class="card b"><div class="caption">合成到访会话</div><div class="value" id="kVisits">—</div><div class="small">相近抓拍按访问窗口聚合</div></div><div class="card c"><div class="caption">虚构人员去重</div><div class="value" id="kPeople">—</div><div class="small">仅根据P###标识去重</div></div><div class="card d"><div class="caption">模拟规则命中</div><div class="value" id="kAlerts">—</div><div class="small" id="roster">底库状态：—</div></div></div>
 <div class="grid-two" style="margin-top:14px">
@@ -117,6 +138,51 @@ async function load(){const btn=$('reload');btn.disabled=true;msg('加载中…'
 async function doSearch(){const q=$('personQuery').value.trim(),days=$('personDays').value;const extra={days,q};const url='/api/insights/people?'+params(extra);const box=$('peopleList');box.innerHTML='<div class="empty">正在查询…</div>';try{const data=await api(url);$('searchCount').textContent=`查询到 ${data.count} 条虚构人员标识${data.truncated?'（仅显示前200条）':''}`;if(!data.people.length){box.innerHTML='<div class="empty">暂无符合条件的合成观测，或需要先点击「初始化合成示例」</div>';return}box.innerHTML='<table><thead><tr><th>虚构编号</th><th>主归属</th><th>出现场所</th><th>合成到访</th><th>最后观测</th><th>查看</th></tr></thead><tbody>'+data.people.map(p=>`<tr><td><b>${escapeHTML(p.person)}</b></td><td>${escapeHTML(p.affiliation_place_name||'无')}</td><td class="wraptext">${escapeHTML(p.seen_place_names.join('、'))}</td><td>${p.synthetic_visits}</td><td>${escapeHTML(p.last_seen_utc.slice(0,16))}</td><td><button type="button" data-person="${escapeHTML(p.person)}">详情 →</button></td></tr>`).join('')+'</tbody></table>';box.querySelectorAll('[data-person]').forEach(b=>b.addEventListener('click',()=>openPerson(b.dataset.person)))}catch(e){box.innerHTML='<div class="empty">查询失败：'+escapeHTML(e.message)+'</div>'}}
 async function openPerson(person){$('detailBox').classList.add('show');$('detailBox').setAttribute('aria-hidden','false');$('personTitle').textContent=person;$('personSubtitle').textContent='正在加载虚构到访…';$('personContent').innerHTML='';try{const days=$('personDays').value;const q=new URLSearchParams({days});if($('region').value)q.set('region_id',$('region').value);const d=await api('/api/insights/people/'+encodeURIComponent(person)+'?'+q);$('personSubtitle').textContent=`主归属：${d.affiliation_place_name||'未发布/无归属'} · ${d.total_visits}个模拟到访会话 · ${d.seen_places}个场所`;const mapHref='/geo?'+new URLSearchParams({person,days});
 $('personContent').innerHTML=`<p class="info"><a id="openPersonMap" href="${escapeHTML(mapHref)}">在地图中回放合成P###到访（非真人路线） →</a></p><h3 class="subhead">模拟时间线 · 按观测时间倒序</h3><div class="timeline">${d.visits.map(v=>`<div class="event"><div class="loc">${escapeHTML(v.place_name)}</div><small>${escapeHTML(v.started_at.replace('T',' ').slice(0,19))} UTC · ${v.raw_observations}条原始合成观测</small><small>证据编号：${escapeHTML(v.observation_ids.join(', '))}</small></div>`).join('')}</div><h3 class="subhead">关联预警 (${d.alerts.length})</h3>${d.alerts.slice(0,15).map(a=>`<p class="info"><span class="tag orange">${escapeHTML(a.type_name)}</span> ${escapeHTML(a.title)}</p>`).join('')||'<p class="info">未关联模拟预警</p>'}<h3 class="subhead">共同出现时间窗口（非真实人物关系）</h3>${d.co_presence.slice(0,15).map(e=>`<p class="info">${escapeHTML(e.person_a)} / ${escapeHTML(e.person_b)} · ${e.windows}个窗口 · 场所ID ${escapeHTML(e.place_ids.join(', '))}</p>`).join('')||'<p class="info">无共同出现关联</p>'}<div class="notice" style="margin-top:18px">${escapeHTML(d.disclaimer)}</div>`}catch(e){$('personSubtitle').textContent='查询出错';$('personContent').textContent=e.message}}
+
+let realActivityCache=[];
+function renderRealActivityRows(){
+ const q=$('realActivityQuery').value.trim().toUpperCase();
+ const matches=realActivityCache.filter(a=>!q||a.activity_id.toUpperCase().includes(q));
+ $('realActivityRows').innerHTML=matches.slice(0,40).map(a=>{
+   const time= a.first_video_second==null?'帧 '+a.first_video_frame:
+     a.first_video_second+'秒 — '+a.last_video_second+'秒';
+   return '<tr><td><strong>'+escapeHTML(a.activity_id)+'</strong></td>'+
+     '<td>'+escapeHTML(time)+'</td><td>'+a.synchronized_pair_observations+' 条</td>'+
+     '<td><a href="/cctv#epflResearchPanel">查看检测证据 →</a></td></tr>'
+ }).join('')||'<tr><td colspan="4">当前筛选没有匹配的真实活动片段</td></tr>';
+ if(matches.length>40)$('realActivityStatus').textContent+=' · 当前展示前40条，可按编号检索';
+}
+async function loadRealActivity(){
+ const label=$('realActivityStatus');label.textContent='正在读取真实图像处理结果…';
+ try{
+   let result=await api('/api/real/activity');
+   if(!result.ready){
+     const bundled=await api('/api/research/epfl/bundled');
+     if(bundled.available){
+       await api('/api/research/epfl/bundled/import',{method:'POST'});
+       result=await api('/api/real/activity');
+     }
+   }
+   if(!result.ready){
+     label.textContent='当前尚未安装真实双机检测结果；没有生成或补造数据。';
+     $('realActivityRows').innerHTML='<tr><td colspan="4">无真实活动证据。请检查已授权研究视频包。</td></tr>';
+     return;
+   }
+   realActivityCache=result.activities||[];
+   $('realPairs').textContent=result.matched_pair_observations;
+   $('realFragments').textContent=result.anonymous_activity_fragments;
+   $('realTemporal').textContent=result.cross_time_temporal_linkage_verified?'已核验':'未核验';
+   label.textContent='已读取 '+realActivityCache.length+' 个真实录像匿名片段；非去重人数';
+   renderRealActivityRows();
+ }catch(e){
+   const forbidden=/\b403\b/.test(e.message);
+   label.textContent=forbidden?'研究录像仅对授权管理员开放':'真实数据读取失败：'+e.message;
+   $('realActivityRows').innerHTML='<tr><td colspan="4">'+escapeHTML(label.textContent)+'</td></tr>';
+ }
+}
+$('realActivityRefresh').addEventListener('click',loadRealActivity);
+$('realActivityQuery').addEventListener('input',renderRealActivityRows);
+loadRealActivity();
 $('close').addEventListener('click',()=>{$('detailBox').classList.remove('show');$('detailBox').setAttribute('aria-hidden','true')});$('detailBox').addEventListener('click',e=>{if(e.target===$('detailBox'))$('close').click()});window.addEventListener('keydown',e=>{if(e.key==='Escape')$('close').click()});$('reload').addEventListener('click',load);$('search').addEventListener('click',doSearch);$('personQuery').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});$('region').addEventListener('change',()=>{buildPlaceOptions();load()});$('place').addEventListener('change',load);$('seed').addEventListener('click',async()=>{if(!confirm('生成明确标记为虚构的演示观测？已有数据不会被覆盖。'))return;try{const r=await api('/api/business/seed',{method:'POST'});msg(`初始化：新增 ${r.inserted} 条演示记录`);await load()}catch(e){msg('初始化失败：'+e.message,true)}});
 // Direct links from an alert detail keep the exact simulated subject in view.
 const personFromLink=new URLSearchParams(location.search).get('person');
