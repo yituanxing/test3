@@ -97,6 +97,8 @@ def main():
                         page.locator('.zd-nav[href="/admin"]').click()
                         expect(page).to_have_url(base+"/admin",timeout=15000)
                         expect(page.locator(".zd-global-nav")).to_be_visible()
+                        expect(page.locator(".zd-workspace-tabs button")).to_have_count(4)
+                        page.get_by_role("tab",name=__import__("re").compile("账户权限")).click()
                         expect(page.locator("#accountPanel")).to_be_visible(timeout=15000)
                         page.screenshot(path=str(OUT/"ui-shipped-real-admin-roles.png"),full_page=True)
                         # Excel business information architecture must be reachable
@@ -108,10 +110,16 @@ def main():
                         expect(page.locator('.zd-global-nav a[href="/business"]')).to_be_visible()
                         page.locator('.zd-global-nav a[href="/business"]').click()
                         expect(page).to_have_url(base+"/business",timeout=15000)
+                        expect(page.locator(".zd-workspace-tabs button")).to_have_count(4)
+                        expect(page.locator("#alerts")).to_be_visible()
+                        page.get_by_role("tab",name=__import__("re").compile("规则配置")).click()
                         expect(page.locator("#instancePanel")).to_be_visible()
+                        page.screenshot(path=str(OUT/"ui-shipped-compact-rule-settings.png"),full_page=True)
                         page.locator('.zd-global-nav a[href="/insights"]').click()
                         expect(page).to_have_url(base+"/insights",timeout=15000)
+                        expect(page.locator(".zd-workspace-tabs button")).to_have_count(3)
                         expect(page.locator("#personQuery")).to_be_visible()
+
                         page.locator('.zd-global-nav a[href="/portal"]').click()
                         expect(page).to_have_url(base+"/portal",timeout=15000)
                         expect(page.locator('#navigation a[href="/base"]')).to_be_visible()
@@ -164,6 +172,8 @@ def main():
                         ]
                         for route,label,selector in targets:
                             page.goto(base+route,wait_until="domcontentloaded")
+                            if route=="/monitor":
+                                page.get_by_role("tab",name=__import__("re").compile("持续采集")).click()
                             expect(page.locator(selector)).to_be_visible(timeout=18000)
                             page.wait_for_timeout(800)
                             text=page.locator("body").inner_text()
@@ -171,6 +181,24 @@ def main():
                                               "screenshot":"ui-shipped-"+label+".png"}
                             page.screenshot(path=str(OUT/("ui-shipped-"+label+".png")),full_page=True)
                         assert page.locator("body").is_visible()
+                        # Verify major workspaces fit on one purposeful screen and
+                        # that operations remain available under the correct tab.
+                        for route,label,selected,secondary in [
+                            ("/business","rules","预警处理","规则配置"),
+                            ("/base","registry","人员底库","底库维护"),
+                            ("/admin","admin","辖区与场所","账户权限"),
+                            ("/monitor","devices","采集概览","持续采集"),
+                            ("/insights","search","人员检索","综合分析"),
+                        ]:
+                            page.goto(base+route,wait_until="domcontentloaded")
+                            bar=page.locator(".zd-workspace-tabs")
+                            expect(bar).to_be_visible()
+                            expect(bar.get_by_role("tab",name=__import__("re").compile(selected))).to_have_attribute("aria-selected","true")
+                            primary=page.locator('main .panel:not(.zd-compact-hidden),main .card:not(.zd-compact-hidden)')
+                            page.screenshot(path=str(OUT/("ui-shipped-compact-"+label+"-primary.png")),full_page=True)
+                            bar.get_by_role("tab",name=__import__("re").compile(secondary)).click()
+                            expect(bar.get_by_role("tab",name=__import__("re").compile(secondary))).to_have_attribute("aria-selected","true")
+                            page.screenshot(path=str(OUT/("ui-shipped-compact-"+label+"-secondary.png")),full_page=True)
                         # Check the first screen reports both independent data sources.
                         page.goto(base+"/portal")
                         expect(page.locator(".zd-demo-strip")).to_be_visible()
