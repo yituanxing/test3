@@ -41,7 +41,6 @@ window.addEventListener('load',async()=>{
 <main class="wrap"><div class="intro"><div><span class="tag">业务操作</span><h2 style="font-size:22px;margin:9px 0 2px">预警规则管理与人工复核</h2><p>查看预警命中与证据，人工核实后可调整规则并重新分析。</p></div><div class="row"><button class="secondary" onclick="seed(false)">生成合成场景</button><button class="danger" onclick="seed(true)">重置模拟数据</button><button onclick="reload()">刷新分析</button></div></div>
 <p class="warning"><b>数据说明：</b> P###人员与预警均为合成演示，不代表真实身份或实际异常；真实视频独立展示。</p>
 <div class="cards"><div class="card"><span>原始合成观测</span><strong id="mRaw">—</strong><span>复核后有效：<b id="mEffective">—</b></span></div><div class="card"><span>合并后的到访事件</span><strong id="mVisit">—</strong><span>聚合窗口可配置</span></div><div class="card"><span>模拟身份 / 唯一主归属</span><strong id="mPerson">—</strong><span>归属依据可切换</span></div><div class="card"><span>当前规则命中候选</span><strong id="mAlert">—</strong><span>七类规则，人工复核</span></div></div>
-<div class="pipeline"><div class="step">① 合成观测</div><div class="step">② 纠错筛选</div><div class="step">③ 到访聚合</div><div class="step">④ 唯一归属</div><div class="step">⑤ 规则计算</div><div class="step">⑥ 审核复算</div></div>
 <div class="layout">
 <section class="panel"><h2>七类业务规则命中</h2><p class="hint">命中数量按现有规则和有效到访实时计算；不是硬编码结果。</p><div class="rules" id="rules"></div></section>
 <section class="panel"><h2>可调整的分析参数</h2><p class="hint">停用规则不会删除原始证据；人数异常仅在所选时段结束后计算。</p><div class="fields" id="configs"></div>
