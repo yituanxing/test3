@@ -117,7 +117,11 @@ def main():
                         page.screenshot(path=str(OUT/"ui-shipped-compact-rule-settings.png"),full_page=True)
                         page.locator('.zd-global-nav a[href="/insights"]').click()
                         expect(page).to_have_url(base+"/insights",timeout=15000)
-                        expect(page.locator(".zd-workspace-tabs button")).to_have_count(3)
+                        expect(page.locator(".zd-workspace-tabs button")).to_have_count(4)
+                        expect(page.locator("#realActivityRows")).to_be_visible()
+                        expect(page.locator("#realPairs")).to_have_text("119",timeout=18000)
+                        expect(page.locator("#realActivityRows")).to_contain_text("V",timeout=18000)
+                        page.get_by_role("tab",name=__import__("re").compile("模拟人员检索")).click()
                         expect(page.locator("#personQuery")).to_be_visible()
 
                         page.locator('.zd-global-nav a[href="/portal"]').click()
@@ -163,7 +167,7 @@ def main():
                           ("/portal","business-overview","#navigation"),
                           ("/base","business-roster","#candidateRows"),
                           ("/business","business-seven-rules","#alerts"),
-                          ("/insights","business-people-search","#peopleList"),
+                          ("/insights","business-real-activities","#realActivityRows"),
                           ("/portal?tab=alerts","business-alert-list",".content"),
                           ("/portal?tab=places","business-places",".content"),
                           ("/portal?tab=acceptance","business-23-acceptance","#acceptanceRows"),
@@ -181,6 +185,17 @@ def main():
                                               "screenshot":"ui-shipped-"+label+".png"}
                             page.screenshot(path=str(OUT/("ui-shipped-"+label+".png")),full_page=True)
                         assert page.locator("body").is_visible()
+                        # The people-facing default is backed by the real EPFL
+                        # detection results, not the P### fabricated roster.
+                        page.goto(base+"/insights")
+                        expect(page.locator("#realPairs")).to_have_text("119",timeout=25000)
+                        actual=read("/api/real/activity")
+                        assert actual["ready"] and actual["matched_pair_observations"]==119
+                        expect(page.locator("#realFragments")).to_have_text(
+                            str(actual["anonymous_activity_fragments"]),timeout=15000)
+                        expect(page.locator("#realActivityRows")).to_contain_text("V")
+                        expect(page.locator("#peopleList")).to_be_hidden()
+                        page.screenshot(path=str(OUT/"ui-shipped-real-activity-first-business-view.png"),full_page=True)
                         # Verify major workspaces fit on one purposeful screen and
                         # that operations remain available under the correct tab.
                         for route,label,selected,secondary in [
@@ -188,7 +203,7 @@ def main():
                             ("/base","registry","人员底库","自动维护"),
                             ("/admin","admin","辖区与场所","账户权限"),
                             ("/monitor","devices","运行概览","持续采集"),
-                            ("/insights","search","人员检索","综合分析"),
+                            ("/insights","search","真实活动记录","模拟人员检索"),
                             ("/cctv","evidence","双机视频证据","录像及轨迹"),
                         ]:
                             page.goto(base+route,wait_until="domcontentloaded")
@@ -249,6 +264,7 @@ def main():
                         page.locator("#review").click()
                         expect(page.locator(".content")).to_contain_text("已核实",timeout=15000)
                         page.goto(base+"/insights")
+                        page.get_by_role("tab",name=__import__("re").compile("模拟人员检索")).click()
                         page.locator("#personQuery").fill("P099")
                         page.locator("#search").click()
                         expect(page.locator("#peopleList")).to_contain_text("P099",timeout=15000)
