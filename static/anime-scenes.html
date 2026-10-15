@@ -252,4 +252,4 @@ $('source').onchange=()=>{state=null;$('candidates').innerHTML='<tr><td colspan=
 $('targetScene').onchange=fillSamples;$('tag').onclick=tag;
 $('logout').onclick=async e=>{e.preventDefault();await api('/api/auth/logout','POST').catch(()=>{});sessionStorage.removeItem('zd_access_token');location.replace('/login')};
 start();
-</script></body></html>
+</script><script src="/ui/site-navigation.js"></script></body></html>
