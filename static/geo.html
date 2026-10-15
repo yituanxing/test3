@@ -105,7 +105,11 @@ function fallback(){
    '<rect width="920" height="470" fill="#e9f1f9"/>'+
    '<text x="24" y="27" fill="#596f8d" font-size="15">离线经纬度位置示意 · 无真实地理底图</text>'+
    (events.length>1?'<polyline points="'+route+'" fill="none" stroke="#296bc0" stroke-width="3" stroke-dasharray="8 7"/>':'')+
-   pts+order+'</svg>';
+   pts+order+
+   (!all.length?'<g><rect x="217" y="146" width="486" height="180" rx="16" fill="#ffffff" stroke="#bed3e7" stroke-dasharray="6 5"/>'+
+     '<text x="460" y="200" fill="#244d74" font-size="22" font-weight="bold" text-anchor="middle">暂无场所示意点位</text>'+
+     '<text x="460" y="235" fill="#607f9e" font-size="16" text-anchor="middle">请点击上方「生成虚构示意位置」</text>'+
+     '<text x="460" y="264" fill="#607f9e" font-size="14" text-anchor="middle">演示点位不是真实 GPS 或摄像机位置</text></g>':'')+'</svg>';
  if(!b.parentElement)$('map').prepend(b);
  $('mapCaption').textContent='离线示意图：按经纬度比例投影，真实地理底图暂不可用。模拟点位并非实测场所。';
 }
