@@ -73,6 +73,40 @@ def verify_all_business_pages(page,base,out,read):
             assert layout['text']>100,(route,'blank screen',layout)
             assert layout['width']<=layout['viewport']+3,(route,'horizontal overflow',layout)
             result['layout']=layout
+            # The old pages were 2–3 screens high while navigation was only one
+            # screen. Reject that geometry, then prove an actual mouse wheel moves
+            # the RIGHT pane without moving the fixed sidebar or document.
+            metrics=page.evaluate("""() => {
+              const p=location.pathname;
+              const pane=p==='/portal'?document.querySelector('#view'):
+                p==='/real'?document.querySelector('.zd-work main'):
+                document.querySelector('.zd-global-body > main');
+              const nav=p==='/portal'?document.querySelector('.layout>aside'):
+                p==='/real'?document.querySelector('.zd-sidebar'):
+                document.querySelector('.zd-global-nav');
+              return {pane:!!pane, nav:!!nav,
+                 scrollHeight:pane?.scrollHeight||0,clientHeight:pane?.clientHeight||0,
+                 windowHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,
+                 navHeight:nav?.getBoundingClientRect().height||0,
+                 top:pane?.scrollTop||0,navTop:nav?.scrollTop||0}
+            }""")
+            assert metrics['pane'] and metrics['nav'],(route,metrics)
+            assert metrics['documentHeight']<=metrics['windowHeight']+5,(route,'long document',metrics)
+            assert abs(metrics['navHeight']-metrics['windowHeight'])<=5,(route,'sidebar size mismatch',metrics)
+            if metrics['scrollHeight']>metrics['clientHeight']+65:
+                page.mouse.move(1350,500)
+                page.mouse.wheel(0,560)
+                page.wait_for_timeout(260)
+                after=page.evaluate("""() => {
+                   const p=location.pathname;
+                   const el=p==='/portal'?document.querySelector('#view'):
+                     p==='/real'?document.querySelector('.zd-work main'):
+                     document.querySelector('.zd-global-body>main');
+                   return el?.scrollTop||0}""")
+                assert after>metrics['top']+35,(route,'wheel failed to scroll right content',metrics,after)
+                result['wheel_scroll_pixels']=after-metrics['top']
+                page.mouse.wheel(0,-2000)
+                page.wait_for_timeout(150)
             slug=f'{n:02d}-'+route.strip('/').replace('/','-').replace('?','-').replace('=','-')
             screenshot=f'accept-page-{slug}.png'
             page.screenshot(path=str(out/screenshot),full_page=True)
@@ -123,6 +157,16 @@ def verify_all_business_pages(page,base,out,read):
                 assert page.locator('#researchPoster').evaluate('(x)=>x.complete&&x.naturalWidth>200')
             if route=='/portal?tab=acceptance':
                 expect(page.locator('#acceptanceRows tr')).to_have_count(23,timeout=15000)
+                table=page.locator('.accept-table-scroller')
+                expect(table).to_be_visible()
+                assert table.evaluate('(e)=>e.scrollHeight>e.clientHeight+400')
+                table.scroll_into_view_if_needed()
+                box=table.bounding_box()
+                page.mouse.move(box['x']+box['width']/2,box['y']+min(box['height']/2,320))
+                page.mouse.wheel(0,720)
+                page.wait_for_timeout(150)
+                assert table.evaluate('(e)=>e.scrollTop')>250,'23-row table did not wheel-scroll'
+                result['excel_table_scrolled']=True
                 matrix=read('/api/demo/excel-acceptance')
                 assert len(matrix['requirements'])==23 and sum(matrix['counts'].values())==23
                 assert matrix['counts']['missing']==2 and matrix['counts']['synthetic_only']==10
