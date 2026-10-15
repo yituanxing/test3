@@ -111,4 +111,4 @@ async function toggleSource(id){const x=sources.find(x=>x.id===id);await action(
 async function bindCamera(){await action(async()=>api('/api/frigate/cameras','POST',{camera:$('cameraId').value,place_id:Number($('cameraPlace').value)}))}
 async function loadScope(){try{const id=$('scopeRegion').value;const x=await api('/api/monitoring/overview?days=7'+(id?'&region_id='+encodeURIComponent(id):''));$('scopeBody').innerHTML=x.places.map(x=>`<tr><td>${esc(x.place_name)}</td><td>${x.person_objects}</td><td>${x.sampled_frames}</td><td>${x.face_detections}</td></tr>`).join('')||'<tr><td colspan="4">该区域暂无场所</td></tr>';$('scopeNote').textContent=`涵盖 ${x.places.length} 个场所；Frigate匿名person事件共${x.counts.person_objects}条，视频抽样帧共${x.counts.sampled_frames}条。`;}catch(e){toast(e.message,true)}}
 refresh().catch(e=>toast(e.message,true));
-</script><script src="/ui/site-navigation.js"></script></body></html>
+</script><script src="/ui/site-navigation.js"></script><script src="/ui/compact-sections.js"></script></body></html>
