@@ -181,7 +181,7 @@ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 let imported=[],lastImage=null,qaOffset=0,qaNextOffset=null,qaPageSize=200;
 let qaPageRecords=new Map(),qaModelBlobUrl=null;
 let epflPendingReport=null,epflCurrentReportDigest=null,epflCandidateOffset=0;
-const EPFL_PAGE_SIZE=12;
+const EPFL_PAGE_SIZE=6;
 async function api(path,method='GET',body){const r=await fetch(path,{method,
  headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
  body:body===undefined?undefined:JSON.stringify(body)});
