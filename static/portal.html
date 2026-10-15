@@ -90,6 +90,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 .content .zd-demo-strip{margin:11px 0 13px;gap:11px}
 .content .toolbar{margin:10px 0}
 #portalResearchClip{max-width:460px!important;width:100%;height:auto;max-height:260px}
+.zd-overview-quick{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-top:11px}
+.zd-overview-quick .panel{margin:0}
+.zd-overview-quick .toolbar{margin:8px 0}
+.zd-overview-quick .banner{margin:8px 0}
+@media(max-width:1120px){.zd-overview-quick{grid-template-columns:1fr}}
 #view .accept-table-scroller{max-height:calc(100dvh - 280px);min-height:280px;
  overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;
  border:1px solid var(--border);border-radius:10px}
@@ -202,7 +207,7 @@ function summary(){
  '<p class="smallnote">38秒 EPFL 同一实验室双机研究录像；不能证明真人跨场所识别，也不计入上方Frigate现场统计。</p>'+
  '<video id="portalResearchClip" controls playsinline preload="auto" style="display:block;width:100%;max-width:790px;aspect-ratio:16/9;background:#152c45;border-radius:10px"></video>'+
  '<div id="portalResearchStatus" class="smallnote">正在检查真实研究录像…</div></section>':'')+
- '<section class="panel"><div class="row"><h2>业务操作入口</h2><span class="smallnote">按原Excel的业务链路组织，页面共用已有数据库和接口。</span></div>'+
+ '<div class="zd-overview-quick"><section class="panel"><div class="row"><h2>业务操作入口</h2><span class="smallnote">按原Excel的业务链路组织，页面共用已有数据库和接口。</span></div>'+
  '<div class="toolbar"><a href="/real">① 真实视频与检测 →</a><a href="/portal?tab=places">② 场所与辖区 →</a><a href="/portal?tab=alerts">③ 预警与复核 →</a><a href="/insights">④ 智能检索 →</a></div>'+
  '<p class="smallnote">真人跨场所身份尚未验收；人员底库与七类规则的演示数据独立于真实视频。</p></section>'+
  (state.user.level===1?'<section class="panel"><div class="row"><h2>单独的合成算法验证区（非真实业务结果）</h2><a href="/portal?tab=acceptance">查看真实/合成验收对照 →</a></div>'+
@@ -210,7 +215,7 @@ function summary(){
  '<div class="toolbar"><a href="/base">模拟底库</a><a href="/business">模拟规则</a><a href="/insights">合成统计</a></div>'+
  (c.synthetic_visits===0?'<div class="banner"><strong>演示尚未准备：</strong>当前人员底库、七类预警和人员检索没有合成业务事件，进入相应页面会看到空结果。<button id="seed" type="button">初始化明确标注的演示数据</button></div>':
  '<p class="smallnote">合成活动已准备：'+esc(c.synthetic_visits)+'次模拟到访。进入底库生成草稿、核验归并并发布。</p>')+
- '</section>':'');
+ '</section>':'')+'</div>';
 }
 
 function acceptancePage(){
