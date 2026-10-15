@@ -9,6 +9,7 @@ on:
       - tests/test_demo_first_run_ready.py
       - scripts/demo_bootstrap.py
       - static/**
+      - app/main.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -88,6 +89,7 @@ jobs:
               for required in (
                   'zd-demo/static/portal.html',
                   'zd-demo/static/site_navigation.js',
+                  'zd-demo/static/compact_sections.js',
                   'zd-demo/static/showcase_ui.js',
                   'zd-demo/scripts/start_local_demo_windows.bat',
                   'zd-demo/scripts/start_local_demo_windows.ps1',
