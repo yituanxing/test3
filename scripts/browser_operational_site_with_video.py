@@ -306,6 +306,11 @@ def main():
                         page.goto(base+"/portal?tab=acceptance")
                         expect(page.locator("#acceptanceRows tr")).to_have_count(23,timeout=15000)
                         # 23 entries on screen are statuses, NOT 23 finished features.
+                        # Mandatory evaluator-quality walk-through of EACH page,
+                        # not merely happy-path API tests or a successful homepage.
+                        from scripts.browser_each_page_acceptance import verify_all_business_pages
+                        each_page_report=verify_all_business_pages(page,base,OUT,read)
+                        assert each_page_report["passed"]==len(each_page_report["pages"])
                         with (OUT/"excel-business-actual-browser-audit.json").open("w") as f:
                             json.dump({"business_screens":inspected,
                                 "initial_synthetic_visits":initial_syn["synthetic_visits"],
@@ -325,6 +330,8 @@ def main():
                             "actual_pair_observations":119,
                             "certified_short_fragments":14,
                             "separate_navigation_modules_tested":5,
+                            "all_user_pages_accepted":each_page_report["passed"],
+                            "all_task_tabs_accepted":each_page_report["tasks_checked"],
                             "administrator_role_screen_visible":True,
                             "client_javascript_errors":errors,
                         },ensure_ascii=False),flush=True)
