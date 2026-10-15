@@ -54,6 +54,16 @@ def verify_all_business_pages(page,base,out,read):
                 page.locator('.zd-workspace-tabs [data-tab="accounts"]').click()
             expect(page.locator(selector).first).to_be_visible(timeout=20000)
             page.wait_for_timeout(300)
+            if route=='/real':
+                # This is what a presenter sees after loading and seeking the real
+                # AVI-derived clip; a black unloaded player is not proof of video.
+                page.wait_for_function(
+                    "() => document.querySelector('#overviewVideo')?.videoWidth>=1200",
+                    timeout=20000)
+                page.locator('#overviewVideo').evaluate("(v)=>{v.currentTime=15;v.pause()}")
+                page.wait_for_function(
+                    "() => {const v=document.querySelector('#overviewVideo'); return v.readyState>=2&&Math.abs(v.currentTime-15)<.3}",
+                    timeout=20000)
             layout=page.evaluate("""() => ({
                viewport:innerWidth,width:document.documentElement.scrollWidth,
                height:document.documentElement.scrollHeight,
