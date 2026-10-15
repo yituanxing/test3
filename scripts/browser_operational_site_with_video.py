@@ -97,7 +97,7 @@ def main():
                         page.locator('.zd-nav[href="/admin"]').click()
                         expect(page).to_have_url(base+"/admin",timeout=15000)
                         expect(page.locator(".zd-global-nav")).to_be_visible()
-                        expect(page.locator(".zd-workspace-tabs button")).to_have_count(4)
+                        expect(page.locator(".zd-workspace-tabs button")).to_have_count(6)
                         page.get_by_role("tab",name=__import__("re").compile("账户权限")).click()
                         expect(page.locator("#accountPanel")).to_be_visible(timeout=15000)
                         page.screenshot(path=str(OUT/"ui-shipped-real-admin-roles.png"),full_page=True)
@@ -110,9 +110,9 @@ def main():
                         expect(page.locator('.zd-global-nav a[href="/business"]')).to_be_visible()
                         page.locator('.zd-global-nav a[href="/business"]').click()
                         expect(page).to_have_url(base+"/business",timeout=15000)
-                        expect(page.locator(".zd-workspace-tabs button")).to_have_count(4)
+                        expect(page.locator(".zd-workspace-tabs button")).to_have_count(6)
                         expect(page.locator("#alerts")).to_be_visible()
-                        page.get_by_role("tab",name=__import__("re").compile("规则配置")).click()
+                        page.get_by_role("tab",name=__import__("re").compile("规则实例")).click()
                         expect(page.locator("#instancePanel")).to_be_visible()
                         page.screenshot(path=str(OUT/"ui-shipped-compact-rule-settings.png"),full_page=True)
                         page.locator('.zd-global-nav a[href="/insights"]').click()
@@ -185,9 +185,9 @@ def main():
                         # that operations remain available under the correct tab.
                         for route,label,selected,secondary in [
                             ("/business","rules","预警处理","规则配置"),
-                            ("/base","registry","人员底库","底库维护"),
+                            ("/base","registry","人员底库","自动维护"),
                             ("/admin","admin","辖区与场所","账户权限"),
-                            ("/monitor","devices","采集概览","持续采集"),
+                            ("/monitor","devices","运行概览","持续采集"),
                             ("/insights","search","人员检索","综合分析"),
                             ("/cctv","evidence","双机视频证据","录像及轨迹"),
                         ]:
