@@ -103,4 +103,4 @@ let chosen=prompt(`人员 ${person} 归属哪个场所？输入场所编号：\n
 async function removePerson(person){if(!state.run||state.run.state!=='draft'){toast('已发布版本不可修改；请先生成矫正草稿',true);return}let reason=prompt(`确认把虚构人员 ${person} 移出当前底库？填写理由：`,'演示数据人工移出');if(reason===null)return;await runAction(()=>api(`/api/base/runs/${state.run.id}/decide`,'POST',{person,place_id:null,action:'remove',reason}),'已从本批次底库移出；原始观测保留。')}
 async function addPerson(){if(!state.run||state.run.state!=='draft'){toast('已发布版本不可修改；请先生成新草稿',true);return}let person=prompt('输入虚构人员编码 P001–P999：','P007');if(person===null)return;person=person.trim().toUpperCase();if(!/^P\d{3}$/.test(person)){toast('必须是 P000–P999 格式',true);return}await choose(person)}
 load().catch(e=>toast('加载失败：'+e.message,true));
-</script><script src="/ui/site-navigation.js"></script></body></html>
+</script><script src="/ui/site-navigation.js"></script><script src="/ui/compact-sections.js"></script></body></html>
