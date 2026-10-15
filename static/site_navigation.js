@@ -53,6 +53,7 @@ aside.innerHTML=`<div class="zd-brand-name">ZD · 场所预警分析<small>多�
  <a href="/portal?tab=places" data-route="places">▦　场所列表</a>
  <a href="/business" data-research-only="1" data-route="rules">⚙　预警规则与复核 <small>演示</small></a>
  <a href="/cctv" data-route="cctv">▥　抓拍证据与人工复核</a>
+ <a href="/recognition-results" data-route="recognition">◆　视觉识别成果</a>
  <div class="zd-nav-group">基础管理</div>
  <a href="/monitor" data-route="monitor">◷　设备与采集</a>
  <a href="/admin" data-route="admin">⚑　辖区、场所与账号</a>
@@ -69,7 +70,7 @@ top.append(title,home);
 const nodes=[...document.body.childNodes];
 document.body.append(root);root.append(aside,content);content.append(top);
 for(const n of nodes)content.append(n);
-const activeByPath={"/base":"base","/business":"rules","/insights":"insights","/cctv":"cctv","/monitor":"monitor","/admin":"admin","/geo":"insights","/face-lab":"insights"};
+const activeByPath={"/base":"base","/business":"rules","/insights":"insights","/cctv":"cctv","/monitor":"monitor","/admin":"admin","/geo":"insights","/face-lab":"insights","/recognition-results":"recognition"};
 const active=aside.querySelector('[data-route="'+activeByPath[pathname]+'"]');
 if(active){active.classList.add("active");active.setAttribute("aria-current","page")}
 const token=sessionStorage.getItem("zd_access_token");
