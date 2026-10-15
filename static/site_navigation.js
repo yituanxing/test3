@@ -12,6 +12,7 @@ const pageNames={
  "/admin":"辖区、场所与权限管理",
  "/geo":"活动区域与地图（合成演示）",
  "/face-lab":"授权照片实验",
+ "/recognition-results":"视觉识别技术成果",
 };
 if(!pageNames[pathname])return;
 const styles=document.createElement("style");
