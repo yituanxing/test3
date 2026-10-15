@@ -396,6 +396,12 @@ def operational_site_navigation_script():
                         media_type='text/javascript',headers={"Cache-Control":"no-store"})
 
 
+@app.get('/ui/compact-sections.js')
+def operational_compact_workspaces():
+    return FileResponse(ROOT / 'static' / 'compact_sections.js',
+                        media_type='text/javascript',headers={"Cache-Control":"no-store"})
+
+
 @app.get('/ui/showcase.js')
 def operational_site_script():
     return FileResponse(ROOT / 'static' / 'showcase_ui.js',
