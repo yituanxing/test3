@@ -67,6 +67,35 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 #flash{position:fixed;bottom:25px;right:25px;z-index:30;padding:13px 18px;background:#173d63;color:white;border-radius:10px;display:none}
 @media(max-width:1120px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.cols{grid-template-columns:1fr}}
 @media(max-width:760px){.layout{grid-template-columns:1fr}aside{height:auto;position:static;padding:12px}.logo{padding:8px}.navtitle,.sidebar-foot{display:none}nav{display:flex;flex-wrap:wrap}nav a{padding:9px}.top{height:auto;padding:15px}.top h1{font-size:16px}.content{padding:16px}.userinfo{font-size:11px}}
+
+/* Desktop shell: keep navigation aligned with the viewport, with an independently
+   wheel-scrollable business workspace rather than a 3-screen document. */
+@media(min-width:761px){
+ html,body{height:100%;overflow:hidden}
+ .layout{height:100dvh;min-height:0;overflow:hidden}
+ .layout>aside{position:relative;top:auto;height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+ .layout>main{display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden}
+ .layout>main>.top{height:68px;min-height:68px;flex:0 0 68px;padding:0 26px}
+ .layout>main>.content{flex:1;min-height:0;width:100%;overflow-y:auto;overflow-x:hidden;
+    overscroll-behavior:contain;scrollbar-gutter:stable;padding:20px 25px 30px}
+}
+.content .cards{gap:11px;margin:13px 0}
+.content .card{padding:13px 16px}
+.content .card strong{font-size:26px;line-height:1.35}
+.content .grid{margin:11px 0;gap:12px}
+.content .panel{padding:16px}
+.content .item{padding:10px 12px}
+.content .sub{margin:6px 0 12px}
+.content .banner{padding:10px 13px;margin:0 0 12px}
+.content .zd-demo-strip{margin:11px 0 13px;gap:11px}
+.content .toolbar{margin:10px 0}
+#portalResearchClip{max-width:460px!important;width:100%;height:auto;max-height:260px}
+#view .accept-table-scroller{max-height:calc(100dvh - 280px);min-height:280px;
+ overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;
+ border:1px solid var(--border);border-radius:10px}
+#view .accept-table-scroller thead th{position:sticky;top:0;z-index:2;background:#f0f5fc}
+#view .accept-table-scroller td{padding:9px 10px}
+@media(max-width:760px){#view .accept-table-scroller{max-height:65vh}}
 </style>
 </head>
 <body>
@@ -256,7 +285,7 @@ function acceptancePage(){
   Object.keys(names).map(k=>'<option value="'+k+'">'+esc(names[k])+' · '+a.counts[k]+'项</option>').join('')+
   '</select></label><label>搜索需求<input id="acceptSearch" placeholder="17 / 轨迹 / 底库" autocomplete="off"></label>'+
   '<span id="acceptVisibleCount" role="status">显示 23 / 23 项</span></div>'+
-  '<div class="scroller"><table class="accept-table"><thead><tr><th>编号</th><th>需求名称</th>'+
+  '<p class="smallnote">23项均保留，表格内可用鼠标滚轮向下查看；表头固定。</p><div class="scroller accept-table-scroller" tabindex="0" aria-label="Excel23项需求表，可用鼠标滚轮滚动"><table class="accept-table"><thead><tr><th>编号</th><th>需求名称</th>'+
   '<th>严格状态</th><th>实际能力与缺口</th><th>演示入口</th>'+
   '</tr></thead><tbody id="acceptanceRows">'+body+'</tbody></table></div></section>';
 }
