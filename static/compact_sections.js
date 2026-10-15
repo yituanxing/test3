@@ -70,6 +70,11 @@
     .zd-workspace-tabs button[aria-selected="true"]{background:#245da6;color:#fff;border-color:#245da6}
     .zd-workspace-tabs button[aria-selected="true"] small{color:#d8eaff}
     .zd-compact-hidden{display:none!important}
+    /* CCTv's state-authorized #epflResearchPanel uses display:block!important.
+       A more specific selector is required or two entire hidden sections leak
+       into every tab, recreating the original 3400px-long page. */
+    body[data-state-ui="yes"] #epflResearchPanel.zd-compact-hidden,
+    body[data-state-ui="yes"] #researchPanel.zd-compact-hidden{display:none!important}
     .zd-workspace-tabs + .layout, .zd-workspace-tabs + .grid{margin-top:0}
     main:has(.zd-workspace-tabs) > .jumpnav{display:none!important}
     @media(max-width:750px){.zd-workspace-tabs{position:relative;top:auto;flex-wrap:nowrap;
