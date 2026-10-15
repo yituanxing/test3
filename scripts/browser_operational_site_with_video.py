@@ -94,6 +94,18 @@ def main():
                         page.locator('.zd-nav[data-panel="alerts"]').click()
                         expect(page.locator("#demoAlertRows")).to_contain_text("EPFL-DEMO",timeout=18000)
                         page.screenshot(path=str(OUT/"ui-shipped-real-alerts.png"),full_page=True)
+                        # Visible recognition-research achievement center must
+                        # show real model evidence, not merely a marketing stub.
+                        page.goto(base+"/recognition-results")
+                        expect(page.locator("h1")).to_contain_text("识别工作")
+                        expect(page.locator("#metricPairs")).to_have_text("119",timeout=20000)
+                        expect(page.locator("#metricLocal")).to_have_text("14",timeout=20000)
+                        expect(page.locator("#researchPoster")).to_be_visible(timeout=20000)
+                        expect(page.locator("#actualSourceState")).to_contain_text("当前数据库已读取",timeout=20000)
+                        assert page.locator("a[href='/cctv#epflResearchPanel']").count()>0
+                        assert page.locator("a[href='/face-lab']").count()>0
+                        page.screenshot(path=str(OUT/"ui-shipped-recognition-results-with-real-media.png"),full_page=True)
+                        page.goto(base+"/real")
                         page.locator('.zd-nav[href="/admin"]').click()
                         expect(page).to_have_url(base+"/admin",timeout=15000)
                         expect(page.locator(".zd-global-nav")).to_be_visible()
