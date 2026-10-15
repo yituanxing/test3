@@ -70,6 +70,12 @@
     .zd-workspace-tabs button[aria-selected="true"]{background:#245da6;color:#fff;border-color:#245da6}
     .zd-workspace-tabs button[aria-selected="true"] small{color:#d8eaff}
     .zd-compact-hidden{display:none!important}
+    /* The real video reader must not open under synthetic P### filters or
+       the fabricated-data banner. These are shown in simulation tabs only. */
+    body:has(.zd-workspace-tabs button[data-tab="recorded"][aria-selected="true"])
+      main.container > .notice,
+    body:has(.zd-workspace-tabs button[data-tab="recorded"][aria-selected="true"])
+      main.container > .controls{display:none!important}
     /* CCTv's state-authorized #epflResearchPanel uses display:block!important.
        A more specific selector is required or two entire hidden sections leak
        into every tab, recreating the original 3400px-long page. */
