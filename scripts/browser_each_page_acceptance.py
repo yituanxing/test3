@@ -135,6 +135,8 @@ def verify_all_business_pages(page,base,out,read):
             if route=='/geo':
                 assert ('合成' in page.locator('body').inner_text() or
                         '示意' in page.locator('body').inner_text())
+                if read('/api/geo/places')['positioned']==0:
+                    expect(page.locator('#geoMapEmpty')).to_be_visible(timeout=15000)
             result['status']='PASS'
         except Exception as exc:
             result['status']='FAIL'
