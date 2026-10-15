@@ -195,6 +195,8 @@ def main():
                             str(actual["anonymous_activity_fragments"]),timeout=15000)
                         expect(page.locator("#realActivityRows")).to_contain_text("V")
                         expect(page.locator("#peopleList")).to_be_hidden()
+                        expect(page.locator("main.container > .notice")).to_be_hidden()
+                        expect(page.locator("main.container > .controls")).to_be_hidden()
                         page.screenshot(path=str(OUT/"ui-shipped-real-activity-first-business-view.png"),full_page=True)
                         # Verify major workspaces fit on one purposeful screen and
                         # that operations remain available under the correct tab.
